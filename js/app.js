@@ -3251,7 +3251,7 @@ function actionAddUser() {
     return;
   }
 
-  store.state.users.push({ u, pw, nama, hp, role });
+  store.state.users.push({ id: u, u, pw, nama, hp, role });
   if (role === 'pimpinan' && hp) {
     store.state.set.waOwner = hp;
   }
@@ -3295,6 +3295,9 @@ function delUser(username) {
     store.state.users = store.state.users.filter(x => x.u !== username);
     store.logActivity('Hapus', 'Pengguna', username);
     store.saveLocal();
+    if (window.firebaseBackend && window.firebaseBackend.db) {
+      window.firebaseBackend.db.collection('k_users').doc(username).delete().catch(e => console.log(e));
+    }
   });
 }
 

@@ -165,8 +165,10 @@ class FirebaseBackend {
       for (const col of this.store.COLLECTIONS) {
         const items = state[col] || [];
         for (const item of items) {
-          if (item && item.id) {
-            const docRef = this.db.collection('k_' + col).doc(String(item.id));
+          // Khusus user, identifier uniknya adalah item.u (username), sedangkan item lain adalah item.id
+          const docId = (col === 'users') ? (item.u || item.id) : item.id;
+          if (item && docId) {
+            const docRef = this.db.collection('k_' + col).doc(String(docId));
             batch.set(docRef, JSON.parse(JSON.stringify(item)), { merge: true });
           }
         }
