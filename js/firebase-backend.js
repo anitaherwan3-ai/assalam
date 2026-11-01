@@ -112,13 +112,18 @@ class FirebaseBackend {
       const unsub = this.db.collection('k_' + colName).onSnapshot(snapshot => {
         if (!snapshot.metadata.hasPendingWrites) {
           const docs = snapshot.docs.map(d => d.data());
-          if (docs.length > 0 || this.store.state[colName].length > 0) {
-            // Urutkan data berdasarkan waktu dibuat
+          // Khusus 'users', JANGAN biarkan kosong jika di remote belum ada data
+          if (docs.length > 0) {
             this.store.state[colName] = docs.sort((a, b) => (a._t || 0) - (b._t || 0));
             this.store.saveLocal(false);
             if (typeof window.renderCurrentTab === 'function') {
               window.renderCurrentTab();
             }
+          } else if (colName === 'users' && (!this.store.state.users || this.store.state.users.length === 0)) {
+            // Inisialisasi akun master pimpinan ke Firestore jika di cloud masih kosong
+            this.store.state.users = [{ u: 'praktekrose', pw: 'Dinkes123@', nama: 'Pimpinan Klinik', role: 'pimpinan' }];
+            this.store.saveLocal(false);
+            this.pushData(this.store.state);
           }
         }
       }, err => {
@@ -127,6 +132,13 @@ class FirebaseBackend {
       });
       this.listeners.push(unsub);
     });
+
+    // Otomatis seed initial data ke cloud jika Firestore masih fresh/kosong
+    setTimeout(() => {
+      if (this.isOnline && this.store.state) {
+        this.pushData(this.store.state);
+      }
+    }, 1500);
   }
 
   pushData(state) {

@@ -1,4 +1,4 @@
-// Store & Local State Management
+﻿// Store & Local State Management
 
 const DEFAULT_SETTINGS = {
   nama: 'Klinik Sehat Pratama',
@@ -23,9 +23,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const INITIAL_USERS = [
-  { u: 'kasir', pw: 'kasir123', nama: 'Siti (Kasir)', role: 'kasir', hp: '081234567891' },
-  { u: 'admin', pw: 'admin123', nama: 'Budi (Admin Gudang & Keu)', role: 'admin', hp: '081234567892' },
-  { u: 'pimpinan', pw: 'pimpinan123', nama: 'dr. Hendra (Pimpinan)', role: 'pimpinan', hp: '081299998888' }
+  { u: 'praktekrose', pw: 'Dinkes123@', nama: 'Pimpinan / Dokter Penanggung Jawab', role: 'pimpinan', hp: '081299998888' }
 ];
 
 const INITIAL_OBAT = [

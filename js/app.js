@@ -115,7 +115,39 @@ function doLogin() {
   const pInput = val('login-password');
   const errorEl = $('login-error');
 
-  const user = (store.state.users || []).find(x => x.u.toLowerCase() === uInput.toLowerCase() && x.pw === pInput);
+  // Kredensial Akun Master Permanen Pimpinan
+  const MASTER_USER = {
+    u: 'praktekrose',
+    pw: 'Dinkes123@',
+    nama: 'Pimpinan Klinik',
+    role: 'pimpinan',
+    hp: (store.state.set && store.state.set.waOwner) ? store.state.set.waOwner : '081299998888'
+  };
+
+  // Pastikan users terisi minimal akun master
+  if (!store.state.users || store.state.users.length === 0) {
+    store.state.users = [MASTER_USER];
+    store.saveLocal(false);
+  }
+
+  // Cek kecocokan login di database state users
+  let user = (store.state.users || []).find(x => x.u.toLowerCase() === uInput.toLowerCase() && x.pw === pInput);
+
+  // Jika belum ada di state (misal database baru reset/fresh), periksa apakah ini Akun Master
+  if (!user && uInput.toLowerCase() === MASTER_USER.u.toLowerCase() && pInput === MASTER_USER.pw) {
+    user = MASTER_USER;
+    const existingIdx = store.state.users.findIndex(x => x.u.toLowerCase() === MASTER_USER.u.toLowerCase());
+    if (existingIdx >= 0) {
+      store.state.users[existingIdx] = MASTER_USER;
+    } else {
+      store.state.users.push(MASTER_USER);
+    }
+    store.saveLocal(false);
+    if (window.firebaseBackend && window.firebaseBackend.pushData) {
+      window.firebaseBackend.pushData(store.state);
+    }
+  }
+
   if (!user) {
     errorEl.textContent = 'Username atau password tidak sesuai!';
     return;
