@@ -1,4 +1,4 @@
-// Firebase Firestore Free Backend Adapter
+﻿// Firebase Firestore Free Backend Adapter
 // Menggunakan Firebase Web SDK v10 Compat (CDN) - 100% Gratis di Google Firebase Spark Plan
 
 class FirebaseBackend {
@@ -32,11 +32,23 @@ class FirebaseBackend {
     }
   }
 
+  // Konfigurasi Default Otomatis Firebase (assalam-db)
+  static DEFAULT_CONFIG = {
+    apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
+    authDomain: "assalam-db.firebaseapp.com",
+    projectId: "assalam-db",
+    storageBucket: "assalam-db.firebasestorage.app",
+    messagingSenderId: "735617963454",
+    appId: "1:735617963454:web:cea7a5ab29eb398e8855ef"
+  };
+
   init() {
-    const config = this.store.state.firebaseConfig;
+    // Gunakan custom config jika ada di local, atau fallback ke DEFAULT_CONFIG
+    let config = this.store.state.firebaseConfig;
     if (!config || !config.apiKey || !config.projectId) {
-      this.updateBadge('local');
-      return;
+      config = FirebaseBackend.DEFAULT_CONFIG;
+      this.store.state.firebaseConfig = config;
+      this.store.saveLocal(false);
     }
 
     try {
@@ -85,6 +97,9 @@ class FirebaseBackend {
         if (remoteData && remoteData.set) {
           this.store.state.set = Object.assign({}, this.store.state.set, remoteData.set);
           this.store.saveLocal(false);
+          if (typeof window.renderCurrentTab === 'function') {
+            window.renderCurrentTab();
+          }
         }
       }
     }, err => {
@@ -101,6 +116,9 @@ class FirebaseBackend {
             // Urutkan data berdasarkan waktu dibuat
             this.store.state[colName] = docs.sort((a, b) => (a._t || 0) - (b._t || 0));
             this.store.saveLocal(false);
+            if (typeof window.renderCurrentTab === 'function') {
+              window.renderCurrentTab();
+            }
           }
         }
       }, err => {

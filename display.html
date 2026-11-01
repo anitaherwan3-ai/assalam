@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Layar Antrean Pasien - TV Ruang Tunggu</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📺</text></svg>">
   
   <!-- Google Font: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -410,6 +413,9 @@
       to   { opacity: 1; transform: translateY(0); }
     }
   </style>
+  <!-- Firebase Compat Web SDK (CDN) for Realtime TV Display Sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -902,6 +908,95 @@
         loadDisplayData();
       }
     });
+
+        // Firebase Cloud Realtime Sync for TV Display
+    const firebaseDisplayConfig = {
+      apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
+      authDomain: "assalam-db.firebaseapp.com",
+      projectId: "assalam-db",
+      storageBucket: "assalam-db.firebasestorage.app",
+      messagingSenderId: "735617963454",
+      appId: "1:735617963454:web:cea7a5ab29eb398e8855ef"
+    };
+
+    let fbDisplayDb = null;
+    try {
+      if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseDisplayConfig);
+        }
+        fbDisplayDb = firebase.firestore();
+
+        // 1. Listen Settings & Running Text
+        fbDisplayDb.doc('klinik_config/settings').onSnapshot(doc => {
+          if (doc.exists) {
+            const remote = doc.data() || {};
+            const set = remote.set || {};
+            if (set.nama) document.getElementById('display-clinic-name').textContent = set.nama;
+            if (set.alamat) document.getElementById('display-clinic-addr').textContent = set.alamat;
+            if (set.logoImg) {
+              document.getElementById('display-logo').innerHTML = `<img src="${set.logoImg}" alt="Logo">`;
+            } else if (set.logo) {
+              document.getElementById('display-logo').textContent = set.logo;
+            }
+            if (set.runningTextDisplay) {
+              document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+            }
+            const enableVideo = set.enableYoutubeDisplay !== false;
+            const videoId = parseYoutubeId(set.youtubeVideoId || '');
+            showVideoOrFallback(videoId, enableVideo);
+          }
+        }, err => console.log('FB Display settings listener error:', err));
+
+        // 2. Listen Realtime Patient Queue
+        fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
+          const today = new Date().toISOString().slice(0, 10);
+          const docs = snapshot.docs.map(d => d.data());
+          const patients = docs.filter(p => p.tgl === today && !p.done);
+          const called = docs.filter(p => p.tgl === today && p.calling).pop();
+
+          if (called) {
+            const hero = document.getElementById('hero-card');
+            const prevNo = document.getElementById('active-no').textContent;
+            document.getElementById('active-no').textContent = called.no;
+            document.getElementById('active-name').textContent = called.nama;
+            document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
+
+            if (prevNo !== called.no) {
+              hero.classList.remove('flash');
+              void hero.offsetWidth;
+              hero.classList.add('flash');
+              if (audioEnabled) {
+                playChime();
+                speakCall(called.no, called.layanan || 'Poli Umum');
+              }
+            }
+          }
+
+          const nextList = patients.filter(p => !called || p.id !== called.id);
+          document.getElementById('waiting-count').textContent = `${nextList.length} Pasien Menunggu`;
+          const queueListEl = document.getElementById('queue-list');
+          if (nextList.length === 0) {
+            queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Tidak ada antrean berikutnya</div>`;
+          } else {
+            queueListEl.innerHTML = nextList.slice(0, 6).map((p, idx) => `
+              <div class="queue-item">
+                <div class="queue-item-left">
+                  <span class="queue-no">${p.no}</span>
+                  <div>
+                    <div class="queue-name">${p.nama}</div>
+                    <div class="queue-poli">${p.layanan || 'Poli Umum'}</div>
+                  </div>
+                </div>
+                <span class="queue-status">Antrean ke-${idx + 1}</span>
+              </div>
+            `).join('');
+          }
+        }, err => console.log('FB Display queue listener error:', err));
+      }
+    } catch (e) {
+      console.warn('Firebase Display init error:', e);
+    }
 
     // Initial load
     window.addEventListener('DOMContentLoaded', () => {
