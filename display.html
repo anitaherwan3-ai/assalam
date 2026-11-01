@@ -1,0 +1,915 @@
+﻿<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Layar Antrean Pasien - TV Ruang Tunggu</title>
+  
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #091724;
+      --card-bg: #112235;
+      --card-border: #1e3a5a;
+      --pr: #06b6d4;
+      --pr-glow: rgba(6, 182, 212, 0.4);
+      --tx: #f8fafc;
+      --mu: #94a3b8;
+      --acc: #10b981;
+      --warn: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 50% 10%, #0e2a47 0%, var(--bg) 100%);
+      color: var(--tx);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Top Bar Header */
+    header {
+      background: rgba(17, 34, 53, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 2px solid var(--card-border);
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      font-size: 38px;
+      line-height: 1;
+    }
+
+    .brand-logo img {
+      height: 44px;
+      width: 44px;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #fff;
+      padding: 3px;
+    }
+
+    .brand-info h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .brand-info p {
+      font-size: 13px;
+      color: var(--mu);
+      font-weight: 500;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .clock-box {
+      text-align: right;
+    }
+
+    .clock-time {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--pr);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .clock-date {
+      font-size: 12px;
+      color: var(--mu);
+      font-weight: 600;
+    }
+
+    .btn-tv-control {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-tv-control:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: #fff;
+    }
+
+    /* Main Display Layout */
+    main {
+      flex: 1;
+      padding: 18px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 20px;
+      overflow: hidden;
+    }
+
+    main.no-video {
+      grid-template-columns: 1.3fr 1fr;
+    }
+
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    /* Active Call Hero Card */
+    .hero-card {
+      background: linear-gradient(145deg, #132b45, #0d1e30);
+      border: 2px solid var(--pr);
+      border-radius: 20px;
+      box-shadow: 0 0 40px var(--pr-glow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .hero-badge {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid var(--pr);
+      color: var(--pr);
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 6px 20px;
+      border-radius: 99px;
+      margin-bottom: 10px;
+    }
+
+    .hero-number {
+      font-size: 100px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+      text-shadow: 0 0 35px rgba(6, 182, 212, 0.6);
+      margin: 8px 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hero-patient {
+      font-size: 26px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 8px;
+    }
+
+    .hero-dest {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid var(--acc);
+      color: #a7f3d0;
+      font-size: 20px;
+      font-weight: 800;
+      padding: 8px 24px;
+      border-radius: 12px;
+      margin-top: 6px;
+    }
+
+    /* Waiting List Card */
+    .queue-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .queue-header {
+      padding: 14px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .queue-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .queue-header span {
+      font-size: 12px;
+      color: var(--mu);
+      font-weight: 600;
+    }
+
+    .queue-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .queue-item {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .queue-item-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .queue-no {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--pr);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .queue-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .queue-poli {
+      font-size: 12px;
+      color: var(--mu);
+    }
+
+    .queue-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 99px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fde68a;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Video Player Card (YouTube 16:9) */
+    .video-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+      flex: 1;
+    }
+
+    .video-header {
+      padding: 12px 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .video-badge-live {
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 280px;
+      background: #000;
+      flex: 1;
+    }
+
+    .video-wrapper iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    /* Running Text Marquee Footer */
+    footer {
+      background: #06111c;
+      border-top: 2px solid var(--card-border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .marquee-badge {
+      background: var(--pr);
+      color: #042f2e;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .marquee-container {
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .marquee-content {
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+      animation: marquee 28s linear infinite;
+    }
+
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* Flash animation when called */
+    .flash {
+      animation: pulseGlow 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      from { box-shadow: 0 0 30px var(--pr-glow); }
+      to { box-shadow: 0 0 80px rgba(6, 182, 212, 0.85); transform: scale(1.01); }
+    }
+
+    @keyframes tipsFade {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header>
+    <div class="brand">
+      <div id="display-logo" class="brand-logo">🏥</div>
+      <div class="brand-info">
+        <h1 id="display-clinic-name">Klinik Sehat Pratama</h1>
+        <p id="display-clinic-addr">Melayani dengan Sepenuh Hati dan Profesional</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="clock-box">
+        <div id="clock-time" class="clock-time">00:00:00</div>
+        <div id="clock-date" class="clock-date">Memuat tanggal...</div>
+      </div>
+      <button id="btn-audio-enable" class="btn-tv-control" onclick="enableAudio()">
+        <span>🔊</span> <span id="audio-status-text">Aktifkan Suara TV</span>
+      </button>
+      <button class="btn-tv-control" onclick="document.getElementById('video-file-input').click()" title="Pilih video MP4/WebM langsung dari komputer (Bebas Error 153 & Tanpa Iklan)">
+        <span>🎬</span> <span>Video File Lokal</span>
+      </button>
+      <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg" style="display:none;" onchange="loadLocalVideoFile(this.files[0])">
+      <button class="btn-tv-control" onclick="toggleFullscreen()">
+        <span>⛶</span> <span>Layar Penuh (F11)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid Layout -->
+  <main id="display-main">
+    <!-- Kolom Kiri: Panggilan Antrean Utama & Daftar Menunggu -->
+    <div class="left-col">
+      <!-- Active Call Hero Card -->
+      <div class="hero-card" id="hero-card">
+        <div class="hero-badge">📢 SEDANG DILAYANI</div>
+        <div id="active-no" class="hero-number">---</div>
+        <div id="active-name" class="hero-patient">Menunggu Panggilan Antrean</div>
+        <div id="active-dest" class="hero-dest">
+          <span>📍</span> <span id="active-poli">Ruang Dokter</span>
+        </div>
+      </div>
+
+      <!-- Waiting List Card -->
+      <div class="queue-card">
+        <div class="queue-header">
+          <h2>Antrean Berikutnya</h2>
+          <span id="waiting-count">0 Pasien Menunggu</span>
+        </div>
+        <div id="queue-list" class="queue-list">
+          <div style="text-align:center;color:var(--mu);padding:30px 20px;">
+            Belum ada antrean berikutnya hari ini
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kolom Kanan: Video Edukasi Pasien (YouTube 16:9) -->
+    <div class="right-col" id="right-col">
+      <div class="video-card" id="video-card">
+        <div class="video-header">
+          <span>📺 Video Edukasi & Informasi Kesehatan Pasien</span>
+          <span class="video-badge-live" id="video-status-badge">Tayang</span>
+        </div>
+        <!-- video-wrapper harus pakai padding-top trick ATAU min-height agar fallback kelihatan -->
+        <div class="video-wrapper" style="position:relative;">
+
+          <!-- YouTube iframe -->
+          <iframe id="yt-player"
+            src=""
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;display:none;">
+          </iframe>
+
+          <!-- Local / Direct MP4 Video Player (Anti Error 153, Bebas Iklan & Offline) -->
+          <video id="local-player"
+            controls
+            autoplay
+            muted
+            loop
+            playsinline
+            style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;">
+          </video>
+
+          <!-- Fallback: Slide Edukasi Kesehatan — tampil otomatis jika video belum dikonfigurasi atau error -->
+          <div id="health-tips-fallback"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;background:linear-gradient(135deg,#0d2137 0%,#0f3050 100%);text-align:center;overflow:hidden;">
+            <div id="tips-slide" style="width:100%;"></div>
+            <div style="display:flex;gap:6px;margin-top:16px;" id="tips-dots"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Running Text -->
+  <footer>
+    <div class="marquee-badge">Pengumuman</div>
+    <div class="marquee-container">
+      <div id="marquee-text" class="marquee-content">
+        Selamat datang di Klinik Sehat. Mohon perhatikan nomor antrean Anda pada layar display. Jaga selalu kebersihan dan kenyamanan bersama.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Audio Context & Voice Synthesizer
+    let audioCtx = null;
+    let audioEnabled = false;
+    let currentYtVideoId = '';
+
+    function enableAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      audioEnabled = true;
+      document.getElementById('audio-status-text').textContent = 'Suara TV Aktif';
+      document.getElementById('btn-audio-enable').style.borderColor = '#10b981';
+      document.getElementById('btn-audio-enable').style.background = 'rgba(16, 185, 129, 0.2)';
+      playChime();
+    }
+
+    // Pleasant 2-Tone Ding Dong Chime
+    function playChime() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const now = audioCtx.currentTime;
+
+        // Tone 1 (High: 554.37 Hz - C#5)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(554.37, now);
+        gain1.gain.setValueAtTime(0.35, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.55);
+
+        // Tone 2 (Lower: 440 Hz - A4)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(440, now + 0.28);
+        gain2.gain.setValueAtTime(0.35, now + 0.28);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.28);
+        osc2.stop(now + 0.95);
+      } catch (e) {
+        console.warn('Audio chime error:', e);
+      }
+    }
+
+    // Voice Announcement in Indonesian
+    function speakCall(noAntrean, poli) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      // Format spell: "A 0 1 2" -> "A, nol, satu, dua"
+      const chars = noAntrean.split('').map(c => {
+        if (c === '0') return 'nol';
+        return c;
+      }).join(' ');
+
+      const text = `Nomor antrean, ${chars}, silakan menuju, ${poli}`;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'id-ID';
+      utterance.rate = 0.88;
+      utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      const idVoice = voices.find(v => v.lang.startsWith('id') || v.lang.includes('Indonesian'));
+      if (idVoice) utterance.voice = idVoice;
+
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 700);
+    }
+
+    // Digital Clock
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+      const dateStr = now.toLocaleDateString('id-ID', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+      document.getElementById('clock-time').textContent = timeStr;
+      document.getElementById('clock-date').textContent = dateStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Fullscreen Toggle
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.log(err));
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // Ekstrak ID YouTube dari URL atau ID mentah
+    function parseYoutubeId(input) {
+      if (!input) return '';
+      if (input.startsWith('videoseries') || input.startsWith('PL')) return input.trim();
+      const match = input.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+      if (match) return match[1];
+      if (/^[\w-]{11}$/.test(input.trim())) return input.trim();
+      return '';
+    }
+
+    // Health Tips Slideshow (fallback jika YouTube tidak dikonfigurasi atau error)
+    const HEALTH_TIPS = [
+      { icon: '🩺', title: 'Cuci Tangan Rutin', body: 'Cuci tangan dengan sabun dan air mengalir selama minimal 20 detik, terutama sebelum makan dan setelah dari toilet.' },
+      { icon: '💧', title: 'Minum Air Putih Cukup', body: 'Minumlah 8 gelas (2 liter) air putih setiap hari untuk menjaga hidrasi tubuh dan fungsi organ tetap optimal.' },
+      { icon: '🥗', title: 'Konsumsi Makanan Bergizi', body: 'Perbanyak sayur, buah, dan protein. Kurangi makanan olahan, gorengan, dan tinggi gula untuk kesehatan jangka panjang.' },
+      { icon: '🏃', title: 'Olahraga Teratur', body: 'Lakukan aktivitas fisik minimal 30 menit sehari, 5 hari seminggu. Berjalan kaki pun sudah sangat bermanfaat bagi kesehatan.' },
+      { icon: '😴', title: 'Tidur yang Berkualitas', body: 'Dewasa membutuhkan 7–9 jam tidur per malam. Tidur cukup meningkatkan daya tahan tubuh dan kesehatan mental.' },
+      { icon: '🚭', title: 'Hindari Rokok & Alkohol', body: 'Merokok dan konsumsi alkohol berlebihan meningkatkan risiko penyakit jantung, kanker, dan gangguan pernapasan.' },
+      { icon: '🧠', title: 'Jaga Kesehatan Mental', body: 'Kelola stres dengan meditasi, hobi, atau berbicara dengan orang yang dipercaya. Kesehatan jiwa sama pentingnya dengan fisik.' },
+      { icon: '🏥', title: 'Periksa Kesehatan Rutin', body: 'Lakukan pemeriksaan kesehatan berkala minimal setahun sekali, meskipun merasa sehat, untuk deteksi dini penyakit.' }
+    ];
+
+    let tipIndex = 0;
+    let tipsInterval = null;
+
+    function renderHealthTip(idx) {
+      const tip = HEALTH_TIPS[idx % HEALTH_TIPS.length];
+      const slide = document.getElementById('tips-slide');
+      const dots  = document.getElementById('tips-dots');
+      if (!slide || !dots) return;
+      slide.innerHTML = `
+        <div style="font-size:72px;margin-bottom:18px;">${tip.icon}</div>
+        <div style="font-size:22px;font-weight:800;color:#e2e8f0;margin-bottom:14px;">${tip.title}</div>
+        <div style="font-size:15px;color:#94a3b8;line-height:1.75;max-width:340px;margin:0 auto;">${tip.body}</div>
+      `;
+      dots.innerHTML = HEALTH_TIPS.map((_, i) =>
+        `<div style="width:${i===idx%HEALTH_TIPS.length?'20':'8'}px;height:8px;border-radius:4px;background:${i===idx%HEALTH_TIPS.length?'#06b6d4':'rgba(148,163,184,0.4)'};transition:all .3s;"></div>`
+      ).join('');
+    }
+
+    function startHealthTips() {
+      renderHealthTip(0);
+      if (tipsInterval) clearInterval(tipsInterval);
+      tipsInterval = setInterval(() => {
+        tipIndex = (tipIndex + 1) % HEALTH_TIPS.length;
+        renderHealthTip(tipIndex);
+      }, 6000);
+    }
+
+    // Deteksi Error YouTube via postMessage API (termasuk Error 153)
+    let ytErrorDetected = false;
+    let ytLoadTimer = null;
+
+    window.addEventListener('message', function(event) {
+      // YouTube mengirim pesan saat video error / tidak bisa di-embed
+      if (event.data && typeof event.data === 'string') {
+        try {
+          const msg = JSON.parse(event.data);
+          // Error 153 = embedding disabled; juga tangkap error umum lainnya
+          if (msg.event === 'onError' || (msg.info && [100, 101, 150, 153].includes(msg.info))) {
+            console.warn('YouTube embed error detected via postMessage:', msg.info);
+            ytErrorDetected = true;
+            switchToFallback('⚠️ Video tidak dapat ditampilkan (Error ' + (msg.info || '153') + ' — embedding dinonaktifkan pemilik video). Menampilkan Tips Kesehatan.');
+          }
+          // YouTube ready = berhasil
+          if (msg.event === 'onReady' || msg.event === 'infoDelivery') {
+            ytErrorDetected = false;
+            if (ytLoadTimer) { clearTimeout(ytLoadTimer); ytLoadTimer = null; }
+          }
+        } catch(e) {}
+      }
+    });
+
+    let currentVideoSource = '';
+    let isLocalFileActive = false;
+
+    // Putar file video lokal (.mp4, .webm) yang dipilih user
+    function loadLocalVideoFile(file) {
+      if (!file) return;
+      const localPlayer = document.getElementById('local-player');
+      const ytIframe    = document.getElementById('yt-player');
+      const fallback    = document.getElementById('health-tips-fallback');
+      const badge       = document.getElementById('video-status-badge');
+
+      if (ytIframe) { ytIframe.style.display = 'none'; ytIframe.src = ''; }
+      if (fallback) { fallback.style.display = 'none'; }
+      if (tipsInterval) { clearInterval(tipsInterval); tipsInterval = null; }
+
+      const fileUrl = URL.createObjectURL(file);
+      localPlayer.src = fileUrl;
+      localPlayer.style.display = 'block';
+      localPlayer.play().catch(e => console.log('Autoplay:', e));
+      isLocalFileActive = true;
+      if (badge) {
+        badge.textContent = 'Video MP4 Lokal';
+        badge.style.background = '#10b981';
+      }
+    }
+
+    function switchToFallback(reason) {
+      const ytIframe    = document.getElementById('yt-player');
+      const localPlayer = document.getElementById('local-player');
+      const fallback    = document.getElementById('health-tips-fallback');
+      const badge       = document.getElementById('video-status-badge');
+
+      if (isLocalFileActive) return; // Jangan timpa jika sedang memutar video lokal manual
+
+      if (ytIframe)    { ytIframe.style.display = 'none'; ytIframe.src = ''; }
+      if (localPlayer) { localPlayer.style.display = 'none'; localPlayer.pause(); }
+      if (fallback)    { fallback.style.display = 'flex'; }
+      if (badge)       { badge.textContent = 'Tips Kesehatan'; badge.style.background = '#0891b2'; }
+      currentYtVideoId   = '';
+      currentVideoSource = '';
+      if (!tipsInterval) startHealthTips();
+      if (reason) console.info(reason);
+    }
+
+    function showVideoOrFallback(videoInput, enableVideo) {
+      if (isLocalFileActive) return; // Prioritaskan video lokal yang sedang aktif
+
+      const rightCol    = document.getElementById('right-col');
+      const displayMain = document.getElementById('display-main');
+      const ytIframe    = document.getElementById('yt-player');
+      const localPlayer = document.getElementById('local-player');
+      const fallback    = document.getElementById('health-tips-fallback');
+      const badge       = document.getElementById('video-status-badge');
+
+      rightCol.style.display = 'flex';
+      displayMain.classList.remove('no-video');
+
+      if (!enableVideo || !videoInput) {
+        // Tampilkan Slide Edukasi Kesehatan jika dinonaktifkan atau kosong
+        switchToFallback('Video tidak aktif atau belum diisi.');
+        return;
+      }
+
+      // Deteksi apakah input berupa URL Video MP4/WebM langsung
+      const isDirectVideo = /\.(mp4|webm|ogg)($|\?)/i.test(videoInput);
+
+      if (isDirectVideo) {
+        // Mode Video MP4 / WebM
+        if (videoInput !== currentVideoSource) {
+          currentVideoSource = videoInput;
+          if (ytIframe)    { ytIframe.style.display = 'none'; ytIframe.src = ''; }
+          if (fallback)    { fallback.style.display = 'none'; }
+          if (tipsInterval){ clearInterval(tipsInterval); tipsInterval = null; }
+          localPlayer.src = videoInput;
+          localPlayer.style.display = 'block';
+          localPlayer.play().catch(e => console.log('Autoplay:', e));
+          if (badge) { badge.textContent = 'Video MP4'; badge.style.background = '#10b981'; }
+        }
+      } else {
+        // Mode YouTube
+        const videoId = parseYoutubeId(videoInput);
+        if (!videoId) {
+          switchToFallback('ID atau URL YouTube tidak valid.');
+          return;
+        }
+
+        if (videoId !== currentYtVideoId) {
+          currentYtVideoId = videoId;
+          ytErrorDetected  = false;
+
+          if (localPlayer) { localPlayer.style.display = 'none'; localPlayer.pause(); }
+
+          const base = 'https://www.youtube-nocookie.com/embed/';
+          const src  = (videoId.startsWith('videoseries') || videoId.startsWith('PL'))
+            ? `${base}videoseries?list=${videoId}&autoplay=1&mute=1&controls=1&rel=0&modestbranding=1&enablejsapi=1`
+            : `${base}${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=1&rel=0&modestbranding=1&enablejsapi=1`;
+
+          if (ytIframe)  { ytIframe.src = src; ytIframe.style.display = 'block'; }
+          if (fallback)  { fallback.style.display = 'none'; }
+          if (tipsInterval) { clearInterval(tipsInterval); tipsInterval = null; }
+          if (badge) { badge.textContent = 'YouTube'; badge.style.background = '#10b981'; }
+
+          if (ytLoadTimer) clearTimeout(ytLoadTimer);
+          ytLoadTimer = setTimeout(() => {
+            if (ytErrorDetected) switchToFallback('Timeout YouTube, beralih ke Tips Kesehatan.');
+          }, 12000);
+        }
+      }
+    }
+
+    // State & Sync Loader
+    function loadDisplayData() {
+      try {
+        const raw = localStorage.getItem('klinik_data');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        const set = data.set || {};
+        const today = new Date().toISOString().slice(0, 10);
+
+        // Update clinic branding
+        document.getElementById('display-clinic-name').textContent = set.nama || 'Klinik Sehat Pratama';
+        document.getElementById('display-clinic-addr').textContent = set.alamat || 'Melayani dengan Sepenuh Hati dan Profesional';
+        if (set.logoImg) {
+          document.getElementById('display-logo').innerHTML = `<img src="${set.logoImg}" alt="Logo">`;
+        } else {
+          document.getElementById('display-logo').textContent = set.logo || '🏥';
+        }
+
+        // Update running text
+        if (set.runningTextDisplay) {
+          document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+        }
+
+        // Atur Video YouTube atau Fallback
+        const enableVideo = set.enableYoutubeDisplay !== false;
+        const videoId     = parseYoutubeId(set.youtubeVideoId || '');
+        showVideoOrFallback(videoId, enableVideo);
+
+        // Patients waiting today
+        const patients = (data.pasien || []).filter(p => p.tgl === today && !p.done);
+        
+        // Active called patient
+        const called = (data.pasien || []).filter(p => p.tgl === today && p.calling).pop();
+        if (called) {
+          document.getElementById('active-no').textContent = called.no;
+          document.getElementById('active-name').textContent = called.nama;
+          document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
+        }
+
+        // Waiting list
+        const nextList = patients.filter(p => !called || p.id !== called.id);
+        document.getElementById('waiting-count').textContent = `${nextList.length} Pasien Menunggu`;
+
+        const queueListEl = document.getElementById('queue-list');
+        if (nextList.length === 0) {
+          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Tidak ada antrean berikutnya</div>`;
+        } else {
+          queueListEl.innerHTML = nextList.slice(0, 6).map((p, idx) => `
+            <div class="queue-item">
+              <div class="queue-item-left">
+                <span class="queue-no">${p.no}</span>
+                <div>
+                  <div class="queue-name">${p.nama}</div>
+                  <div class="queue-poli">${p.layanan || 'Poli Umum'}</div>
+                </div>
+              </div>
+              <span class="queue-status">Antrean ke-${idx + 1}</span>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.error('Display sync error:', err);
+      }
+    }
+
+    // BroadcastChannel: Mendengarkan panggilan kasir secara real-time antar tab/window HDMI
+    const queueChannel = new BroadcastChannel('klinik_queue_channel');
+    queueChannel.onmessage = event => {
+      const { type, patient, poli } = event.data || {};
+      if (type === 'CALL_PATIENT') {
+        const hero = document.getElementById('hero-card');
+        document.getElementById('active-no').textContent = patient.no;
+        document.getElementById('active-name').textContent = patient.nama;
+        document.getElementById('active-poli').textContent = poli || patient.layanan || 'Poli Umum';
+
+        hero.classList.remove('flash');
+        void hero.offsetWidth;
+        hero.classList.add('flash');
+
+        if (audioEnabled) {
+          playChime();
+          speakCall(patient.no, poli || patient.layanan || 'Poli Umum');
+        }
+
+        loadDisplayData();
+      } else if (type === 'QUEUE_UPDATE') {
+        loadDisplayData();
+      }
+    };
+
+    // Fallback sync via StorageEvent
+    window.addEventListener('storage', e => {
+      if (e.key === 'klinik_data') {
+        loadDisplayData();
+      }
+    });
+
+    // Initial load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Tampilkan health tips dulu sebagai default — akan diganti YouTube jika Admin sudah set video
+      startHealthTips();
+      loadDisplayData();
+      setInterval(loadDisplayData, 5000);
+    });
+  </script>
+</body>
+</html>
