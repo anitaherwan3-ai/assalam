@@ -1,4 +1,6 @@
-﻿// Aplikasi Utama Keuangan Klinik (Controller & View Renderer)
+```javascript
+// Aplikasi Utama Keuangan Klinik (Controller & View Renderer)
+// Diperbarui & Disinkronkan: Pencegahan Tumpang Tindih & Akurasi Nominal Keuangan
 
 const store = window.clinicStore;
 
@@ -55,19 +57,30 @@ function getFilteredTrx() {
   });
 }
 
-// Perhitungan Finansial
+// ==========================================
+// PERHITUNGAN FINANSIAL & REKAP (SINKRON & AMAN)
+// ==========================================
 function calculateFinancials() {
   const trxList = getFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
 
-  const sumByJenis = j => allItems.filter(i => (i.t || i.jenis) === j).reduce((s, x) => s + (x.harga * x.qty), 0);
+  const sumByJenis = j => allItems
+    .filter(i => (i.t || i.jenis) === j)
+    .reduce((s, x) => s + (Number(x.harga || 0) * Number(x.qty || 0)), 0);
   
-  const rev = trxList.reduce((s, t) => s + (t.total || 0), 0);
-  const hpp = allItems.filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket').reduce((s, x) => s + ((x.hpp || 0) * x.qty), 0);
+  // Murni Omset Transaksi
+  const rev = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
   
-  const loss = inFilterRange(store.state.loss).reduce((s, l) => s + (l.nilai || 0), 0);
-  const op = inFilterRange(store.state.biaya).filter(b => b.status === 'approved').reduce((s, b) => s + (b.jml || 0), 0);
-  const pc = inFilterRange(store.state.petty).reduce((s, p) => s + (p.jml || 0), 0);
+  // HPP Obat & Paket
+  const hpp = allItems
+    .filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket')
+    .reduce((s, x) => s + (Number(x.hpp || 0) * Number(x.qty || 0)), 0);
+  
+  const loss = inFilterRange(store.state.loss).reduce((s, l) => s + Number(l.nilai || 0), 0);
+  const op = inFilterRange(store.state.biaya)
+    .filter(b => b.status === 'approved')
+    .reduce((s, b) => s + Number(b.jml || 0), 0);
+  const pc = inFilterRange(store.state.petty).reduce((s, p) => s + Number(p.jml || 0), 0);
 
   const kons = sumByJenis('Konsultasi');
   const tind = sumByJenis('Tindakan');
@@ -75,10 +88,17 @@ function calculateFinancials() {
   const paket = sumByJenis('Paket');
   const disk = Math.abs(sumByJenis('Diskon')); // Diskon absolut
 
+  // Total Modal Awal Shift dalam Rentang Filter (jika ada)
+  const totalModalAwalShift = inFilterRange(store.state.shift || []).reduce((s, sh) => s + Number(sh.modal || 0), 0);
+
   // Laba bersih = Total Omset - HPP - Kerugian Obat - Biaya Operasional - Kas Kecil
   const laba = rev - hpp - loss - op - pc;
 
-  return { trxList, rev, hpp, loss, op, pc, kons, tind, obat, paket, disk, laba };
+  return { 
+    trxList, rev, hpp, loss, op, pc, kons, tind, obat, paket, disk, laba,
+    totalModalAwalShift,
+    totalKasDiTangan: totalModalAwalShift + rev - pc // Total Kas termasuk Modal Awal dikurangi Pengeluaran Kas Kecil
+  };
 }
 
 // Inisialisasi Aplikasi
@@ -115,25 +135,22 @@ function doLogin() {
   const pInput = val('login-password');
   const errorEl = $('login-error');
 
-  // Kredensial Akun Master Permanen Pimpinan
   const MASTER_USER = {
     u: 'praktekrose',
     pw: 'Dinkes123@',
     nama: 'Pimpinan Klinik',
     role: 'pimpinan',
-    hp: (store.state.set && store.state.set.waOwner) ? store.state.set.waOwner : '081299998888'
+    hp: (store.state.set && store.state.set.waOwner) ? store.state.set.waOwner : '081299998888',
+    _t: Date.now()
   };
 
-  // Pastikan users terisi minimal akun master
   if (!store.state.users || store.state.users.length === 0) {
     store.state.users = [MASTER_USER];
     store.saveLocal(false);
   }
 
-  // Cek kecocokan login di database state users
   let user = (store.state.users || []).find(x => x.u.toLowerCase() === uInput.toLowerCase() && x.pw === pInput);
 
-  // Jika belum ada di state (misal database baru reset/fresh), periksa apakah ini Akun Master
   if (!user && uInput.toLowerCase() === MASTER_USER.u.toLowerCase() && pInput === MASTER_USER.pw) {
     user = MASTER_USER;
     const existingIdx = store.state.users.findIndex(x => x.u.toLowerCase() === MASTER_USER.u.toLowerCase());
@@ -246,9 +263,9 @@ function getShiftTrx(shift) {
 
 function calcShiftCash(shift) {
   const trxList = getShiftTrx(shift);
-  const tunaiTrx = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
-  const kasKecil = (store.state.petty || []).filter(p => p.sh === shift.id).reduce((s, p) => s + (p.jml || 0), 0);
-  return (shift.modal || 0) + tunaiTrx - kasKecil;
+  const tunaiTrx = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
+  const kasKecil = (store.state.petty || []).filter(p => p.sh === shift.id).reduce((s, p) => s + Number(p.jml || 0), 0);
+  return Number(shift.modal || 0) + tunaiTrx - kasKecil;
 }
 
 function viewShift() {
@@ -258,7 +275,7 @@ function viewShift() {
   let activeCard = '';
   if (shift) {
     const trxs = getShiftTrx(shift);
-    const nonTunai = trxs.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
+    const nonTunai = trxs.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
     const tunaiSistem = calcShiftCash(shift);
 
     const ownerWa = store.getOwnerWa ? store.getOwnerWa() : (store.state.set && store.state.set.waOwner);
@@ -338,7 +355,7 @@ function actionBukaShift() {
     jam: now.toTimeString().slice(0, 5),
     kasir: currentUser.u,
     nama: currentUser.nama,
-    modal: modal,
+    modal: Number(modal) || 0,
     status: 'buka',
     _t: Date.now()
   });
@@ -362,15 +379,15 @@ function actionTutupShift() {
     const sistem = calcShiftCash(shift);
     shift.status = 'tutup';
     shift.jamT = new Date().toTimeString().slice(0, 5);
-    shift.sistem = sistem;
-    shift.fisik = fisik;
-    shift.selisih = fisik - sistem;
+    shift.sistem = Number(sistem);
+    shift.fisik = Number(fisik);
+    shift.selisih = Number(fisik) - Number(sistem);
     shift.verif = false;
+    shift._t = Date.now();
 
-    store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(fisik - sistem)}`);
+    store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(shift.selisih)}`);
     store.saveLocal();
 
-    // Otomatis kirim Rekap Tutup Shift ke WhatsApp Owner
     const waRes = sendShiftRecapWA(shift, store);
     showShiftCloseModal(shift, waRes);
     renderApp();
@@ -448,7 +465,6 @@ function closeShiftCloseModal() {
   if (modal) modal.style.display = 'none';
 }
 
-// Salin teks rekap shift ke clipboard
 function copyShiftWa(shiftId) {
   const shift = store.get('shift', shiftId);
   if (!shift) return;
@@ -462,20 +478,19 @@ function copyShiftWa(shiftId) {
   }
 }
 
-// Cetak Slip Berita Acara Kasir Tutup Shift (Thermal 80mm / 58mm)
 function printShiftSlip(shiftId) {
   const shift = store.get('shift', shiftId);
   if (!shift) return;
   const set = store.state.set || {};
   const trxList = (store.state.trx || []).filter(t => t.sh === shift.id);
-  const tunaiTrx = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
-  const nonTunaiTrx = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
+  const tunaiTrx = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
+  const nonTunaiTrx = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const pettyList = (store.state.petty || []).filter(p => p.sh === shift.id);
-  const kasKecil = pettyList.reduce((s, p) => s + (p.jml || 0), 0);
-  const modal = shift.modal || 0;
-  const sistem = shift.sistem !== undefined ? shift.sistem : (modal + tunaiTrx - kasKecil);
-  const fisik = shift.fisik !== undefined ? shift.fisik : sistem;
-  const selisih = shift.selisih !== undefined ? shift.selisih : (fisik - sistem);
+  const kasKecil = pettyList.reduce((s, p) => s + Number(p.jml || 0), 0);
+  const modal = Number(shift.modal || 0);
+  const sistem = shift.sistem !== undefined ? Number(shift.sistem) : (modal + tunaiTrx - kasKecil);
+  const fisik = shift.fisik !== undefined ? Number(shift.fisik) : sistem;
+  const selisih = shift.selisih !== undefined ? Number(shift.selisih) : (fisik - sistem);
 
   const modalEl = $('modal-nota');
   const body = $('modal-nota-body');
@@ -526,7 +541,6 @@ function printShiftSlip(shiftId) {
     </div>
   `;
 
-  // Sesuaikan tombol modal nota saat mencetak rekap shift
   const waBtn = $('btn-wa-receipt');
   if (waBtn) waBtn.style.display = 'none';
   const labelBtn = $('btn-label-obat-nota');
@@ -562,7 +576,6 @@ function viewPasien() {
         <button class="btn-tv-header s" onclick="openTvDisplay()">📺 Buka Layar Display TV (HDMI)</button>
       </div>
 
-      <!-- Pencarian Cepat Pasien Lama -->
       <div style="position:relative;margin-bottom:16px;">
         <label style="font-weight:700;font-size:13px;display:block;margin-bottom:5px;color:var(--pr);">🔍 Cari Pasien Lama — Isi Otomatis Nama &amp; HP</label>
         <input id="p-search-lama" type="search" placeholder="Ketik nama atau nomor HP pasien lama..."
@@ -639,6 +652,7 @@ function editPasien(id) {
   ], res => {
     p.nama = res.nama;
     p.hp = res.hp;
+    p._t = Date.now();
     store.logActivity('Ubah', 'Pasien', `${p.no} - ${p.nama}`);
     store.saveLocal();
   });
@@ -660,7 +674,7 @@ function delPasien(id) {
 // -------------------------------------------------------------
 function viewTrx() {
   const waitingPatients = (store.state.pasien || []).filter(p => !p.done);
-  const totalCart = cartItems.reduce((s, i) => s + (i.harga * i.qty), 0);
+  const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   const cartRows = cartItems.map((item, idx) => [
     esc(item.nama),
@@ -671,25 +685,21 @@ function viewTrx() {
     `<button class="s btn-danger" onclick="cartItems.splice(${idx}, 1); renderApp();">Hapus</button>`
   ]);
 
-  // Filter daftar obat berdasarkan pencarian
   const searchLower = cashierSearchQuery.toLowerCase();
   const filteredObat = (store.state.obat || []).filter(o => 
     o.nama.toLowerCase().includes(searchLower)
   );
 
-  // Hitung ringkasan hari ini
   const todayTrx   = (store.state.trx || []).filter(t => t.tgl === todayStr);
-  const todayTotal  = todayTrx.reduce((s, t) => s + (t.total || 0), 0);
+  const todayTotal  = todayTrx.reduce((s, t) => s + Number(t.total || 0), 0);
   const todayCount  = todayTrx.length;
 
   return `
-    <!-- POS LAYOUT: Split Panel -->
     <div class="pos-layout">
 
       <!-- KIRI: Menu Produk + Pencarian -->
       <div class="pos-left">
 
-        <!-- Header POS -->
         <div class="pos-top-bar">
           <div style="flex:1;">
             <div style="font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;">PILIH PASIEN</div>
@@ -710,7 +720,6 @@ function viewTrx() {
           </div>
         </div>
 
-        <!-- Filter Kategori + Pencarian -->
         <div style="display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--bdr);flex-wrap:wrap;">
           <input id="trx-search-input" type="search" placeholder="🔍 Cari obat / jasa / paket... (F2)"
             value="${esc(cashierSearchQuery)}"
@@ -724,12 +733,10 @@ function viewTrx() {
           </div>
         </div>
 
-        <!-- Grid Produk Layar Sentuh -->
         <div class="pos-product-grid">
           ${renderTouchCardsPOS()}
         </div>
 
-        <!-- Tambah Manual (dropdown fallback) -->
         <div class="pos-manual-add">
           <details style="width:100%;">
             <summary style="cursor:pointer;font-size:12px;color:var(--mu);font-weight:600;padding:6px 0;">
@@ -769,7 +776,6 @@ function viewTrx() {
       <!-- KANAN: Keranjang + Pembayaran -->
       <div class="pos-right">
 
-        <!-- Keranjang -->
         <div class="pos-cart-header">
           <span>🛒 Keranjang</span>
           <span style="font-size:12px;color:var(--mu);">${cartItems.length} item</span>
@@ -798,7 +804,6 @@ function viewTrx() {
           }
         </div>
 
-        <!-- Diskon -->
         <div style="padding:8px 14px;border-top:1px solid var(--bdr);display:flex;gap:8px;align-items:flex-end;">
           <label style="flex:1;font-size:12px;">Diskon (Rp)
             <input id="trx-diskon" type="number" min="0" placeholder="0" style="margin-top:3px;">
@@ -806,13 +811,11 @@ function viewTrx() {
           <button class="s" onclick="actionAddDiskon()" style="white-space:nowrap;">Terapkan</button>
         </div>
 
-        <!-- Total -->
         <div class="pos-total-bar">
           <span>TOTAL</span>
           <span style="font-size:22px;font-weight:900;">${rp(totalCart)}</span>
         </div>
 
-        <!-- Metode Bayar -->
         <div style="padding:10px 14px;border-top:1px solid var(--bdr);">
           <div style="font-size:11px;color:var(--mu);font-weight:700;margin-bottom:6px;">METODE PEMBAYARAN</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
@@ -824,14 +827,12 @@ function viewTrx() {
           <input type="hidden" id="trx-metode" value="Tunai">
         </div>
 
-        <!-- Kalkulator Kembalian Tunai -->
         <div id="cash-calc-box" style="padding:10px 14px;border-top:1px solid var(--bdr);">
           <div style="font-size:11px;color:var(--mu);font-weight:700;margin-bottom:6px;">UANG DITERIMA <span class="kbd-hint">F4</span></div>
           <input id="trx-bayar-tunai" type="number" value="${totalCart}"
             oninput="calcKembalian(${totalCart})"
             onkeydown="if(event.key==='Enter')actionBayarTrx(${totalCart})"
             style="width:100%;padding:10px;font-size:18px;font-weight:800;border-radius:10px;border:2px solid var(--pr);background:var(--bg);color:var(--tx);text-align:right;margin-bottom:8px;">
-          <!-- Preset pecahan -->
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;">
             <button type="button" class="cash-preset-btn" onclick="setQuickCash(${totalCart},${totalCart})" style="font-size:11px;">Pas</button>
             <button type="button" class="cash-preset-btn" onclick="setQuickCash(20000,${totalCart})">20rb</button>
@@ -846,7 +847,6 @@ function viewTrx() {
           </div>
         </div>
 
-        <!-- Tombol Bayar -->
         <div style="padding:12px 14px;">
           <button class="p" style="width:100%;padding:16px;font-size:16px;font-weight:800;border-radius:14px;letter-spacing:0.5px;"
             onclick="actionBayarTrx(${totalCart})">
@@ -854,7 +854,6 @@ function viewTrx() {
           </button>
         </div>
 
-        <!-- Riwayat mini hari ini -->
         <div style="padding:0 14px 14px;">
           <div style="font-size:11px;color:var(--mu);font-weight:700;margin-bottom:6px;padding-top:8px;border-top:1px solid var(--bdr);">TRANSAKSI SELESAI HARI INI (${todayCount})</div>
           <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">
@@ -887,7 +886,6 @@ function toggleCashCalculator(metode) {
   }
 }
 
-// Pilih metode pembayaran dengan tombol layar sentuh
 function selectPayMethod(method) {
   const hidden = $('trx-metode');
   if (hidden) hidden.value = method;
@@ -902,7 +900,6 @@ function selectPayMethod(method) {
   toggleCashCalculator(method);
 }
 
-// Pengatur jumlah item keranjang (+ / -) dengan proteksi stok
 function cartQtyAdj(idx, delta) {
   if (!cartItems[idx]) return;
   const item = cartItems[idx];
@@ -922,12 +919,10 @@ function cartQtyAdj(idx, delta) {
   renderApp();
 }
 
-// Render Menu Cepat Layar Sentuh (Touch POS) dengan Pencarian & Kategori
 function renderTouchCardsPOS() {
   const list = [];
   const query = (cashierSearchQuery || '').toLowerCase().trim();
 
-  // Kategori Jasa / Tindakan / Konsultasi
   if (posFilterCategory === 'Semua' || posFilterCategory === 'Jasa') {
     (store.state.tarif || []).forEach(t => {
       if (!query || t.nama.toLowerCase().includes(query) || (t.jenis || '').toLowerCase().includes(query)) {
@@ -942,7 +937,6 @@ function renderTouchCardsPOS() {
     });
   }
 
-  // Kategori Obat & Alkes
   if (posFilterCategory === 'Semua' || posFilterCategory === 'Obat') {
     (store.state.obat || []).forEach(o => {
       if (!query || o.nama.toLowerCase().includes(query)) {
@@ -963,12 +957,11 @@ function renderTouchCardsPOS() {
     });
   }
 
-  // Kategori Paket Pelayanan
   if (posFilterCategory === 'Semua' || posFilterCategory === 'Paket') {
     (store.state.paket || []).forEach(p => {
       if (!query || p.nama.toLowerCase().includes(query) || (p.deskripsi || '').toLowerCase().includes(query)) {
-        const normal = (p.items || []).reduce((s, it) => s + (it.harga * (it.qty || 1)), 0);
-        const hemat = Math.max(0, normal - p.harga);
+        const normal = (p.items || []).reduce((s, it) => s + (Number(it.harga || 0) * Number(it.qty || 1)), 0);
+        const hemat = Math.max(0, normal - Number(p.harga || 0));
         const itemsList = (p.items || []).map(i => `${i.nama} (${i.qty}x)`).join(', ');
 
         list.push(`
@@ -996,7 +989,6 @@ function renderTouchCardsPOS() {
        </div>`;
 }
 
-// Alias untuk kompatibilitas
 function renderTouchCards() {
   return renderTouchCardsPOS();
 }
@@ -1017,7 +1009,7 @@ function addTouchItem(type, id) {
       cartItems.push({
         nama: tarif.nama,
         t: tarif.jenis,
-        harga: tarif.harga,
+        harga: Number(tarif.harga) || 0,
         qty: 1,
         hpp: 0
       });
@@ -1039,9 +1031,9 @@ function addTouchItem(type, id) {
         oid: obat.id,
         nama: obat.nama,
         t: 'Obat',
-        harga: obat.jual,
+        harga: Number(obat.jual) || 0,
         qty: 1,
-        hpp: obat.hpp || 0
+        hpp: Number(obat.hpp) || 0
       });
     }
     renderApp();
@@ -1049,7 +1041,6 @@ function addTouchItem(type, id) {
     const paket = store.get('paket', id);
     if (!paket) return;
 
-    // Cek ketersediaan stok obat dalam paket jika ada
     const obatItems = (paket.items || []).filter(i => i.type === 'obat' && (i.oid || i.id));
     for (const oi of obatItems) {
       const obat = store.getObat(oi.oid || oi.id);
@@ -1072,12 +1063,12 @@ function addTouchItem(type, id) {
         nama: paket.nama,
         t: 'Paket',
         jenis: 'Paket',
-        harga: paket.harga,
+        harga: Number(paket.harga) || 0,
         qty: 1,
         items: paket.items || [],
         hpp: (paket.items || []).filter(i => i.type === 'obat').reduce((s, it) => {
           const o = store.getObat(it.oid || it.id);
-          return s + ((o ? o.hpp : 0) * (it.qty || 1));
+          return s + ((o ? Number(o.hpp) : 0) * (Number(it.qty) || 1));
         }, 0)
       });
     }
@@ -1093,7 +1084,7 @@ function actionAddPaketToCart() {
 
 function calcKembalian(total) {
   const uang = numVal('trx-bayar-tunai');
-  const kembalian = uang - total;
+  const kembalian = Number(uang) - Number(total);
   const el = $('trx-kembalian');
   if (el) {
     el.textContent = rp(Math.max(0, kembalian));
@@ -1116,7 +1107,7 @@ function actionAddTarifToCart() {
   cartItems.push({
     nama: tarif.nama,
     t: tarif.jenis,
-    harga: tarif.harga,
+    harga: Number(tarif.harga) || 0,
     qty: 1,
     hpp: 0
   });
@@ -1139,9 +1130,9 @@ function actionAddObatToCart() {
     oid: obat.id,
     nama: obat.nama,
     t: 'Obat',
-    harga: obat.jual,
-    qty: qty,
-    hpp: obat.hpp || 0
+    harga: Number(obat.jual) || 0,
+    qty: Number(qty),
+    hpp: Number(obat.hpp) || 0
   });
   renderApp();
 }
@@ -1153,7 +1144,7 @@ function actionAddDiskon() {
   cartItems.push({
     nama: 'Potongan Diskon',
     t: 'Diskon',
-    harga: -disk,
+    harga: -Math.abs(Number(disk)),
     qty: 1,
     hpp: 0
   });
@@ -1182,7 +1173,7 @@ function actionBayarTrx(totalCart) {
   }
 
   const metode = val('trx-metode');
-  let bayarTunai = totalCart;
+  let bayarTunai = Number(totalCart);
   let kembalian = 0;
 
   if (metode === 'Tunai') {
@@ -1194,7 +1185,6 @@ function actionBayarTrx(totalCart) {
     kembalian = bayarTunai - totalCart;
   }
 
-  // Alokasikan pengurangan batch FEFO & potong stok obat (baik langsung maupun via Paket)
   for (const item of cartItems) {
     if (item.oid) {
       const obat = store.getObat(item.oid);
@@ -1233,15 +1223,16 @@ function actionBayarTrx(totalCart) {
     kasir: currentUser.u,
     sh: shift.id,
     items: [...cartItems],
-    total: totalCart,
+    total: Number(totalCart),
     metode: metode,
-    bayar: bayarTunai,
-    kembalian: kembalian,
+    bayar: Number(bayarTunai),
+    kembalian: Number(kembalian),
     _t: Date.now()
   };
 
   store.state.trx.push(newTrx);
   pasien.done = true;
+  pasien._t = Date.now();
   cartItems = [];
 
   store.logActivity('Transaksi', 'Kasir', `Nota ${noNota} - Pasien ${pasien.nama} (${rp(totalCart)})`);
@@ -1322,7 +1313,6 @@ function printReceipt(trxId) {
     </div>
   `;
 
-  // Tombol Kirim Struk WhatsApp
   const waBtn = $('btn-wa-receipt');
   if (waBtn) {
     if (set.fiturKirimWA !== false) {
@@ -1333,7 +1323,6 @@ function printReceipt(trxId) {
     }
   }
 
-  // Tombol Cetak Label Obat (Etiket Farmasi)
   const labelBtn = $('btn-label-obat-nota');
   if (labelBtn) {
     const hasMed = (trx.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
@@ -1373,7 +1362,7 @@ function closeReceipt() {
 function viewPetty() {
   const shift = getCurrentShift();
   const list = inFilterRange(store.state.petty).slice().reverse();
-  const totalHariIni = (store.state.petty || []).filter(p => p.tgl === todayStr).reduce((s, p) => s + (p.jml || 0), 0);
+  const totalHariIni = (store.state.petty || []).filter(p => p.tgl === todayStr).reduce((s, p) => s + Number(p.jml || 0), 0);
 
   const rows = list.map(p => [
     esc(p.tgl),
@@ -1419,7 +1408,7 @@ function actionAddPetty() {
     id: uid(),
     tgl: todayStr,
     ket: ket,
-    jml: jml,
+    jml: Number(jml),
     kasir: currentUser ? currentUser.u : '-',
     sh: shift ? shift.id : null,
     _t: Date.now()
@@ -1439,7 +1428,8 @@ function editPetty(id) {
     ['jml', 'Nominal (Rp)', 'number', p.jml]
   ], res => {
     p.ket = res.ket;
-    p.jml = res.jml;
+    p.jml = Number(res.jml);
+    p._t = Date.now();
     store.logActivity('Ubah', 'Kas Kecil', `${p.ket} (${rp(p.jml)})`);
     store.saveLocal();
   });
@@ -1564,7 +1554,13 @@ function editObat(id) {
     ['stok', 'Stok Fisik', 'number', o.stok],
     ['min', 'Batas Stok Minimum', 'number', o.min || 5]
   ], res => {
-    Object.assign(o, res);
+    Object.assign(o, res, {
+      hpp: Number(res.hpp),
+      jual: Number(res.jual),
+      stok: Number(res.stok),
+      min: Number(res.min),
+      _t: Date.now()
+    });
     store.logActivity('Ubah', 'Master Obat', o.nama);
     store.saveLocal();
   });
@@ -1608,7 +1604,10 @@ function editTarif(id) {
     ]],
     ['harga', 'Tarif (Rp)', 'number', t.harga]
   ], res => {
-    Object.assign(t, res);
+    Object.assign(t, res, {
+      harga: Number(res.harga),
+      _t: Date.now()
+    });
     store.logActivity('Ubah', 'Master Tarif', t.nama);
     store.saveLocal();
   });
@@ -1668,7 +1667,7 @@ function actionAddPaketBuilderItem() {
         oid: obat.id,
         nama: obat.nama,
         satuan: obat.satuan,
-        harga: obat.jual,
+        harga: Number(obat.jual) || 0,
         qty: qty
       });
     }
@@ -1684,7 +1683,7 @@ function actionAddPaketBuilderItem() {
         id: tarif.id,
         nama: tarif.nama,
         jenis: tarif.jenis,
-        harga: tarif.harga,
+        harga: Number(tarif.harga) || 0,
         qty: qty
       });
     }
@@ -1725,7 +1724,7 @@ function renderStagedPaketItemsHtml() {
 }
 
 function updatePaketBuilderSummary() {
-  const normal = (window.paketBuilderItems || []).reduce((s, i) => s + (i.harga * i.qty), 0);
+  const normal = (window.paketBuilderItems || []).reduce((s, i) => s + (Number(i.harga) * Number(i.qty)), 0);
   const pkgPrice = numVal('pkg-harga') || 0;
   
   const sumNormalEl = $('pkg-sum-normal');
@@ -1772,8 +1771,9 @@ function actionSavePaket() {
     if (existing) {
       existing.nama = nama;
       existing.deskripsi = desk;
-      existing.harga = harga;
+      existing.harga = Number(harga);
       existing.items = JSON.parse(JSON.stringify(window.paketBuilderItems));
+      existing._t = Date.now();
       store.logActivity('Ubah', 'Paket Pelayanan', `${nama} (${rp(harga)})`);
       showAlert(`Paket pelayanan "${nama}" berhasil diperbarui.`, 'Sukses');
     }
@@ -1783,7 +1783,7 @@ function actionSavePaket() {
       id: uid(),
       nama: nama,
       deskripsi: desk,
-      harga: harga,
+      harga: Number(harga),
       items: JSON.parse(JSON.stringify(window.paketBuilderItems)),
       _t: Date.now()
     });
@@ -1835,8 +1835,8 @@ function viewPaketPelayanan() {
   const paketList = store.state.paket || [];
 
   const rows = paketList.map(p => {
-    const normalPrice = (p.items || []).reduce((s, it) => s + (it.harga * (it.qty || 1)), 0);
-    const hemat = Math.max(0, normalPrice - p.harga);
+    const normalPrice = (p.items || []).reduce((s, it) => s + (Number(it.harga || 0) * Number(it.qty || 1)), 0);
+    const hemat = Math.max(0, normalPrice - Number(p.harga || 0));
     const hematPct = normalPrice > 0 ? Math.round((hemat / normalPrice) * 100) : 0;
 
     const itemsSummary = (p.items || []).map(it => {
@@ -1857,7 +1857,7 @@ function viewPaketPelayanan() {
     ];
   });
 
-  const builderNormal = (window.paketBuilderItems || []).reduce((s, i) => s + (i.harga * i.qty), 0);
+  const builderNormal = (window.paketBuilderItems || []).reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   return `
     <div class="card" style="border-left:4px solid #a855f7;">
@@ -1881,7 +1881,6 @@ function viewPaketPelayanan() {
         </label>
       </div>
 
-      <!-- Item Staging / Builder -->
       <div style="background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--bdr);margin:14px 0;">
         <div style="font-size:12.5px;font-weight:700;color:var(--pr);margin-bottom:8px;">
           ➕ Tambahkan Komponen ke Paket (Jasa Tindakan atau Obat Farmasi):
@@ -1905,7 +1904,6 @@ function viewPaketPelayanan() {
           <button class="p s" onclick="actionAddPaketBuilderItem()" style="padding:9px 14px;white-space:nowrap;">+ Masukkan ke Paket</button>
         </div>
 
-        <!-- Staged Items List -->
         <div style="margin-top:12px;" id="pkg-staged-container">
           ${renderStagedPaketItemsHtml()}
         </div>
@@ -2025,7 +2023,6 @@ function viewPembelian() {
 function openModalReturBeli(beliId) {
   const b = store.get('beli', beliId);
   if (!b) return;
-  const o = store.getObat(b.oid);
 
   showFormModal(`Retur Pembelian - Faktur ${b.faktur || b.supplier}`, [
     ['qty', `Jumlah Qty yang Diretur (Maks ${b.qty})`, 'number', 1],
@@ -2033,7 +2030,7 @@ function openModalReturBeli(beliId) {
   ], res => {
     const success = store.processReturBeli({
       beliId: b.id,
-      qtyRetur: res.qty,
+      qtyRetur: Number(res.qty),
       alasan: res.alasan
     });
 
@@ -2062,8 +2059,8 @@ function actionAddBeli() {
     supplier: sup,
     faktur: val('beli-fak').trim(),
     oid: oid,
-    qty: qty,
-    total: total,
+    qty: Number(qty),
+    total: Number(total),
     tempo: val('beli-tempo') || todayStr,
     batchNo: val('beli-batch').trim(),
     ed: ed,
@@ -2087,6 +2084,7 @@ function delBeli(id) {
     const obat = store.getObat(b.oid);
     if (obat) {
       obat.stok = Math.max(0, obat.stok - b.qty);
+      obat._t = Date.now();
     }
     store.state.batch = store.state.batch.filter(x => x.beli !== id);
     store.state.beli = store.state.beli.filter(x => x.id !== id);
@@ -2146,9 +2144,10 @@ function actionBuangAllExpired() {
   showConfirm(`Ditemukan ${expiredList.length} batch kedaluwarsa. Buang dan catat sebagai kerugian obat?`, () => {
     expiredList.forEach(b => {
       const obat = store.getObat(b.oid);
-      const rugi = b.sisa * (obat ? obat.hpp : 0);
+      const rugi = b.sisa * (obat ? Number(obat.hpp) : 0);
       if (obat) {
         obat.stok = Math.max(0, obat.stok - b.sisa);
+        obat._t = Date.now();
       }
       store.state.loss.push({
         id: uid(),
@@ -2157,10 +2156,11 @@ function actionBuangAllExpired() {
         bid: b.id,
         qty: b.sisa,
         ket: 'Kedaluwarsa (Expired)',
-        nilai: rugi,
+        nilai: Number(rugi),
         _t: Date.now()
       });
       b.sisa = 0;
+      b._t = Date.now();
     });
 
     store.logActivity('Kerugian', 'Kedaluwarsa', `Buang ${expiredList.length} batch expired`);
@@ -2251,7 +2251,7 @@ function actionAddBiaya() {
     tgl: todayStr,
     kat: val('b-kat'),
     ket: ket,
-    jml: total,
+    jml: Number(total),
     status: status,
     kasir: currentUser ? currentUser.u : '-',
     _t: Date.now()
@@ -2271,7 +2271,8 @@ function editBiaya(id) {
     ['jml', 'Nominal Total (Rp)', 'number', b.jml]
   ], res => {
     b.ket = res.ket;
-    b.jml = res.jml;
+    b.jml = Number(res.jml);
+    b._t = Date.now();
     const set = store.state.set || {};
     const limitAppr = set.batasApproval || 1000000;
     b.status = b.jml >= limitAppr ? 'pending' : 'approved';
@@ -2354,11 +2355,13 @@ function actionAddLoss() {
   }
 
   const obat = store.getObat(batch.oid);
-  const nilai = qty * (obat ? obat.hpp : 0);
+  const nilai = qty * (obat ? Number(obat.hpp) : 0);
 
   batch.sisa -= qty;
+  batch._t = Date.now();
   if (obat) {
     obat.stok = Math.max(0, obat.stok - qty);
+    obat._t = Date.now();
   }
 
   store.state.loss.push({
@@ -2366,9 +2369,9 @@ function actionAddLoss() {
     tgl: todayStr,
     oid: batch.oid,
     bid: batch.id,
-    qty: qty,
+    qty: Number(qty),
     ket: val('op-ket'),
-    nilai: nilai,
+    nilai: Number(nilai),
     _t: Date.now()
   });
 
@@ -2382,9 +2385,15 @@ function delLoss(id) {
     const l = store.get('loss', id);
     if (!l) return;
     const obat = store.getObat(l.oid);
-    if (obat) obat.stok += l.qty;
+    if (obat) {
+      obat.stok += l.qty;
+      obat._t = Date.now();
+    }
     const batch = store.get('batch', l.bid);
-    if (batch) batch.sisa += l.qty;
+    if (batch) {
+      batch.sisa += l.qty;
+      batch._t = Date.now();
+    }
 
     store.state.loss = store.state.loss.filter(x => x.id !== id);
     store.logActivity('Batalkan Kerugian', 'Stok Opname', `${obat ? obat.nama : ''} (${l.qty})`);
@@ -2427,6 +2436,9 @@ function viewVerifikasi() {
   return `
     <div class="card">
       <h2>Verifikasi Setoran Kasir (Menunggu Approval Admin)</h2>
+      <p style="color:var(--mu);font-size:12px;margin-bottom:12px;">
+        💡 Uang Sistem Kasir mencakup: <b>Modal Awal + Transaksi Tunai - Kas Kecil</b>.
+      </p>
       ${renderTable(['Tanggal', 'Kasir', 'Waktu Shift', 'Uang Sistem', 'Uang Fisik Diterima', 'Selisih', 'Aksi'], pendingRows, { key: 'verif_pending' })}
     </div>
 
@@ -2442,6 +2454,7 @@ function actionVerifShift(id) {
   if (!s) return;
   s.verif = true;
   s.oleh = currentUser ? currentUser.nama : 'Admin';
+  s._t = Date.now();
   store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
   store.saveLocal();
   showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
@@ -2518,7 +2531,7 @@ function openModalReturJual(trxId) {
     const success = store.processReturJual({
       trxId: trx.id,
       itemIndex: idx,
-      qtyRetur: res.qty,
+      qtyRetur: Number(res.qty),
       alasan: res.alasan
     });
 
@@ -2565,7 +2578,7 @@ function openModalLabelObat(trxId) {
         nama: it.nama,
         qty: it.qty,
         satuan: (obat && obat.satuan) ? obat.satuan : 'tablet/strip',
-        jenis: 'putih', // 'putih' (obat dalam) | 'biru' (obat luar)
+        jenis: 'putih',
         signa: '3 x 1 Tablet Sehari',
         waktu: 'Sesudah Makan',
         catatan: '',
@@ -2643,7 +2656,6 @@ function renderLabelEditorAndPreview() {
   const { trx, labels } = window.activeLabelState;
   const set = store.state.set || {};
 
-  // Area Editor
   const editorEl = $('modal-label-obat-editor');
   if (editorEl) {
     editorEl.innerHTML = `
@@ -2669,7 +2681,6 @@ function renderLabelEditorAndPreview() {
                 </div>
               </div>
 
-              <!-- Template Cepat -->
               <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;">
                 <span style="font-size:11px;color:var(--mu);align-self:center;">Pilihan Cepat:</span>
                 <button type="button" class="s" style="font-size:10.5px;padding:2px 8px;" onclick="applyQuickSigna(${idx}, '3 x 1 Tablet Sehari', 'Sesudah Makan', '')">3x1 Sesudah Makan</button>
@@ -2681,7 +2692,6 @@ function renderLabelEditorAndPreview() {
                 <button type="button" class="s" style="font-size:10.5px;padding:2px 8px;border-color:#0284c7;color:#0284c7;" onclick="applyQuickSigna(${idx}, 'Teteskan 2 Tetes', '3 Kali Sehari', 'Mata / Telinga', 'biru')">Tetes 3x (Luar)</button>
               </div>
 
-              <!-- Input Form Dosis & Catatan -->
               <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
                 <label style="flex:2;min-width:180px;font-size:11.5px;">Aturan Minum / Dosis (Signa)
                   <input style="margin-top:2px;" value="${esc(item.signa)}" oninput="updateLabelProperty(${idx}, 'signa', this.value)" placeholder="Contoh: 3 x 1 Tablet Sehari">
@@ -2700,7 +2710,6 @@ function renderLabelEditorAndPreview() {
     `;
   }
 
-  // Area Preview
   const previewEl = $('modal-label-obat-preview');
   if (previewEl) {
     previewEl.innerHTML = `
@@ -2766,13 +2775,12 @@ function viewDashboard() {
 
   return renderFilterBar() + `
     <div class="grid">
-      <div class="kpi"><span>Total Omset (Pendapatan)</span><b>${rp(fin.rev)}</b></div>
+      <div class="kpi"><span>Total Omset (Pendapatan Murni)</span><b>${rp(fin.rev)}</b></div>
       <div class="kpi"><span>Jumlah Kunjungan Pasien</span><b>${k} Pasien</b></div>
       <div class="kpi"><span>Rata-Rata per Pasien</span><b>${rp(avg)}</b></div>
       <div class="kpi"><span>Laba Bersih Operasional</span><b class="${fin.laba < 0 ? 'badge-bad' : 'badge-ok'}">${rp(fin.laba)}</b></div>
     </div>
 
-    <!-- Peringatan Operasional Penting -->
     <div class="card" style="border-left:4px solid var(--am);">
       <h2>Peringatan & Perhatian Manajemen</h2>
       <div class="row" style="font-size:13px;gap:20px;">
@@ -2783,7 +2791,6 @@ function viewDashboard() {
       </div>
     </div>
 
-    <!-- Grafik Visual Interaktif (Chart.js) -->
     <div class="charts-grid">
       <div class="chart-card">
         <h3>📈 Tren Omset Harian (Rp)</h3>
@@ -2805,7 +2812,6 @@ function viewDashboard() {
       </div>
     </div>
 
-    <!-- Komposisi Pendapatan -->
     <div class="card">
       <h2>Komposisi Pendapatan Pasien</h2>
       ${renderTable(
@@ -2828,7 +2834,6 @@ window._activeCharts = [];
 function initDashboardCharts(fin) {
   if (typeof Chart === 'undefined') return;
 
-  // Hancurkan chart lama agar tidak overlap saat redraw
   window._activeCharts.forEach(c => {
     try { c.destroy(); } catch (e) {}
   });
@@ -2836,10 +2841,9 @@ function initDashboardCharts(fin) {
 
   const trxList = fin.trxList || [];
 
-  // 1. Chart Omset Harian
   const dailyOmset = {};
   trxList.forEach(t => {
-    dailyOmset[t.tgl] = (dailyOmset[t.tgl] || 0) + (t.total || 0);
+    dailyOmset[t.tgl] = (dailyOmset[t.tgl] || 0) + Number(t.total || 0);
   });
   const daysSorted = Object.keys(dailyOmset).sort();
   const omsetValues = daysSorted.map(d => dailyOmset[d]);
@@ -2876,11 +2880,10 @@ function initDashboardCharts(fin) {
     window._activeCharts.push(c1);
   }
 
-  // 2. Chart Metode Pembayaran (Doughnut)
   const metodeCount = { Tunai: 0, QRIS: 0, Transfer: 0, 'Debit/Kredit': 0 };
   trxList.forEach(t => {
     const m = t.metode || 'Tunai';
-    metodeCount[m] = (metodeCount[m] || 0) + (t.total || 0);
+    metodeCount[m] = (metodeCount[m] || 0) + Number(t.total || 0);
   });
 
   const elMetode = document.getElementById('chart-metode');
@@ -2906,7 +2909,6 @@ function initDashboardCharts(fin) {
     window._activeCharts.push(c2);
   }
 
-  // 3. Chart Struktur Finansial (Bar)
   const elStruktur = document.getElementById('chart-struktur');
   if (elStruktur) {
     const c3 = new Chart(elStruktur, {
@@ -2942,10 +2944,9 @@ function initDashboardCharts(fin) {
 function viewLabaRugi() {
   const fin = calculateFinancials();
 
-  // Kelompokkan biaya operasional berdasarkan kategori
   const opGroup = {};
   inFilterRange(store.state.biaya).filter(b => b.status === 'approved').forEach(b => {
-    opGroup[b.kat] = (opGroup[b.kat] || 0) + b.jml;
+    opGroup[b.kat] = (opGroup[b.kat] || 0) + Number(b.jml || 0);
   });
 
   const pnlRows = [
@@ -2958,7 +2959,7 @@ function viewLabaRugi() {
     ['(-) Kerugian Obat Rusak & Kedaluwarsa', `(-) ${rp(fin.loss)}`],
     ...Object.keys(opGroup).map(kat => [`(-) Beban: ${esc(kat)}`, `(-) ${rp(opGroup[kat])}`]),
     ['(-) Beban Kas Kecil (Petty Cash)', `(-) ${rp(fin.pc)}`],
-    ['<b style="font-size:15px;">LABA BERSIH</b>', `<b style="font-size:15px;" class="${fin.laba < 0 ? 'badge-bad' : 'badge-ok'}">${rp(fin.laba)}</b>`]
+    ['<b style="font-size:15px;">LABA BERSIH OPERASIONAL</b>', `<b style="font-size:15px;" class="${fin.laba < 0 ? 'badge-bad' : 'badge-ok'}">${rp(fin.laba)}</b>`]
   ];
 
   return renderFilterBar() + `
@@ -2974,14 +2975,13 @@ function viewLabaRugi() {
 // -------------------------------------------------------------
 function viewArusKas() {
   const trxList = getFilteredTrx();
-  const totalMasuk = trxList.reduce((s, t) => s + (t.total || 0), 0);
-  const masukTunai = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
-  const masukNonTunai = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + (t.total || 0), 0);
+  const totalMasuk = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
+  const masukTunai = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
+  const masukNonTunai = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
 
-  // Arus kas keluar (Hanya pembelian yang lunas dalam range tanggal bayar)
-  const beliLunas = inFilterRange(store.state.beli).filter(b => b.lunas).reduce((s, b) => s + (b.total || 0), 0);
-  const biayaOp = inFilterRange(store.state.biaya).filter(b => b.status === 'approved').reduce((s, b) => s + (b.jml || 0), 0);
-  const pettyOut = inFilterRange(store.state.petty).reduce((s, p) => s + (p.jml || 0), 0);
+  const beliLunas = inFilterRange(store.state.beli).filter(b => b.lunas).reduce((s, b) => s + Number(b.total || 0), 0);
+  const biayaOp = inFilterRange(store.state.biaya).filter(b => b.status === 'approved').reduce((s, b) => s + Number(b.jml || 0), 0);
+  const pettyOut = inFilterRange(store.state.petty).reduce((s, p) => s + Number(p.jml || 0), 0);
   const totalKeluar = beliLunas + biayaOp + pettyOut;
   const arusKasBersih = totalMasuk - totalKeluar;
 
@@ -3025,7 +3025,7 @@ function viewArusKas() {
 function viewUtang() {
   const set = store.state.set || {};
   const unpaid = (store.state.beli || []).filter(b => !b.lunas).sort((a, b) => (a.tempo < b.tempo ? -1 : 1));
-  const totalUtang = unpaid.reduce((s, b) => s + (b.total || 0), 0);
+  const totalUtang = unpaid.reduce((s, b) => s + Number(b.total || 0), 0);
 
   const rows = unpaid.map(b => {
     const diff = Math.round((new Date(b.tempo) - new Date(todayStr)) / 864e5);
@@ -3082,6 +3082,7 @@ function actionApproveBiaya(id, isApproved) {
   const b = store.get('biaya', id);
   if (!b) return;
   b.status = isApproved ? 'approved' : 'ditolak';
+  b._t = Date.now();
   store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
   store.saveLocal();
   showAlert(`Pengeluaran ${isApproved ? 'disetujui' : 'ditolak'}.`, 'Sukses');
@@ -3161,10 +3162,10 @@ function quickEditOwnerWa() {
     const raw = (res.waOwner || '').trim();
     if (store.state.set) store.state.set.waOwner = raw;
     
-    // Sinkronkan ke akun user pimpinan
     const pimpinan = (store.state.users || []).find(u => u.role === 'pimpinan');
     if (pimpinan) {
       pimpinan.hp = raw;
+      pimpinan._t = Date.now();
     }
     store.logActivity('Ubah', 'Pengguna', `Nomor WA Owner diubah ke ${raw}`);
     store.saveLocal();
@@ -3189,7 +3190,6 @@ function viewPengguna() {
   ]);
 
   return `
-    <!-- Highlight WhatsApp Owner untuk Tutup Shift -->
     <div class="card" style="border-left:4px solid #16a34a;background:rgba(22,163,74,0.06);">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div>
@@ -3251,7 +3251,7 @@ function actionAddUser() {
     return;
   }
 
-  store.state.users.push({ id: u, u, pw, nama, hp, role });
+  store.state.users.push({ id: u, u, pw, nama, hp, role, _t: Date.now() });
   if (role === 'pimpinan' && hp) {
     store.state.set.waOwner = hp;
   }
@@ -3277,7 +3277,7 @@ function editUser(username) {
       { value: 'pimpinan', label: 'Pimpinan' }
     ]]
   ], res => {
-    Object.assign(user, res);
+    Object.assign(user, res, { _t: Date.now() });
     if (user.role === 'pimpinan' && user.hp) {
       store.state.set.waOwner = user.hp;
     }
@@ -3309,7 +3309,6 @@ function viewPengaturan() {
   const fbConfig = store.state.firebaseConfig || {};
 
   return `
-    <!-- Identitas Klinik -->
     <div class="card">
       <h2>Identitas & Profil Klinik</h2>
       <div class="row">
@@ -3351,7 +3350,6 @@ function viewPengaturan() {
       </div>
     </div>
 
-    <!-- Tampilan & Tema -->
     <div class="card">
       <h2>Tampilan Antarmuka</h2>
       <div class="row">
@@ -3383,7 +3381,6 @@ function viewPengaturan() {
       </div>
     </div>
 
-    <!-- Aturan Keuangan -->
     <div class="card">
       <h2>Aturan & Batas Keuangan</h2>
       <div class="row">
@@ -3400,7 +3397,6 @@ function viewPengaturan() {
       <button class="p" onclick="actionSaveSettings()">💾 Simpan Pengaturan Klinik</button>
     </div>
 
-    <!-- Sinkronisasi Cloud (Firebase Firestore 100% Gratis) -->
     <div class="card" style="border-left:4px solid var(--pr);">
       <h2>Sinkronisasi Cloud (Google Firebase - 100% Free Forever)</h2>
       <p style="color:var(--mu);font-size:13px;line-height:1.6;">
@@ -3429,7 +3425,6 @@ function viewPengaturan() {
       </div>
     </div>
 
-    <!-- Cadangan & Pemulihan Data -->
     <div class="card">
       <h2>Cadangan & Pemulihan Data Manual (JSON)</h2>
       <p style="color:var(--mu);font-size:13px;">
@@ -3488,10 +3483,10 @@ function actionSaveSettings() {
   set.edPeringatan = numVal('set-edHari') || 60;
   set.fiturKirimWA = $('set-fiturWA') ? $('set-fiturWA').checked : true;
 
-  // Sinkronkan nomor WA ke akun user pimpinan
   const pimpinan = (store.state.users || []).find(u => u.role === 'pimpinan');
   if (pimpinan && set.waOwner) {
     pimpinan.hp = set.waOwner;
+    pimpinan._t = Date.now();
   }
 
   store.logActivity('Ubah', 'Pengaturan', 'Pembaruan konfigurasi klinik');
@@ -3538,7 +3533,7 @@ function searchPasienLama() {
     resultsEl.innerHTML = '';
     return;
   }
-  // Deduplicate by nama+hp
+
   const seen = new Set();
   const unique = [];
   (store.state.pasien || []).forEach(p => {
@@ -3585,7 +3580,6 @@ function fillPasienLama(nama, hp) {
   if (namaEl)  namaEl.focus();
 }
 
-// Tutup dropdown pencarian pasien lama jika klik di luar
 document.addEventListener('click', e => {
   const resEl  = document.getElementById('p-search-results');
   const srchEl = document.getElementById('p-search-lama');
@@ -3613,7 +3607,6 @@ function viewDisplayTV() {
       </p>
     </div>
 
-    <!-- Video Edukasi Pasien -->
     <div class="card">
       <h2>🎬 Video Edukasi Pasien (YouTube / Video MP4)</h2>
       <div class="row" style="margin-bottom:6px;">
@@ -3623,7 +3616,6 @@ function viewDisplayTV() {
         </label>
       </div>
 
-      <!-- Penjelasan Error 153 & Solusi Praktis -->
       <div style="background:var(--bg);border-left:4px solid var(--warn);padding:14px 16px;border-radius:10px;font-size:12px;color:var(--tx);line-height:1.8;margin-bottom:14px;">
         <b style="color:var(--warn);font-size:13px;">💡 Mengapa YouTube Muncul Error 153 (Meskipun dari Akun Resmi Kemenkes)?</b><br>
         Error 153 terjadi <b>bukan karena videonya rusak</b>, melainkan karena sistem YouTube <b>memblokir pemutaran video jika file HTML dibuka langsung dari harddisk komputer (protokol <code>file:///</code>)</b>.<br>
@@ -3652,7 +3644,6 @@ function viewDisplayTV() {
       </div>
     </div>
 
-    <!-- Running Text -->
     <div class="card">
       <h2>📢 Teks Berjalan (Running Text)</h2>
       <label style="display:block;margin-bottom:10px;">
@@ -3730,13 +3721,12 @@ function viewKartuStok() {
   }
   const obat = obatList.find(o => o.id === selectedKartuStokOid);
 
-  // --- Compile mutations ---
   const muts = [];
 
   (store.state.beli || []).forEach(b => {
     (b.items || []).forEach(it => {
       if (it.oid === obat.id) {
-        muts.push({ tgl: b.tgl || '', ket: `📦 Pembelian — ${b.supplier || '-'} / Faktur: ${b.faktur || '-'}`, masuk: it.qty || 0, keluar: 0 });
+        muts.push({ tgl: b.tgl || '', ket: `📦 Pembelian — ${b.supplier || '-'} / Faktur: ${b.faktur || '-'}`, masuk: Number(it.qty || 0), keluar: 0 });
       }
     });
   });
@@ -3744,7 +3734,7 @@ function viewKartuStok() {
   (store.state.trx || []).forEach(t => {
     (t.items || []).forEach(it => {
       if ((it.oid || it.id) === obat.id && (it.t || it.jenis) === 'Obat') {
-        muts.push({ tgl: t.tgl || '', ket: `🧾 Penjualan — Nota: ${t.nota || '-'} / ${t.pasien || '-'}`, masuk: 0, keluar: it.qty || 0 });
+        muts.push({ tgl: t.tgl || '', ket: `🧾 Penjualan — Nota: ${t.no || '-'} / ${t.nama || '-'}`, masuk: 0, keluar: Number(it.qty || 0) });
       }
     });
   });
@@ -3752,7 +3742,7 @@ function viewKartuStok() {
   (store.state.returJual || []).forEach(r => {
     (r.items || []).forEach(it => {
       if ((it.oid || it.id) === obat.id) {
-        muts.push({ tgl: r.tgl || '', ket: `↩️ Retur Penjualan — Nota: ${r.notaRef || '-'}`, masuk: it.qty || 0, keluar: 0 });
+        muts.push({ tgl: r.tgl || '', ket: `↩️ Retur Penjualan — Nota: ${r.noNota || '-'}`, masuk: Number(it.qty || 0), keluar: 0 });
       }
     });
   });
@@ -3760,14 +3750,14 @@ function viewKartuStok() {
   (store.state.returBeli || []).forEach(r => {
     (r.items || []).forEach(it => {
       if ((it.oid || it.id) === obat.id) {
-        muts.push({ tgl: r.tgl || '', ket: `↪️ Retur ke Supplier — ${r.supplier || '-'}`, masuk: 0, keluar: it.qty || 0 });
+        muts.push({ tgl: r.tgl || '', ket: `↪️ Retur ke Supplier — ${r.supplier || '-'}`, masuk: 0, keluar: Number(it.qty || 0) });
       }
     });
   });
 
   (store.state.loss || []).forEach(l => {
     if (l.oid === obat.id || l.obatId === obat.id) {
-      muts.push({ tgl: l.tgl || '', ket: `⚠️ Kerugian/Opname — ${l.ket || l.keterangan || '-'}`, masuk: 0, keluar: l.qty || 0 });
+      muts.push({ tgl: l.tgl || '', ket: `⚠️ Kerugian/Opname — ${l.ket || l.keterangan || '-'}`, masuk: 0, keluar: Number(l.qty || 0) });
     }
   });
 
@@ -3842,19 +3832,19 @@ function exportKartuStok() {
   if (!obat) return;
   const muts = [];
   (store.state.beli || []).forEach(b => {
-    (b.items || []).forEach(it => { if (it.oid === obat.id) muts.push({ tgl: b.tgl, ket: `Pembelian - ${b.supplier||''} / ${b.faktur||''}`, masuk: it.qty, keluar: 0 }); });
+    (b.items || []).forEach(it => { if (it.oid === obat.id) muts.push({ tgl: b.tgl, ket: `Pembelian - ${b.supplier||''} / ${b.faktur||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
   });
   (store.state.trx || []).forEach(t => {
-    (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.nota||''} / ${t.pasien||''}`, masuk: 0, keluar: it.qty }); });
+    (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
   });
   (store.state.returJual || []).forEach(r => {
-    (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Jual - ${r.notaRef||''}`, masuk: it.qty, keluar: 0 }); });
+    (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Jual - ${r.noNota||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
   });
   (store.state.returBeli || []).forEach(r => {
-    (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Beli - ${r.supplier||''}`, masuk: 0, keluar: it.qty }); });
+    (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Beli - ${r.supplier||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
   });
   (store.state.loss || []).forEach(l => {
-    if (l.oid === obat.id || l.obatId === obat.id) muts.push({ tgl: l.tgl, ket: `Kerugian/Opname - ${l.ket||l.keterangan||''}`, masuk: 0, keluar: l.qty });
+    if (l.oid === obat.id || l.obatId === obat.id) muts.push({ tgl: l.tgl, ket: `Kerugian/Opname - ${l.ket||l.keterangan||''}`, masuk: 0, keluar: Number(l.qty||0) });
   });
   muts.sort((a, b) => (a.tgl < b.tgl ? -1 : 1));
   let saldo = 0;
@@ -3892,7 +3882,6 @@ function renderApp() {
     userHeaderEl.textContent = `${currentUser.nama} (${currentUser.role})`;
   }
 
-  // Render Sidebar Tabs
   const tabs = ROLE_TABS[currentRole] || [];
   if (!tabs.includes(activeTab)) {
     activeTab = tabs[0];
@@ -3905,10 +3894,8 @@ function renderApp() {
     </button>
   `).join('');
 
-  // Routing Konten View
   let content = '';
   switch (activeTab) {
-    // Kasir
     case 'Shift': content = viewShift(); break;
     case 'Pasien': content = viewPasien(); break;
     case 'Transaksi': 
@@ -3926,7 +3913,6 @@ function renderApp() {
       break;
     case 'Kas Kecil': content = viewPetty(); break;
 
-    // Admin & Pimpinan
     case 'Obat & Tarif': content = viewMaster(); break;
     case 'Paket Pelayanan': content = viewPaketPelayanan(); break;
     case 'Pembelian': content = viewPembelian(); break;
@@ -3938,7 +3924,6 @@ function renderApp() {
     case 'Verifikasi': content = viewVerifikasi(); break;
     case 'Display TV': content = viewDisplayTV(); break;
 
-    // Pimpinan
     case 'Dashboard': content = viewDashboard(); break;
     case 'Laba Rugi': content = viewLabaRugi(); break;
     case 'Arus Kas': content = viewArusKas(); break;
@@ -3948,7 +3933,6 @@ function renderApp() {
     case 'Pengguna': content = viewPengguna(); break;
     case 'Pengaturan': content = viewPengaturan(); break;
 
-    // Bersama
     case 'Ekspor': content = viewEkspor(); break;
 
     default:
@@ -3957,7 +3941,6 @@ function renderApp() {
 
   $('main-content').innerHTML = content;
 
-  // Inisialisasi Chart jika membuka tab Dashboard
   if (activeTab === 'Dashboard') {
     setTimeout(() => {
       initDashboardCharts(calculateFinancials());
@@ -3965,9 +3948,8 @@ function renderApp() {
   }
 }
 
-// Pintasan Keyboard Kasir (Keyboard Shortcuts: F1, F2, F3, F4, F8, Esc)
+// Pintasan Keyboard Kasir (F1, F2, F3, F4, F8, Esc)
 window.addEventListener('keydown', e => {
-  // Esc: Tutup semua modal terbuka
   if (e.key === 'Escape') {
     const modals = ['modal-alert', 'modal-confirm', 'modal-form', 'modal-nota', 'modal-label-obat', 'modal-shift-close'];
     modals.forEach(m => {
@@ -3977,13 +3959,11 @@ window.addEventListener('keydown', e => {
     document.body.classList.remove('printing-label');
   }
 
-  // F1: Shift Kasir
   if (e.key === 'F1') {
     e.preventDefault();
     if (currentRole === 'kasir') setTab('Shift');
   }
 
-  // F2: Pintasan fokus ke pencarian obat / keranjang kasir
   if (e.key === 'F2') {
     e.preventDefault();
     if (activeTab !== 'Transaksi' && currentRole === 'kasir') setTab('Transaksi');
@@ -3996,7 +3976,6 @@ window.addEventListener('keydown', e => {
     }, 100);
   }
 
-  // F3: Tambah / Buka Pendaftaran Pasien Antrean
   if (e.key === 'F3') {
     e.preventDefault();
     if (currentRole === 'kasir') {
@@ -4008,7 +3987,6 @@ window.addEventListener('keydown', e => {
     }
   }
 
-  // F4: Pintasan fokus ke input uang bayar tunai kasir
   if (e.key === 'F4') {
     e.preventDefault();
     if (activeTab !== 'Transaksi' && currentRole === 'kasir') setTab('Transaksi');
@@ -4021,7 +3999,6 @@ window.addEventListener('keydown', e => {
     }, 100);
   }
 
-  // F8: Buka Layar Antrean TV HDMI
   if (e.key === 'F8') {
     e.preventDefault();
     openTvDisplay();
@@ -4032,3 +4009,4 @@ window.addEventListener('keydown', e => {
 window.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
+```
