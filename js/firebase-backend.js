@@ -1,6 +1,5 @@
-﻿// Firebase Firestore Free Backend Adapter
-// Menggunakan Firebase Web SDK v10 Compat (CDN) - 100% Gratis di Google Firebase Spark Plan
-
+// Firebase Firestore Free Backend Adapter
+// Firebase Web SDK v10 Compat - Dioptimalkan untuk Sinkronisasi Pendapatan & Anti Tumpang Tindih
 class FirebaseBackend {
   constructor(store) {
     this.store = store;
@@ -16,7 +15,6 @@ class FirebaseBackend {
   updateBadge(status, text) {
     const el = document.getElementById('sync-badge');
     if (!el) return;
-
     if (status === 'online') {
       el.className = 'sync-badge online';
       el.innerHTML = `<span>●</span> <span>Cloud: Firebase Tersambung</span>`;
@@ -32,7 +30,7 @@ class FirebaseBackend {
     }
   }
 
-  // Konfigurasi Default Otomatis Firebase (assalam-db)
+  // Konfigurasi Firebase
   static DEFAULT_CONFIG = {
     apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
     authDomain: "assalam-db.firebaseapp.com",
@@ -43,31 +41,24 @@ class FirebaseBackend {
   };
 
   init() {
-    // Gunakan custom config jika ada di local, atau fallback ke DEFAULT_CONFIG
     let config = this.store.state.firebaseConfig;
     if (!config || !config.apiKey || !config.projectId) {
       config = FirebaseBackend.DEFAULT_CONFIG;
       this.store.state.firebaseConfig = config;
       this.store.saveLocal(false);
     }
-
     try {
       if (typeof firebase === 'undefined') {
         console.warn('Firebase SDK belum termuat dari CDN.');
         this.updateBadge('local');
         return;
       }
-
-      // Inisialisasi Firebase App
       if (!firebase.apps.length) {
         this.app = firebase.initializeApp(config);
       } else {
         this.app = firebase.app();
       }
-
       this.db = firebase.firestore();
-      
-      // Setup Realtime Listeners
       this.setupRealtimeListeners();
       this.isOnline = true;
       this.updateBadge('online');
@@ -81,49 +72,105 @@ class FirebaseBackend {
 
   setupRealtimeListeners() {
     if (!this.db) return;
-
-    // Bersihkan listener sebelumnya
+    // Bersihkan listener sebelumnya agar tidak terjadi duplikasi listener
     this.listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
     });
     this.listeners = [];
-
     const collections = this.store.COLLECTIONS;
 
-    // Listen settings
-    const unsubSet = this.db.doc('klinik_config/settings').onSnapshot(doc => {
-      if (doc.exists) {
-        const remoteData = doc.data();
-        if (remoteData && remoteData.set) {
-          this.store.state.set = Object.assign({}, this.store.state.set, remoteData.set);
-          this.store.saveLocal(false);
-          if (typeof window.renderCurrentTab === 'function') {
-            window.renderCurrentTab();
-          }
-        }
-      }
-    }, err => {
-      console.warn('Listener settings error:', err);
-    });
-    this.listeners.push(unsubSet);
-
-    // Listen each collection
-    collections.forEach(colName => {
-      const unsub = this.db.collection('k_' + colName).onSnapshot(snapshot => {
-        if (!snapshot.metadata.hasPendingWrites) {
-          const docs = snapshot.docs.map(d => d.data());
-          // Khusus 'users', JANGAN biarkan kosong jika di remote belum ada data
-          if (docs.length > 0) {
-            this.store.state[colName] = docs.sort((a, b) => (a._t || 0) - (b._t || 0));
+    // ==========================================
+    // 1. LISTENER PENGATURAN APLIKASI & NOMOR URUT (SEQ)
+    // ==========================================
+    const settingsRef = this.db.doc('klinik_config/settings');
+    const unsubSet = settingsRef.onSnapshot(async doc => {
+      try {
+        if (doc.exists) {
+          const remoteData = doc.data() || {};
+          if (remoteData.set && typeof remoteData.set === 'object') {
+            this.store.state.set = Object.assign({}, this.store.state.set || {}, remoteData.set);
+            
+            // Sinkronisasi nomor urut / sequence agar tidak tumpang tindih antar kasir/perangkat
+            if (remoteData.seq && typeof remoteData.seq === 'object') {
+              this.store.state.seq = Object.assign({}, this.store.state.seq || {}, remoteData.seq);
+            }
+            
             this.store.saveLocal(false);
             if (typeof window.renderCurrentTab === 'function') {
               window.renderCurrentTab();
             }
-          } else if (colName === 'users' && (!this.store.state.users || this.store.state.users.length === 0)) {
-            // Inisialisasi akun master pimpinan ke Firestore jika di cloud masih kosong
-            this.store.state.users = [{ u: 'praktekrose', pw: 'Dinkes123@', nama: 'Pimpinan Klinik', role: 'pimpinan' }];
+          }
+        } else {
+          console.log('Dokumen pengaturan belum tersedia. Inisialisasi awal.');
+          await settingsRef.set({
+            set: this.store.state.set || {},
+            seq: this.store.state.seq || {}
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.warn('Gagal memuat/inisialisasi settings:', e);
+        this.updateBadge('error', e.code || e.message);
+      }
+    }, err => {
+      console.warn('Listener settings error:', err);
+      this.updateBadge('error', err.code || err.message);
+    });
+    this.listeners.push(unsubSet);
+
+    // ==========================================
+    // 2. LISTENER SELURUH COLLECTION (DENGAN MERGE TIMESTAMP ANTI TUMPANG TINDIH)
+    // ==========================================
+    collections.forEach(colName => {
+      const unsub = this.db.collection('k_' + colName).onSnapshot(snapshot => {
+        // Hanya proses jika perubahan bukan berasal dari pending write lokal yang sedang diproses
+        if (!snapshot.metadata.hasPendingWrites) {
+          const remoteDocs = snapshot.docs.map(d => d.data());
+          
+          if (remoteDocs.length > 0) {
+            // Gunakan Map berdasarkan ID unik untuk menggabungkan data lokal dan remote secara aman
+            const mergedMap = new Map();
+            
+            // Masukkan data lokal yang ada saat ini
+            (this.store.state[colName] || []).forEach(item => {
+              if (item && item.id) mergedMap.set(item.id, item);
+            });
+            
+            // Bandingkan dan timpa dengan data remote menggunakan timestamp (_t) terbaru
+            // Ini memastikan data pendapatan/transaksi tidak terhapus atau tertimpa data kosong
+            remoteDocs.forEach(remoteItem => {
+              if (remoteItem && remoteItem.id) {
+                const localItem = mergedMap.get(remoteItem.id);
+                if (!localItem || (remoteItem._t || 0) >= (localItem._t || 0)) {
+                  mergedMap.set(remoteItem.id, remoteItem);
+                }
+              }
+            });
+
+            this.store.state[colName] = Array.from(mergedMap.values()).sort(
+              (a, b) => (a._t || 0) - (b._t || 0)
+            );
+            
             this.store.saveLocal(false);
-            this.pushData(this.store.state);
+            if (typeof window.renderCurrentTab === 'function') {
+              window.renderCurrentTab();
+            }
+          }
+          // =================================ol
+          // KHUSUS INISIALISASI USER PERTAMA
+          // ==================================
+          else if (colName === 'users' && (!this.store.state.users || this.store.state.users.length === 0)) {
+            const initialUser = {
+              u: 'praktekrose',
+              pw: 'Dinkes123@',
+              nama: 'Pimpinan Klinik',
+              role: 'pimpinan',
+              _t: Date.now()
+            };
+            this.store.state.users = [initialUser];
+            this.store.saveLocal(false);
+            this.db.collection('k_users').doc(initialUser.u).set(initialUser, { merge: true }).catch(e => {
+              console.warn('Gagal inisialisasi akun pimpinan:', e);
+            });
           }
         }
       }, err => {
@@ -132,18 +179,13 @@ class FirebaseBackend {
       });
       this.listeners.push(unsub);
     });
-
-    // Otomatis seed initial data ke cloud jika Firestore masih fresh/kosong
-    setTimeout(() => {
-      if (this.isOnline && this.store.state) {
-        this.pushData(this.store.state);
-      }
-    }, 1500);
   }
 
+  // ==========================================
+  // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
+  // ==========================================
   pushData(state) {
     if (!this.db || !this.isOnline) return;
-
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.performPush(state);
@@ -153,35 +195,51 @@ class FirebaseBackend {
   async performPush(state) {
     if (!this.db) return;
     this.updateBadge('syncing');
+    
+    // Gunakan antrean janji (Promise chain) untuk mencegah bentrok penulisan batch secara bersamaan
+    this.syncQueue = this.syncQueue.then(async () => {
+      try {
+        const batch = this.db.batch();
+        
+        // Sinkronisasi pengaturan dan sequence nomor urut pendapatan/pasien
+        const setRef = this.db.doc('klinik_config/settings');
+        batch.set(setRef, {
+          set: state.set,
+          seq: state.seq || {}
+        }, { merge: true });
 
-    try {
-      const batch = this.db.batch();
-
-      // Sinkron pengaturan
-      const setRef = this.db.doc('klinik_config/settings');
-      batch.set(setRef, { set: state.set, seq: state.seq || {} }, { merge: true });
-
-      // Sinkron collections penting
-      for (const col of this.store.COLLECTIONS) {
-        const items = state[col] || [];
-        for (const item of items) {
-          // Khusus user, identifier uniknya adalah item.u (username), sedangkan item lain adalah item.id
-          const docId = (col === 'users') ? (item.u || item.id) : item.id;
-          if (item && docId) {
-            const docRef = this.db.collection('k_' + col).doc(String(docId));
-            batch.set(docRef, JSON.parse(JSON.stringify(item)), { merge: true });
+        // Sinkronisasi seluruh item di collections secara aman
+        for (const col of this.store.COLLECTIONS) {
+          const items = state[col] || [];
+          for (const item of items) {
+            if (!item) continue;
+            // Pastikan setiap item memiliki properti _t (timestamp) agar sinkronisasi akurat
+            if (!item._t) {
+              item._t = Date.now();
+            }
+            
+            const docId = (col === 'users') ? (item.u || item.id) : item.id;
+            if (docId) {
+              const docRef = this.db.collection('k_' + col).doc(String(docId));
+              batch.set(docRef, JSON.parse(JSON.stringify(item)), { merge: true });
+            }
           }
         }
-      }
 
-      await batch.commit();
-      this.updateBadge('online');
-    } catch (err) {
-      console.error('Push ke Firebase gagal:', err);
-      this.updateBadge('error', err.code || err.message);
-    }
+        await batch.commit();
+        this.updateBadge('online');
+      } catch (err) {
+        console.error('Push ke Firebase gagal:', err);
+        this.updateBadge('error', err.code || err.message);
+      }
+    });
+
+    return this.syncQueue;
   }
 
+  // ==========================================
+  // 4. SIMPAN KONFIGURASI FIREBASE
+  // ==========================================
   async saveConfig(cfg) {
     this.store.state.firebaseConfig = cfg;
     this.store.saveLocal(false);
@@ -189,6 +247,9 @@ class FirebaseBackend {
     return true;
   }
 
+  // ==========================================
+  // 5. PUTUSKAN KONEKSI FIREBASE
+  // ==========================================
   disconnect() {
     this.listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
@@ -203,4 +264,7 @@ class FirebaseBackend {
   }
 }
 
-window.firebaseBackend = new FirebaseBackend(window.clinicStore);
+// ==========================================
+// INISIALISASI BACKEND
+// ==========================================
+window.firebaseBackend = new FirebaseBackend(window.clinicStore);[span_0](start_span)[span_0](end_span)
