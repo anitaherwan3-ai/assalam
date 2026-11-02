@@ -1,4 +1,3 @@
-```javascript
 // Aplikasi Utama Keuangan Klinik (Controller & View Renderer)
 // Diperbarui & Disinkronkan: Pencegahan Tumpang Tindih & Akurasi Nominal Keuangan
 
@@ -24,66 +23,6 @@ let dateFilter = {
   metode: '',
   kasir: ''
 };
-// Authentication yang disempurnakan (Anti-Gagal Login & Master Akun Terjaga)
-function doLogin() {
-  const uInput = val('login-username').trim();
-  const pInput = val('login-password');
-  const errorEl = $('login-error');
-
-  // Kredensial Akun Master Permanen Pimpinan
-  const MASTER_USER = {
-    u: 'praktekrose',
-    pw: 'Dinkes123@',
-    nama: 'Pimpinan Klinik',
-    role: 'pimpinan',
-    hp: (store.state.set && store.state.set.waOwner) ? store.state.set.waOwner : '081299998888',
-    _t: Date.now()
-  };
-
-  // Pastikan store.state.users terinisialisasi sebagai array
-  if (!store.state.users || !Array.isArray(store.state.users)) {
-    store.state.users = [];
-  }
-
-  // Cari apakah akun master sudah ada di state, jika belum masukkan secara paksa
-  let masterIdx = store.state.users.findIndex(x => x.u.toLowerCase() === 'praktekrose');
-  if (masterIdx >= 0) {
-    // Perbarui password atau pastikan kredensial master valid
-    store.state.users[masterIdx].pw = 'Dinkes123@';
-    store.state.users[masterIdx].role = 'pimpinan';
-  } else {
-    store.state.users.push(MASTER_USER);
-  }
-
-  // Cek kecocokan login di database state users
-  let user = (store.state.users || []).find(x => x.u.toLowerCase() === uInput.toLowerCase() && x.pw === pInput);
-
-  if (!user) {
-    errorEl.textContent = 'Username atau password tidak sesuai!';
-    return;
-  }
-
-  errorEl.textContent = '';
-  currentUser = user;
-  currentRole = user.role;
-  activeTab = ROLE_TABS[currentRole] ? ROLE_TABS[currentRole][0] : 'Dashboard';
-  cartItems = [];
-  
-  const loginModal = $('login-modal');
-  if (loginModal) loginModal.style.display = 'none';
-  const passInput = $('login-password');
-  if (passInput) passInput.value = '';
-  
-  store.logActivity('Masuk', 'Sesi', `User ${user.nama} (${user.role}) login`);
-  store.saveLocal(false);
-  
-  if (window.firebaseBackend && window.firebaseBackend.pushData) {
-    window.firebaseBackend.pushData(store.state);
-  }
-
-  renderApp();
-};
-
 // Navigasi Tabs per Role
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Kas Kecil'],
@@ -156,7 +95,10 @@ function calculateFinancials() {
   return { 
     trxList, rev, hpp, loss, op, pc, kons, tind, obat, paket, disk, laba,
     totalModalAwalShift,
-    totalKasDiTangan: totalModalAwalShift + rev - pc // Total Kas termasuk Modal Awal dikurangi Pengeluaran Kas Kecil
+    totalKasDiTangan: totalModalAwalShift +
+      trxList.filter(t => t.metode === 'Tunai')
+        .reduce((s, t) => s + Number(t.total || 0), 0) - pc
+    // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
 }
 
@@ -4068,4 +4010,3 @@ window.addEventListener('keydown', e => {
 window.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
-```
