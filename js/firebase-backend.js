@@ -378,6 +378,63 @@ class FirebaseBackend {
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
+  // Simpan transaksi Kasir dan pengurangan stok/batch dalam satu transaksi Firestore.
+  async commitCashierTransaction(trx, patientId, stockChanges) {
+    if (!this.db || !this.auth || !this.auth.currentUser ||
+        !this.currentProfile || this.currentProfile.role !== 'kasir') {
+      throw new Error('Akun Kasir belum terhubung ke Firebase.');
+    }
+    const trxRef = this.db.collection('k_trx').doc(String(trx.id));
+    const patientRef = this.db.collection('k_pasien').doc(String(patientId));
+    const changes = Array.isArray(stockChanges) ? stockChanges : [];
+    const obatRefs = changes.map(x => ({
+      data: x,
+      ref: this.db.collection('k_obat').doc(String(x.oid))
+    }));
+    const batchRefs = [];
+    changes.forEach(x => (x.batches || []).forEach(b => {
+      batchRefs.push({ data: b, ref: this.db.collection('k_batch').doc(String(b.bid)), oid: x.oid });
+    }));
+
+    await this.db.runTransaction(async transaction => {
+      const priorTrx = await transaction.get(trxRef);
+      if (priorTrx.exists) return; // Idempotent: nota yang sama tidak boleh mengurangi stok dua kali.
+      const patientSnap = await transaction.get(patientRef);
+      const obatSnaps = [];
+      for (const item of obatRefs) obatSnaps.push(await transaction.get(item.ref));
+      const batchSnaps = [];
+      for (const item of batchRefs) batchSnaps.push(await transaction.get(item.ref));
+
+      for (let i = 0; i < obatRefs.length; i++) {
+        const item = obatRefs[i], snap = obatSnaps[i], qty = Number(item.data.qty);
+        if (!snap.exists || !Number.isFinite(qty) || qty <= 0 ||
+            Number((snap.data() || {}).stok || 0) < qty) {
+          throw new Error('Stok obat di server berubah atau tidak mencukupi. Muat ulang data stok sebelum transaksi.');
+        }
+      }
+      for (let i = 0; i < batchRefs.length; i++) {
+        const item = batchRefs[i], snap = batchSnaps[i], qty = Number(item.data.qty);
+        if (!snap.exists || !Number.isFinite(qty) || qty <= 0 ||
+            Number((snap.data() || {}).sisa || 0) < qty) {
+          throw new Error('Stok batch di server berubah atau tidak mencukupi. Transaksi tidak disimpan.');
+        }
+      }
+
+      const now = Date.now();
+      obatRefs.forEach((item, i) => {
+        const stok = Number((obatSnaps[i].data() || {}).stok || 0);
+        transaction.update(item.ref, { stok: stok - Number(item.data.qty), _t: now });
+      });
+      batchRefs.forEach((item, i) => {
+        const sisa = Number((batchSnaps[i].data() || {}).sisa || 0);
+        transaction.update(item.ref, { sisa: sisa - Number(item.data.qty), _t: now });
+      });
+      if (patientSnap.exists) transaction.update(patientRef, { done: true, _t: now });
+      transaction.set(trxRef, trx);
+    });
+    return true;
+  }
+
   pushData(state) {
     if (!this.db || !this.isOnline || !this.auth || !this.auth.currentUser) return;
     clearTimeout(this.debounceTimer);
