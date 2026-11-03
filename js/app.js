@@ -3852,7 +3852,8 @@ function viewPimpinanPasien() {
     esc(p.hp || '-'),
     esc(p.layanan || '-'),
     p.deletedAt || p.status === 'dihapus' ? '<span class="badge-warn">Diarsipkan</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
-    esc(p.kasir || '-')
+    esc(p.kasir || '-'),
+    archiveMode ? `<button class="s p" onclick="actionRestorePasien('${p.id}')">Pulihkan</button>` : '-'
   ]);
   return `
     <div class="card">
@@ -3863,9 +3864,31 @@ function viewPimpinanPasien() {
         <button class="${archiveMode ? 'p' : 's'}" onclick="window.PAGE_STATE.patientArchive=true;renderApp()">Arsip Pasien</button>
       </div>
       <div style="font-weight:700;margin-bottom:10px;">Total catatan: ${patients.length}</div>
-      ${renderTable(['Tanggal', 'Jam', 'No. Antrean', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Petugas'], rows, { key: archiveMode ? 'pimpinan_pasien_arsip' : 'pimpinan_pasien_readonly' })}
+      ${renderTable(['Tanggal', 'Jam', 'No. Antrean', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Petugas', 'Aksi'], rows, { key: archiveMode ? 'pimpinan_pasien_arsip' : 'pimpinan_pasien_readonly' })}
     </div>
   `;
+}
+
+function actionRestorePasien(id) {
+  if (currentRole !== 'pimpinan') {
+    showAlert('Hanya Pimpinan yang dapat memulihkan arsip pasien.', 'Akses Ditolak');
+    return;
+  }
+  showConfirm('Pulihkan pasien ini ke daftar pasien aktif?', () => {
+    const p = store.get('pasien', id);
+    if (!p || (!p.deletedAt && p.status !== 'dihapus')) {
+      showAlert('Catatan arsip tidak ditemukan atau sudah aktif.', 'Informasi');
+      return;
+    }
+    p.status = 'aktif';
+    p.deletedAt = null;
+    p.deletedBy = null;
+    p._t = Date.now();
+    store.logActivity('Pulihkan', 'Pasien', `${p.no} - ${p.nama}`);
+    store.saveLocal();
+    window.PAGE_STATE.patientArchive = false;
+    renderApp();
+  });
 }
 
 function viewPimpinanStok() {
