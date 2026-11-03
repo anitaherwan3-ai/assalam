@@ -109,8 +109,11 @@ function calculateFinancials() {
     totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
       trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
-      approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai')
-        .reduce((s, r) => s + Number(r.pengembalian.nominal || r.total || 0), 0) - pc
+      approvedReturns.filter(r =>
+        // Pertahankan perlakuan kas historis untuk retur lama yang belum memiliki data pembayaran.
+        (r.metode === 'Tunai' && !r.pengembalian) ||
+        (r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai'))
+        .reduce((s, r) => s + Number(r.pengembalian ? (r.pengembalian.nominal || r.total || 0) : (r.total || 0)), 0) - pc
     // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
 }
@@ -1415,7 +1418,7 @@ function printReceipt(trxId) {
       return `<div style="font-size:11px;margin:4px 0;">
         <div>${esc(r.namaItem)} — ${Number(r.qty || 0)} x ${rp(r.harga || 0)}</div>
         <div style="display:flex;justify-content:space-between;"><span>Nilai retur (${esc(r.status || 'menunggu')})</span><b>${rp(r.total || 0)}</b></div>
-        <div style="font-size:10px;color:#475569;">Uang: ${paid ? 'SUDAH DIKEMBALIKAN (' + esc(r.pengembalian.metode || '-') + ')' : 'BELUM DIKEMBALIKAN'}</div>
+        <div style="font-size:10px;color:#475569;">Uang: ${!r.pengembalian ? 'DATA RETUR LAMA — PERLU VERIFIKASI' : (paid ? 'SUDAH DIKEMBALIKAN (' + esc(r.pengembalian.metode || '-') + ')' : 'BELUM DIKEMBALIKAN')}</div>
       </div>`;
     }).join('')}
     <div style="font-size:11px;font-weight:700;text-align:right;">Nilai transaksi awal tetap: ${rp(trx.total)}</div>
@@ -2662,17 +2665,20 @@ function viewRiwayat() {
     const status = r.status || 'disetujui';
     const badge = status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
       status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
-    const refund = r.pengembalian || {};
-    const refundBadge = refund.status === 'dibayar'
-      ? '<span class="badge-ok">Uang Sudah Dikembalikan</span>'
-      : (status === 'disetujui' ? '<span class="badge-warn">Menunggu Pimpinan</span>' : '-');
+    const refund = r.pengembalian || null;
+    const legacyRefund = status === 'disetujui' && !refund;
+    const refundBadge = legacyRefund
+      ? '<span class="badge-warn">Retur Lama - Perlu Rekonsiliasi</span>'
+      : (refund && refund.status === 'dibayar'
+        ? '<span class="badge-ok">Uang Sudah Dikembalikan</span>'
+        : (status === 'disetujui' ? '<span class="badge-warn">Menunggu Pimpinan</span>' : '-'));
     const actions = status === 'menunggu' && (currentRole === 'admin' || currentRole === 'pimpinan')
       ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>`
-      : (status === 'disetujui' && refund.status !== 'dibayar' && currentRole === 'pimpinan'
+      : (status === 'disetujui' && refund && refund.status === 'menunggu' && currentRole === 'pimpinan'
         ? `<button class="p" onclick="actionPayReturJual('${r.id}')">Catat Uang Kembali</button>` : '');
-    const refundDetail = refund.status === 'dibayar'
+    const refundDetail = legacyRefund ? 'Periksa catatan lama' : (refund && refund.status === 'dibayar'
       ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') + ' / ' + esc(refund.dibayarOleh || '-')
-      : '-';
+      : '-');
     return [esc(r.tgl), esc(r.noNota), esc(r.namaPasien), esc(r.namaItem), Number(r.qty || 0), rp(r.total),
       esc(r.alasan), esc(r.kasir || '-'), badge, refundBadge, refundDetail, actions];
   });
