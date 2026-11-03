@@ -348,7 +348,7 @@ class ClinicStore {
   callPatient(patientId) {
     const today = new Date().toISOString().slice(0, 10);
     const patient = (this.state.pasien || []).find(p => p.id === patientId);
-    if (!patient) return false;
+    if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
     // Reset status calling pasien lain hari ini
     (this.state.pasien || []).forEach(p => {
