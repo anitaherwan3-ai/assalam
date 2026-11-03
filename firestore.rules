@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.clinic == 'assalam-db'
+        && request.auth.token.role in ['pimpinan', 'admin', 'kasir'];
+    }
+    function pimpinan() { return signedIn() && request.auth.token.role == 'pimpinan'; }
+    function adminOrPimpinan() { return signedIn() && request.auth.token.role in ['admin', 'pimpinan']; }
+    function kasirOrAbove() { return signedIn() && request.auth.token.role in ['kasir', 'admin', 'pimpinan']; }
+
+    match /klinik_config/{document} {
+      allow read: if signedIn();
+      allow write: if pimpinan();
+    }
+
+    // Profil pengguna tidak dapat ditulis langsung dari browser.
+    // Semua pembuatan/perubahan akun harus melalui Cloud Functions.
+    match /k_users/{document} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /k_log/{document} {
+      allow read: if adminOrPimpinan();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.u == request.auth.token.username;
+      allow update: if pimpinan() || (signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.u == request.auth.token.username);
+      allow delete: if pimpinan();
+    }
+
+    match /k_pasien/{document} {
+      allow read, write: if kasirOrAbove();
+    }
+    match /k_trx/{document} {
+      allow read, write: if kasirOrAbove();
+    }
+    match /k_shift/{document} {
+      allow read, write: if kasirOrAbove();
+    }
+    match /k_petty/{document} {
+      allow read, write: if kasirOrAbove();
+    }
+    match /k_obat/{document} {
+      allow read: if signedIn();
+      allow write: if adminOrPimpinan();
+    }
+    match /k_tarif/{document} {
+      allow read: if signedIn();
+      allow write: if adminOrPimpinan();
+    }
+    match /k_paket/{document} {
+      allow read: if signedIn();
+      allow write: if adminOrPimpinan();
+    }
+    match /k_batch/{document} {
+      allow read: if signedIn();
+      allow write: if adminOrPimpinan();
+    }
+    match /k_beli/{document} {
+      allow read: if adminOrPimpinan();
+      allow write: if adminOrPimpinan();
+    }
+    match /k_biaya/{document} {
+      allow read, write: if adminOrPimpinan();
+    }
+    match /k_loss/{document} {
+      allow read, write: if adminOrPimpinan();
+    }
+    match /k_returJual/{document} {
+      allow read, write: if adminOrPimpinan();
+    }
+    match /k_returBeli/{document} {
+      allow read, write: if adminOrPimpinan();
+    }
+
+    // Semua dokumen yang tidak didefinisikan di atas tertutup secara default.
+  }
+}

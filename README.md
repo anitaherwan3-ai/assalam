@@ -64,35 +64,33 @@ Aplikasi manajemen operasional dan keuangan klinik lengkap berbasis web modern y
 
 ---
 
-## 🔑 Akun Uji Coba
+## 🔐 Login Pengguna (Firebase Authentication)
 
-Buka file `index.html` pada browser Anda dan gunakan salah satu akun berikut:
+Versi pengembangan terbaru menggunakan **email + password melalui Firebase Authentication**. Login username/password lokal lama tidak lagi menjadi otoritas autentikasi.
 
-| Peran (Role) | Username | Password | Hak Akses Utama |
-| :--- | :--- | :--- | :--- |
-| **Kasir** | `kasir` | `kasir123` | Buka/Tutup Shift, Antrean Pasien, Transaksi POS, Cetak Struk, Kas Kecil |
-| **Admin** | `admin` | `admin123` | Master Obat & Tarif, Pembelian Supplier, Kedaluwarsa, Biaya, Stok Opname, Verifikasi Setoran, Ekspor |
-| **Pimpinan** | `pimpinan` | `pimpinan123` | Dashboard KPI, Laba Rugi, Arus Kas, Utang, Approval Biaya, Manajemen Pengguna, Pengaturan & Cloud |
+- Akun master Pimpinan tetap memakai ID internal `praktekrose`, tetapi login menggunakan email yang didaftarkan pada Firebase Authentication.
+- Pimpinan dapat menambah/migrasikan akun pengguna lama, mengganti email login, mengubah peran, mengatur password baru, dan menonaktifkan akun.
+- UID Firebase dan ID internal pengguna dipertahankan agar riwayat transaksi/audit tidak terputus saat email diganti.
+- Password tidak disimpan di Firestore. Pengelolaan akun dilakukan melalui Cloud Functions.
+- Gunakan alamat email nyata yang dapat menerima email reset password; domain contoh `@assalamklinik.id` tidak dapat menerima email sebelum domain dan mailbox benar-benar dikonfigurasi.
+
+Ikuti `AUTH_MIGRATION.md` untuk bootstrap akun master, deploy Cloud Functions dan Firestore Security Rules, serta migrasi akun lama. Jangan menggunakan rules test mode untuk deployment produksi.
 
 ---
 
-## ☁️ Cara Menghubungkan Backend Cloud Firebase (100% Gratis)
+## ☁️ Konfigurasi Firebase Cloud
 
-Aplikasi ini sudah siap pakai secara lokal (tersimpan di browser). Jika ingin digunakan di beberapa komputer/gadget sekaligus secara bersamaan:
+Proyek ini telah diarahkan ke Firebase project `assalam-db`. Sebelum login email/password dapat digunakan:
 
-1. Buka [Google Firebase Console](https://console.firebase.google.com/) dan login dengan akun Google Anda.
-2. Klik **Add project** (buat project baru, misal: `klinik-sehat-demo`).
-3. Masuk ke menu **Build** > **Firestore Database**, klik **Create database** (pilih lokasi terdekat seperti `asia-southeast2 / Jakarta`, pilih **Start in test mode**).
-4. Masuk ke **Project Settings** (ikon gerigi di kiri atas), pada bagian *Your apps*, klik ikon Web `</>`.
-5. Salin objek konfigurasinya:
-   ```javascript
-   apiKey: "AIzaSy...",
-   authDomain: "klinik-xxxx.firebaseapp.com",
-   projectId: "klinik-xxxx",
-   appId: "1:xxxx:web:xxxx"
-   ```
-6. Buka aplikasi klinik, login sebagai **Pimpinan**, masuk ke menu **Pengaturan** > **Sinkronisasi Cloud (Firebase)**, tempelkan nilai tersebut lalu klik **Simpan & Hubungkan**.
-7. Status di header akan berubah menjadi **🟢 Cloud: Firebase Tersambung**. Seluruh komputer kasir, apotek, dan pimpinan sekarang tersinkronisasi otomatis!
+1. Buka Firebase Console untuk project `assalam-db`.
+2. Aktifkan **Authentication → Sign-in method → Email/Password**.
+3. Pastikan Firestore Database aktif dan lakukan backup/export data sebelum migrasi.
+4. Jalankan bootstrap akun master sesuai `AUTH_MIGRATION.md`.
+5. Deploy `firestore.rules` dan Cloud Functions. Rules baru menutup akses anonim dan mengatur hak tulis berdasarkan role.
+6. Setelah master login berhasil, migrasikan akun admin/kasir lama dari menu **Pengguna**.
+7. Uji login, perubahan email, nonaktif akun, reset password, sinkronisasi dua perangkat, dan Display TV pada sesi terautentikasi sebelum aplikasi digunakan operasional.
+
+Jangan mengaktifkan rules publik/test mode untuk penggunaan klinik. Jangan menghapus atau mengosongkan koleksi Firestore saat migrasi.
 
 ---
 
@@ -112,3 +110,9 @@ klinik-keuangan/
     ├── export-helper.js    # Ekspor CSV Excel (\uFEFF), PDF (jsPDF), dan JSON backup
     └── app.js              # Alur kerja bisnis, navigasi role, kasir POS & kalkulator
 ```
+
+### Akun Pimpinan
+- Pimpinan utama: `praktekrose@gmail.com` (ID tetap `praktekrose`).
+- Pimpinan kedua: `nursalim42@gmail.com` (ID tetap `pimpinan2`, dibuat dari menu Pengguna setelah Pimpinan utama berhasil login).
+- Password ditentukan sendiri saat bootstrap/pembuatan akun; jangan kirimkan password melalui chat.
+- Panduan lengkap: `AUTH_MIGRATION.md`.
