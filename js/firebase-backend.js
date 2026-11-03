@@ -225,7 +225,7 @@ class FirebaseBackend {
     const role = this.currentProfile && this.currentProfile.role;
     let allowedCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
     if (role === 'kasir') {
-      allowedCollections = ['obat', 'tarif', 'paket', 'batch', 'pasien', 'trx', 'shift', 'petty'];
+      allowedCollections = ['obat', 'tarif', 'paket', 'batch', 'pasien', 'trx', 'shift', 'petty', 'returJual'];
     } else if (role === 'admin') {
       allowedCollections = allowedCollections;
     } else if (role !== 'pimpinan') {
@@ -350,22 +350,22 @@ class FirebaseBackend {
         // di bawah batas maksimum Firestore 500 operasi.
         const operations = [];
 
-        // Hanya Pimpinan yang boleh menulis pengaturan klinik dan sequence global.
+        // Pimpinan mengelola seluruh konfigurasi; Admin hanya field Display TV.
         if (profile.role === 'pimpinan') {
-          operations.push({
-            ref: this.db.doc('klinik_config/settings'),
-            data: {
-              set: state.set || {},
-              seq: state.seq || {}
-            },
-            merge: true
-          });
+          operations.push({ ref: this.db.doc('klinik_config/settings'),
+            data: { set: state.set || {}, seq: state.seq || {} }, merge: true });
+        } else if (profile.role === 'admin') {
+          const settings = state.set || {};
+          operations.push({ ref: this.db.doc('klinik_config/settings'),
+            data: { set: { youtubeVideoId: settings.youtubeVideoId || '',
+              enableYoutubeDisplay: settings.enableYoutubeDisplay !== false,
+              runningTextDisplay: settings.runningTextDisplay || '' } }, merge: true });
         }
 
         // Batasi penulisan berdasarkan hak akses masing-masing peran.
         let writableCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
         if (profile.role === 'kasir') {
-          writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log'];
+          writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log', 'returJual'];
         } else if (profile.role === 'admin') {
           // Admin hanya menulis data operasional gudang/keuangan; data pasien,
           // transaksi kasir, shift, dan kas kecil tetap menjadi kewenangan Kasir/Pimpinan.
@@ -376,8 +376,11 @@ class FirebaseBackend {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
-            // Staf hanya boleh mengirim log aktivitas miliknya sendiri.
+            // Staf hanya mengirim log miliknya sendiri.
             if (col === 'log' && profile.role !== 'pimpinan' && item.u !== profile.u) continue;
+            // Kasir hanya mengirim pengajuan retur miliknya yang masih menunggu.
+            if (col === 'returJual' && profile.role === 'kasir' &&
+                (item.kasir !== profile.u || item.status !== 'menunggu')) continue;
 
             const payload = JSON.parse(JSON.stringify(item));
             if (!payload._t) payload._t = Date.now();
