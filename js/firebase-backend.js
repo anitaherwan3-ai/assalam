@@ -277,10 +277,10 @@ class FirebaseBackend {
     // 2. LISTENER SELURUH COLLECTION (DENGAN MERGE TIMESTAMP ANTI TUMPANG TINDIH)
     // ==========================================
     collections.forEach(colName => {
-      const unsub = this.db.collection('k_' + colName).onSnapshot(snapshot => {
+      const unsub = this.db.collection('k_' + colName).onSnapshot({ includeMetadataChanges: true }, snapshot => {
         // Hanya proses jika perubahan bukan berasal dari pending write lokal yang sedang diproses
         if (!snapshot.metadata.hasPendingWrites) {
-          const remoteDocs = snapshot.docs.map(d => d.data());
+          const remoteDocs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
           
           if (remoteDocs.length > 0) {
             // Gunakan Map berdasarkan ID unik untuk menggabungkan data lokal dan remote secara aman
@@ -305,6 +305,12 @@ class FirebaseBackend {
                     status: remoteItem.status,
                     dibatalkanPada: remoteItem.dibatalkanPada,
                     dibatalkanOleh: remoteItem.dibatalkanOleh,
+                    _t: Math.max(localItem._t || 0, remoteItem._t || 0)
+                  }));
+                } else if (colName === 'batalTrx' && Object.prototype.hasOwnProperty.call(remoteItem, 'status')) {
+                  // Keputusan pembatalan Cloud harus mengalahkan cache lokal yang lebih baru.
+                  mergedMap.set(remoteItem.id, Object.assign({}, localItem, remoteItem, {
+                    id: remoteItem.id,
                     _t: Math.max(localItem._t || 0, remoteItem._t || 0)
                   }));
                 } else if (colName === 'obat' && Object.prototype.hasOwnProperty.call(remoteItem, 'stok')) {
