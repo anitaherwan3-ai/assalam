@@ -94,10 +94,28 @@ service cloud.firestore {
     match /k_trx/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
     match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
     match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
-    match /k_obat/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
+    match /k_obat/{document} {
+      allow read: if signedIn();
+      allow create, delete: if adminOrPimpinan();
+      allow update: if adminOrPimpinan() ||
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stok', '_t']) &&
+          request.resource.data.stok is number &&
+          request.resource.data.stok >= 0 &&
+          request.resource.data.stok <= resource.data.stok);
+    }
     match /k_tarif/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
     match /k_paket/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
-    match /k_batch/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
+    match /k_batch/{document} {
+      allow read: if signedIn();
+      allow create, delete: if adminOrPimpinan();
+      allow update: if adminOrPimpinan() ||
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sisa', '_t']) &&
+          request.resource.data.sisa is number &&
+          request.resource.data.sisa >= 0 &&
+          request.resource.data.sisa <= resource.data.sisa);
+    }
     match /k_beli/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_biaya/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_loss/{document} { allow read, write: if adminOrPimpinan(); }
