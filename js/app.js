@@ -55,9 +55,18 @@ function getFilteredTrx() {
   });
 }
 
+// Status pembatalan yang disetujui menjadi sumber kebenaran untuk tampilan dan laporan.
+// Nilai asli transaksi tetap disimpan sebagai jejak audit.
+function isTrxCancelled(trx) {
+  if (!trx) return false;
+  return trx.status === 'dibatalkan' || (store.state.batalTrx || []).some(r =>
+    r && r.trxId === trx.id && r.status === 'disetujui'
+  );
+}
+
 // Transaksi batal tetap tampil di riwayat, tetapi tidak dihitung sebagai pemasukan.
 function getActiveFilteredTrx() {
-  return getFilteredTrx().filter(t => t.status !== 'dibatalkan');
+  return getFilteredTrx().filter(t => !isTrxCancelled(t));
 }
 
 // ==========================================
@@ -283,7 +292,7 @@ function getCurrentShift() {
 }
 
 function getShiftTrx(shift) {
-  return (store.state.trx || []).filter(t => t.sh === shift.id && t.status !== 'dibatalkan');
+  return (store.state.trx || []).filter(t => t.sh === shift.id && !isTrxCancelled(t));
 }
 
 function calcShiftCash(shift) {
@@ -764,7 +773,7 @@ function viewTrx() {
     o.nama.toLowerCase().includes(searchLower)
   );
 
-  const todayTrx   = (store.state.trx || []).filter(t => t.tgl === todayStr && t.status !== 'dibatalkan');
+  const todayTrx   = (store.state.trx || []).filter(t => t.tgl === todayStr && !isTrxCancelled(t));
   const todayTotal  = todayTrx.reduce((s, t) => s + Number(t.total || 0), 0);
   const todayCount  = todayTrx.length;
 
@@ -1395,6 +1404,7 @@ async function actionBayarTrx(totalCart) {
 function printReceipt(trxId) {
   const trx = store.get('trx', trxId);
   if (!trx) return;
+  const cancelled = isTrxCancelled(trx);
   window.lastReceiptTrxId = trxId;
 
   const set = store.state.set || {};
@@ -1428,6 +1438,7 @@ function printReceipt(trxId) {
         <span style="font-size:11px;color:#475569;">${esc(set.alamat || '')}</span><br>
         <span style="font-size:11px;color:#475569;">Telp: ${esc(set.telp || '-')}</span>
       </div>
+      ${cancelled ? `<div style="margin:10px 0;padding:10px;text-align:center;border:2px solid #dc2626;color:#dc2626;font-weight:900;font-size:16px;letter-spacing:1px;">NOTA DIBATALKAN<br><span style="font-size:10px;letter-spacing:0;">Tidak berlaku sebagai bukti pembayaran</span></div>` : ''}
       <hr>
       <div style="display:flex;justify-content:space-between;font-size:11px;">
         <span>Nota: ${esc(trx.no)}</span>
@@ -1439,9 +1450,10 @@ function printReceipt(trxId) {
       ${itemsHtml}
       <hr>
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
-        <span>TOTAL:</span>
-        <span>${rp(trx.total)}</span>
+        <span>${cancelled ? 'TOTAL SETELAH PEMBATALAN:' : 'TOTAL:'}</span>
+        <span>${rp(cancelled ? 0 : trx.total)}</span>
       </div>
+      ${cancelled ? `<div style="text-align:right;font-size:10px;color:#64748b;">Nilai transaksi awal: ${rp(trx.total)} (disimpan untuk audit)</div>` : ''}
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px;">
         <span>Metode:</span>
         <span>${esc(trx.metode || 'Tunai')}</span>
@@ -1465,7 +1477,7 @@ function printReceipt(trxId) {
 
   const waBtn = $('btn-wa-receipt');
   if (waBtn) {
-    if (set.fiturKirimWA !== false) {
+    if (!cancelled && set.fiturKirimWA !== false) {
       waBtn.style.display = 'inline-block';
       waBtn.onclick = () => actionTriggerSendWA(trx);
     } else {
@@ -1476,7 +1488,7 @@ function printReceipt(trxId) {
   const labelBtn = $('btn-label-obat-nota');
   if (labelBtn) {
     const hasMed = (trx.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
-    if (hasMed) {
+    if (hasMed && !cancelled) {
       labelBtn.style.display = 'inline-block';
       labelBtn.onclick = () => openModalLabelObat(trx.id);
     } else {
@@ -1488,6 +1500,7 @@ function printReceipt(trxId) {
 }
 
 function actionTriggerSendWA(trx) {
+  if (isTrxCancelled(trx)) { showAlert('Nota sudah dibatalkan. Pengiriman WhatsApp tidak tersedia.', 'Nota Dibatalkan'); return; }
   if (!trx.hp) {
     showFormModal('Kirim Struk via WhatsApp', [
       ['hp', 'Nomor WhatsApp Pasien (Contoh: 08123456789)', 'tel', '']
@@ -2610,14 +2623,15 @@ function viewRiwayat() {
   const rows = trxList.map(t => {
     const hasMed = (t.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
     const cancelRequest = cancelList.find(r => r.trxId === t.id && r.status !== 'ditolak');
-    const trxStatus = t.status === 'dibatalkan'
+    const cancelled = isTrxCancelled(t);
+    const trxStatus = cancelled
       ? '<span class="badge-bad">DIBATALKAN</span>'
       : (cancelRequest ? '<span class="badge-warn">Menunggu Pembatalan</span>' : '<span class="badge-ok">Selesai</span>');
     const actions = `<button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
       ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')">🏷️ Label Obat</button>` : ''}
       ${t.status === 'dibatalkan' || currentRole !== 'kasir' || cancelRequest ? '' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
       <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Ajukan Pembatalan</button>`}`;
-    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total), trxStatus, actions];
+    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), cancelled ? `<span style="text-decoration:line-through;color:var(--mu);">${rp(t.total)}</span><br><b>${rp(0)}</b>` : rp(t.total), trxStatus, actions];
   });
   const cancelRows = cancelList.map(r => {
     const status = r.status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
@@ -3891,7 +3905,7 @@ function viewKartuStok() {
 
   (store.state.trx || []).forEach(t => {
     (t.items || []).forEach(it => {
-      if (t.status !== 'dibatalkan' && (it.oid || it.id) === obat.id && (it.t || it.jenis) === 'Obat') {
+      if (!isTrxCancelled(t) && (it.oid || it.id) === obat.id && (it.t || it.jenis) === 'Obat') {
         muts.push({ tgl: t.tgl || '', ket: `🧾 Penjualan — Nota: ${t.no || '-'} / ${t.nama || '-'}`, masuk: 0, keluar: Number(it.qty || 0) });
       }
     });
@@ -3992,7 +4006,7 @@ function exportKartuStok() {
     (b.items || []).forEach(it => { if (it.oid === obat.id) muts.push({ tgl: b.tgl, ket: `Pembelian - ${b.supplier||''} / ${b.faktur||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
   });
   (store.state.trx || []).forEach(t => {
-    if (t.status !== 'dibatalkan') (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
+    if (!isTrxCancelled(t)) (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
   });
   (store.state.returJual || []).forEach(r => {
     if (r.status && r.status !== 'disetujui') return;
