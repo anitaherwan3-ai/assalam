@@ -1261,28 +1261,53 @@ function actionBayarTrx(totalCart) {
     kembalian = bayarTunai - totalCart;
   }
 
+  // Validasi total stok utama DAN stok batch sebelum mengubah satu pun data.
+  const stockDemand = {};
+  cartItems.forEach(item => {
+    if (item.oid) stockDemand[item.oid] = (stockDemand[item.oid] || 0) + Number(item.qty || 0);
+    if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+      item.items.forEach(part => {
+        const oid = part.type === 'obat' ? (part.oid || part.id) : null;
+        if (oid) stockDemand[oid] = (stockDemand[oid] || 0) + (Number(part.qty) || 1) * Number(item.qty || 0);
+      });
+    }
+  });
+  for (const [oid, needed] of Object.entries(stockDemand)) {
+    const obat = store.getObat(oid);
+    const batchAvailable = (store.state.batch || [])
+      .filter(b => b.oid === oid && Number(b.sisa) > 0 && b.ed >= todayStr)
+      .reduce((sum, b) => sum + Number(b.sisa || 0), 0);
+    if (!obat || Number(obat.stok || 0) < needed || batchAvailable < needed) {
+      showAlert(`Stok batch obat ${obat ? obat.nama : oid} tidak mencukupi. Stok utama: ${obat ? obat.stok : 0}, stok batch layak: ${batchAvailable}, kebutuhan: ${needed}. Periksa pembelian dan batch terlebih dahulu.`, 'Stok Batch Tidak Cukup');
+      return;
+    }
+  }
+
   for (const item of cartItems) {
     if (item.oid) {
       const obat = store.getObat(item.oid);
-      if (obat) {
-        obat.stok = Math.max(0, obat.stok - item.qty);
-        const { deductions } = store.deductBatchFEFO(item.oid, item.qty);
-        item.batchDeductions = deductions;
+      const result = store.deductBatchFEFO(item.oid, item.qty);
+      if (result.unallocated > 0) {
+        showAlert('Pengurangan stok dibatalkan karena batch tidak mencukupi. Tidak ada transaksi yang dibuat.');
+        return;
       }
+      obat.stok = Number(obat.stok || 0) - Number(item.qty);
+      obat._t = Date.now();
+      item.batchDeductions = result.deductions;
     } else if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
-      item.items.forEach(pkgIt => {
-        if (pkgIt.type === 'obat' && (pkgIt.oid || pkgIt.id)) {
-          const oid = pkgIt.oid || pkgIt.id;
-          const obat = store.getObat(oid);
-          const deductQty = (pkgIt.qty || 1) * item.qty;
-          if (obat) {
-            obat.stok = Math.max(0, obat.stok - deductQty);
-            const { deductions } = store.deductBatchFEFO(oid, deductQty);
-            // Simpan alokasi batch komponen agar pembatalan transaksi bisa rollback.
-            pkgIt.batchDeductions = deductions;
-          }
+      for (const pkgIt of item.items) {
+        if (pkgIt.type !== 'obat' || !(pkgIt.oid || pkgIt.id)) continue;
+        const oid = pkgIt.oid || pkgIt.id;
+        const obat = store.getObat(oid);
+        const deductQty = (Number(pkgIt.qty) || 1) * Number(item.qty || 0);
+        const result = store.deductBatchFEFO(oid, deductQty);
+        if (result.unallocated > 0) {
+          showAlert('Pengurangan stok komponen paket dibatalkan karena batch tidak mencukupi.');
+          return;
         }
-      });
+        if (obat) { obat.stok = Number(obat.stok || 0) - deductQty; obat._t = Date.now(); }
+        pkgIt.batchDeductions = result.deductions;
+      }
     }
   }
 
