@@ -1223,7 +1223,9 @@ function actionBayarTrx(totalCart) {
           const deductQty = (pkgIt.qty || 1) * item.qty;
           if (obat) {
             obat.stok = Math.max(0, obat.stok - deductQty);
-            store.deductBatchFEFO(oid, deductQty);
+            const { deductions } = store.deductBatchFEFO(oid, deductQty);
+            // Simpan alokasi batch komponen agar pembatalan transaksi bisa rollback.
+            pkgIt.batchDeductions = deductions;
           }
         }
       });
@@ -1970,7 +1972,7 @@ function viewPembelian() {
         : `<button class="s p" onclick="store.lunasiBeli('${b.id}')">Lunasi Sekarang</button>`,
       `
         <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>
-        <button class="s btn-danger" onclick="delBeli('${b.id}')">Hapus</button>
+
       `
     ];
   });
@@ -2100,19 +2102,9 @@ function actionAddBeli() {
 }
 
 function delBeli(id) {
-  showConfirm('Hapus faktur pembelian ini? Stok obat dan batch terkait akan dikurangi.', () => {
-    const b = store.get('beli', id);
-    if (!b) return;
-    const obat = store.getObat(b.oid);
-    if (obat) {
-      obat.stok = Math.max(0, obat.stok - b.qty);
-      obat._t = Date.now();
-    }
-    store.state.batch = store.state.batch.filter(x => x.beli !== id);
-    store.state.beli = store.state.beli.filter(x => x.id !== id);
-    store.logActivity('Hapus', 'Pembelian', `Faktur ${b.faktur} - ${b.supplier}`);
-    store.saveLocal();
-  });
+  // Faktur pembelian adalah jejak audit stok/HPP; gunakan Retur ke Supplier,
+  // bukan penghapusan, agar stok dan nilai persediaan tetap dapat ditelusuri.
+  showAlert('Faktur pembelian tidak dapat dihapus agar riwayat stok dan HPP tetap akurat. Gunakan tombol Retur untuk mengoreksi pembelian.', 'Perlindungan Data');
 }
 
 // -------------------------------------------------------------
