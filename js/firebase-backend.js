@@ -543,11 +543,20 @@ class FirebaseBackend {
         if (!snap || !snap.exists) throw new Error('Batch asal tidak ditemukan: ' + path);
         transaction.update(refs.get(path), { sisa: Number(snap.data().sisa || 0) + qty, _t: Date.now() });
       }
+      const approvedAt = Date.now();
       transaction.update(returRef, {
         status: 'disetujui',
         diverifikasiOleh: profile.u || profile.email || '-',
-        diverifikasiPada: Date.now(),
-        _t: Date.now()
+        diverifikasiPada: approvedAt,
+        pengembalian: {
+          status: 'menunggu',
+          nominal: Number(retur.total),
+          metode: null,
+          referensi: '',
+          dibayarOleh: null,
+          dibayarPada: null
+        },
+        _t: approvedAt
       });
     });
     return true;
@@ -595,7 +604,10 @@ class FirebaseBackend {
       if (!snap.exists) throw new Error('Data retur tidak ditemukan di Cloud.');
       const retur = snap.data() || {};
       if (retur.status !== 'disetujui') throw new Error('Retur harus disetujui Admin sebelum uang dikembalikan.');
-      if (retur.pengembalian && retur.pengembalian.status === 'dibayar') {
+      if (!retur.pengembalian || retur.pengembalian.status !== 'menunggu') {
+        throw new Error('Data retur lama perlu rekonsiliasi Pimpinan dan tidak dapat dibayar ulang dari tombol ini.');
+      }
+      if (retur.pengembalian.status === 'dibayar') {
         throw new Error('Pengembalian uang retur ini sudah tercatat. Tidak boleh dibayar dua kali.');
       }
       const nominal = Number(retur.total);
