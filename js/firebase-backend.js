@@ -553,6 +553,68 @@ class FirebaseBackend {
     return true;
   }
 
+  // Penolakan retur dicatat melalui transaksi Cloud, bukan sinkronisasi cache lokal.
+  async rejectReturJual(returId, reason) {
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role) ||
+        !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Hanya Admin/Pimpinan yang terhubung ke Firebase dapat menolak retur.');
+    }
+    const ref = this.db.collection('k_returJual').doc(String(returId));
+    const now = Date.now();
+    await this.db.runTransaction(async transaction => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists || (snap.data() || {}).status !== 'menunggu') {
+        throw new Error('Retur tidak ditemukan atau sudah pernah diproses.');
+      }
+      transaction.update(ref, {
+        status: 'ditolak',
+        alasanPenolakan: String(reason || '').trim() || 'Tidak disetujui Admin',
+        diverifikasiOleh: profile.u || profile.email || '-',
+        diverifikasiPada: now,
+        _t: now
+      });
+    });
+    return true;
+  }
+
+  // Pengembalian uang hanya dapat dicatat Pimpinan, terpisah dari persetujuan stok.
+  async payReturJual(returId, method, reference) {
+    const profile = this.currentProfile;
+    if (!profile || profile.role !== 'pimpinan' ||
+        !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Hanya Pimpinan yang dapat mencatat pengembalian uang kepada pasien.');
+    }
+    if (!['Tunai', 'Transfer'].includes(method)) throw new Error('Metode pengembalian uang tidak valid.');
+    const refText = String(reference || '').trim();
+    if (method === 'Transfer' && !refText) throw new Error('Nomor referensi/bukti transfer wajib diisi.');
+    const ref = this.db.collection('k_returJual').doc(String(returId));
+    const now = Date.now();
+    await this.db.runTransaction(async transaction => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new Error('Data retur tidak ditemukan di Cloud.');
+      const retur = snap.data() || {};
+      if (retur.status !== 'disetujui') throw new Error('Retur harus disetujui Admin sebelum uang dikembalikan.');
+      if (retur.pengembalian && retur.pengembalian.status === 'dibayar') {
+        throw new Error('Pengembalian uang retur ini sudah tercatat. Tidak boleh dibayar dua kali.');
+      }
+      const nominal = Number(retur.total);
+      if (!Number.isFinite(nominal) || nominal <= 0) throw new Error('Nominal retur tidak valid.');
+      transaction.update(ref, {
+        pengembalian: {
+          status: 'dibayar',
+          nominal,
+          metode: method,
+          referensi: refText,
+          dibayarOleh: profile.u || profile.email || '-',
+          dibayarPada: now
+        },
+        _t: now
+      });
+    });
+    return true;
+  }
+
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
@@ -659,7 +721,7 @@ class FirebaseBackend {
           writableCollections = writableCollections.filter(name => !['pasien', 'trx', 'petty'].includes(name));
         }
 
-        writableCollections = writableCollections.filter(name => name !== 'batalTrx');
+        // Retur hanya ditulis Kasir saat mengajukan; keputusan dan pembayaran memakai transaksi Cloud khusus.\n        writableCollections = writableCollections.filter(name => name !== 'batalTrx' && (profile.role === 'kasir' || name !== 'returJual'));
 
         for (const col of writableCollections) {
           const items = state[col] || [];
