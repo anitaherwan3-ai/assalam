@@ -109,7 +109,8 @@ function calculateFinancials() {
     totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
       trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
-      approvedReturns.filter(r => r.metode === 'Tunai').reduce((s, r) => s + Number(r.total || 0), 0) - pc
+      approvedReturns.filter(r => r.metode === 'Tunai' && r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai')
+        .reduce((s, r) => s + Number(r.pengembalian.nominal || r.total || 0), 0) - pc
     // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
 }
@@ -1406,6 +1407,19 @@ function printReceipt(trxId) {
   if (!trx) return;
   const cancelled = isTrxCancelled(trx);
   const cancellationRecord = (store.state.batalTrx || []).find(r => r && r.trxId === trx.id && r.status === 'disetujui');
+  const receiptReturns = (store.state.returJual || []).filter(r => r && r.trxId === trx.id && r.status !== 'ditolak');
+  const returnsHtml = receiptReturns.length ? `
+    <hr><div style="font-weight:700;font-size:12px;">RIWAYAT RETUR</div>
+    ${receiptReturns.map(r => {
+      const paid = r.pengembalian && r.pengembalian.status === 'dibayar';
+      return `<div style="font-size:11px;margin:4px 0;">
+        <div>${esc(r.namaItem)} — ${Number(r.qty || 0)} x ${rp(r.harga || 0)}</div>
+        <div style="display:flex;justify-content:space-between;"><span>Nilai retur (${esc(r.status || 'menunggu')})</span><b>${rp(r.total || 0)}</b></div>
+        <div style="font-size:10px;color:#475569;">Uang: ${paid ? 'SUDAH DIKEMBALIKAN (' + esc(r.pengembalian.metode || '-') + ')' : 'BELUM DIKEMBALIKAN'}</div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:11px;font-weight:700;text-align:right;">Nilai transaksi awal tetap: ${rp(trx.total)}</div>
+  ` : '';
   window.lastReceiptTrxId = trxId;
 
   const set = store.state.set || {};
@@ -1449,6 +1463,7 @@ function printReceipt(trxId) {
       <div style="font-size:11px;">Kasir: ${esc(trx.kasir || '-')}</div>
       <hr>
       ${itemsHtml}
+      ${returnsHtml}
       <hr>
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
         <span>${cancelled ? 'NOMINAL NOTA (ARSIP):' : 'TOTAL:'}</span>
@@ -2647,10 +2662,19 @@ function viewRiwayat() {
     const status = r.status || 'disetujui';
     const badge = status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
       status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
-    const actions = currentRole === 'admin' && status === 'menunggu'
-      ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>` : '';
+    const refund = r.pengembalian || {};
+    const refundBadge = refund.status === 'dibayar'
+      ? '<span class="badge-ok">Uang Sudah Dikembalikan</span>'
+      : (status === 'disetujui' ? '<span class="badge-warn">Menunggu Pimpinan</span>' : '-');
+    const actions = status === 'menunggu' && (currentRole === 'admin' || currentRole === 'pimpinan')
+      ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>`
+      : (status === 'disetujui' && refund.status !== 'dibayar' && currentRole === 'pimpinan'
+        ? `<button class="p" onclick="actionPayReturJual('${r.id}')">Catat Uang Kembali</button>` : '');
+    const refundDetail = refund.status === 'dibayar'
+      ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') + ' / ' + esc(refund.dibayarOleh || '-')
+      : '-';
     return [esc(r.tgl), esc(r.noNota), esc(r.namaPasien), esc(r.namaItem), Number(r.qty || 0), rp(r.total),
-      esc(r.alasan), esc(r.kasir || '-'), badge, actions];
+      esc(r.alasan), esc(r.kasir || '-'), badge, refundBadge, refundDetail, actions];
   });
   return renderFilterBar() + `
     <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
@@ -2659,8 +2683,8 @@ function viewRiwayat() {
       <p style="color:var(--mu);font-size:13px;">Nota dan stok hanya berubah setelah Admin menyetujui pengajuan.</p>
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
     <div class="card"><h2>Riwayat Retur Penjualan Pasien</h2>
-      <p style="color:var(--mu);font-size:13px;">Retur dari Kasir harus disetujui Admin sebelum stok obat dan batch bertambah.</p>
-      ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Petugas','Status','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
+      <p style="color:var(--mu);font-size:13px;">Retur disetujui Admin untuk mengembalikan stok. Pengembalian uang dicatat terpisah dan hanya dapat dilakukan Pimpinan.</p>
+      ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Petugas','Status Retur','Status Uang','Bukti/Metode','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
   `;
 }
 
@@ -2680,9 +2704,35 @@ function actionApproveReturJual(id) {
 
 function actionRejectReturJual(id) {
   if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
-  showFormModal('Alasan Penolakan Retur', [['alasan', 'Alasan penolakan', 'text', 'Barang tidak memenuhi syarat retur']], res => {
-    if (store.rejectReturJual(id, res.alasan)) showAlert('Retur ditolak. Stok tidak berubah.', 'Retur Ditolak');
-    else showAlert('Retur tidak dapat ditolak. Periksa statusnya.');
+  showFormModal('Alasan Penolakan Retur', [['alasan', 'Alasan penolakan', 'text', 'Barang tidak memenuhi syarat retur']], async res => {
+    try {
+      await window.firebaseBackend.rejectReturJual(id, res.alasan);
+      showAlert('Retur ditolak. Stok dan uang tidak berubah.', 'Retur Ditolak');
+    } catch (err) {
+      showAlert(err.message || 'Retur tidak dapat ditolak.', 'Gagal');
+    }
+    renderApp();
+  });
+}
+
+function actionPayReturJual(id) {
+  if (currentRole !== 'pimpinan') {
+    showAlert('Hanya Pimpinan yang dapat mencatat pengembalian uang.', 'Akses Ditolak');
+    return;
+  }
+  showFormModal('Catat Pengembalian Uang Retur', [
+    ['metode', 'Metode pengembalian', 'select', 'Tunai', [
+      { value: 'Tunai', label: 'Tunai' },
+      { value: 'Transfer', label: 'Transfer' }
+    ]],
+    ['referensi', 'Nomor referensi/bukti transfer (wajib untuk transfer)', 'text', '']
+  ], async res => {
+    try {
+      await window.firebaseBackend.payReturJual(id, res.metode, res.referensi);
+      showAlert('Pengembalian uang tercatat satu kali. Saldo kas tunai akan diperbarui bila metode Tunai.', 'Pengembalian Tercatat');
+    } catch (err) {
+      showAlert(err.message || 'Pengembalian uang gagal dicatat.', 'Gagal');
+    }
     renderApp();
   });
 }
