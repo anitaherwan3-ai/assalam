@@ -174,7 +174,7 @@ class FirebaseBackend {
             ![item.role].includes(existing.role)) {
           throw new Error('Profil '+item.email+' sudah ada dengan data/peran berbeda. Tidak ditimpa.');
         }
-        await ref.set(Object.assign({}, profile, { active: existing.active === true }), { merge: true });
+        await ref.set(profile, { merge: true });
       } else {
         await ref.set(profile);
       }
