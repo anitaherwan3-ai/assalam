@@ -81,10 +81,11 @@ service cloud.firestore {
 
     match /k_log/{document} {
       allow read: if adminOrPimpinan();
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && (initialOwner() ||
+        request.resource.data.u == staffProfile().u);
       allow update: if pimpinan() ||
-        (signedIn() && resource.data.uid == request.auth.uid &&
-          request.resource.data.uid == request.auth.uid);
+        (signedIn() && resource.data.u == staffProfile().u &&
+          request.resource.data.u == staffProfile().u);
       allow delete: if pimpinan();
     }
     match /k_pasien/{document} { allow read, write: if kasirOrAbove(); }
