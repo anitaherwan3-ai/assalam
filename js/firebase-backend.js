@@ -353,13 +353,22 @@ class FirebaseBackend {
       if (!trxSnap.exists) throw new Error('Nota tidak ditemukan di Cloud.');
       const trx = trxSnap.data() || {};
       if (trx.status === 'dibatalkan') throw new Error('Nota sudah dibatalkan.');
-      if (requestSnap.exists) throw new Error('Nota ini sudah memiliki pengajuan pembatalan.');
+      if (requestSnap.exists && (requestSnap.data() || {}).status !== 'ditolak') {
+        throw new Error('Nota ini sudah memiliki pengajuan pembatalan yang belum ditolak.');
+      }
       if (returnSnap.docs.some(doc => (doc.data() || {}).status !== 'ditolak')) {
         throw new Error('Nota memiliki retur yang sedang diproses atau sudah disetujui. Pembatalan tidak dapat diajukan.');
       }
       request.noNota = trx.no || id;
       request.namaPasien = trx.nama || '-';
-      transaction.set(requestRef, request);
+      if (requestSnap.exists) {
+        request.alasanPenolakan = null;
+        request.diverifikasiOleh = null;
+        request.diverifikasiPada = null;
+        transaction.update(requestRef, request);
+      } else {
+        transaction.set(requestRef, request);
+      }
     });
     return request;
   }
