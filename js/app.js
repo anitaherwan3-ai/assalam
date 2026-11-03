@@ -27,7 +27,7 @@ let dateFilter = {
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Kas Kecil'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
-  pimpinan: ['Dashboard', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
@@ -35,7 +35,7 @@ const TAB_ICONS = {
   'Obat & Tarif': '💊', 'Paket Pelayanan': '🎁', 'Pembelian': '📦', 'Kedaluwarsa': '⏳', 'Biaya': '💸',
   'Stok Opname': '📋', 'Kartu Stok': '📒', 'Riwayat Transaksi': '🗂️', 'Verifikasi': '✅', 'Ekspor': '📤',
   'Display TV': '📺',
-  'Dashboard': '📊', 'Laba Rugi': '📈', 'Arus Kas': '💱', 'Utang': '🧮',
+  'Dashboard': '📊', 'Data Pasien': '👥', 'Stok Obat': '💊', 'Kartu Stok': '📒', 'Laba Rugi': '📈', 'Arus Kas': '💱', 'Utang': '🧮',
   'Approval': '✍️', 'Log Aktivitas': '🕘', 'Pengguna': '👤', 'Pengaturan': '⚙️'
 };
 
@@ -3923,6 +3923,68 @@ function exportKartuStok() {
 }
 
 // -------------------------------------------------------------
+// MODULE: TAMPILAN BACA-SAJ A PIMPINAN (TANPA UBAH DATA)
+// -------------------------------------------------------------
+function viewPimpinanPasien() {
+  const patients = (store.state.pasien || []).slice().sort((a, b) =>
+    String(b.tgl || '').localeCompare(String(a.tgl || '')) ||
+    String(b.jam || '').localeCompare(String(a.jam || ''))
+  );
+  const rows = patients.map(p => [
+    esc(p.tgl || '-'),
+    esc(p.jam || '-'),
+    esc(p.no || '-'),
+    esc(p.nama || '-'),
+    esc(p.hp || '-'),
+    esc(p.layanan || '-'),
+    p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
+    esc(p.kasir || '-')
+  ]);
+  return `
+    <div class="card">
+      <h2>👥 Data Pasien</h2>
+      <p style="color:var(--mu);font-size:13px;">Tampilan baca-saja untuk Pimpinan. Tidak tersedia tombol tambah, edit, atau hapus.</p>
+      <div style="font-weight:700;margin-bottom:10px;">Total catatan pasien: ${patients.length}</div>
+      ${renderTable(['Tanggal', 'Jam', 'No. Antrean', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Petugas'], rows, { key: 'pimpinan_pasien_readonly' })}
+    </div>
+  `;
+}
+
+function viewPimpinanStok() {
+  const obatList = (store.state.obat || []).slice().sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || '')));
+  const batchList = store.state.batch || [];
+  const rows = obatList.map(o => {
+    const batches = batchList.filter(b => b.oid === o.id);
+    const activeBatches = batches.filter(b => Number(b.sisa || 0) > 0);
+    const batchSummary = activeBatches.length
+      ? activeBatches.map(b => `${esc(b.no || '-')} (sisa ${Number(b.sisa || 0)}, ED ${esc(b.ed || '-')})`).join('<br>')
+      : 'Tidak ada batch aktif';
+    const low = Number(o.stok || 0) <= Number(o.min || 0);
+    return [
+      esc(o.nama || '-'),
+      esc(o.satuan || '-'),
+      Number(o.stok || 0),
+      Number(o.min || 0),
+      low ? '<span class="badge-warn">Perlu perhatian</span>' : '<span class="badge-ok">Normal</span>',
+      batchSummary
+    ];
+  });
+  const totalItems = obatList.length;
+  const lowItems = obatList.filter(o => Number(o.stok || 0) <= Number(o.min || 0)).length;
+  return `
+    <div class="card">
+      <h2>💊 Stok Obat &amp; Batch</h2>
+      <p style="color:var(--mu);font-size:13px;">Tampilan baca-saja untuk Pimpinan. Informasi stok berasal dari data inventori yang tersimpan; tidak ada tindakan perubahan stok di halaman ini.</p>
+      <div class="row" style="gap:12px;">
+        <div class="card" style="flex:1;min-width:130px;"><b>Jenis obat</b><div style="font-size:24px;font-weight:800;">${totalItems}</div></div>
+        <div class="card" style="flex:1;min-width:130px;"><b>Stok perlu perhatian</b><div style="font-size:24px;font-weight:800;">${lowItems}</div></div>
+      </div>
+      ${renderTable(['Nama Obat', 'Satuan', 'Stok', 'Stok Minimum', 'Kondisi', 'Batch Aktif / Kedaluwarsa'], rows, { key: 'pimpinan_stok_readonly' })}
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // MAIN RENDERER
 // -------------------------------------------------------------
 function renderApp() {
@@ -3985,6 +4047,8 @@ function renderApp() {
     case 'Display TV': content = viewDisplayTV(); break;
 
     case 'Dashboard': content = viewDashboard(); break;
+    case 'Data Pasien': content = viewPimpinanPasien(); break;
+    case 'Stok Obat': content = viewPimpinanStok(); break;
     case 'Laba Rugi': content = viewLabaRugi(); break;
     case 'Arus Kas': content = viewArusKas(); break;
     case 'Utang': content = viewUtang(); break;
