@@ -2606,13 +2606,23 @@ function actionVerifShift(id) {
 function viewRiwayat() {
   const trxList = getFilteredTrx().slice().reverse();
   const returList = (store.state.returJual || []).slice().reverse();
+  const cancelList = (store.state.batalTrx || []).slice().reverse();
   const rows = trxList.map(t => {
     const hasMed = (t.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
     return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total),
       `<button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
       ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')">🏷️ Label Obat</button>` : ''}
-      ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole === 'admin' ? '<span class="badge-ok">Baca saja</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
-      <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`)}`];
+      ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole !== 'kasir' ? '<span class="badge-ok">Baca saja</span>' : (() => { const request = cancelList.find(r => r.trxId === t.id && r.status !== 'ditolak'); return request ? '<span class="badge-warn">Menunggu Pembatalan</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
+      <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Ajukan Pembatalan</button>`; })())}`];
+  });
+  const cancelRows = cancelList.map(r => {
+    const status = r.status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
+      r.status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
+    const actions = currentRole === 'admin' && r.status === 'menunggu'
+      ? `<button class="p" onclick="actionProcessCancelTrx('${r.id}','disetujui')">Setujui</button>
+         <button class="s btn-danger" onclick="actionProcessCancelTrx('${r.id}','ditolak')">Tolak</button>` : '';
+    return [esc(r.tgl), esc(r.noNota || r.trxId), esc(r.namaPasien || '-'), esc(r.kasir || '-'),
+      esc(r.alasan || '-'), status, actions];
   });
   const returRows = returList.map(r => {
     const status = r.status || 'disetujui';
@@ -2626,6 +2636,9 @@ function viewRiwayat() {
   return renderFilterBar() + `
     <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Aksi'], rows, { key: 'all_trx' })}</div>
+    ${currentRole === 'admin' ? `<div class="card"><h2>Pengajuan Pembatalan Transaksi</h2>
+      <p style="color:var(--mu);font-size:13px;">Nota dan stok hanya berubah setelah Admin menyetujui pengajuan.</p>
+      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
     <div class="card"><h2>Riwayat Retur Penjualan Pasien</h2>
       <p style="color:var(--mu);font-size:13px;">Retur dari Kasir harus disetujui Admin sebelum stok obat dan batch bertambah.</p>
       ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Petugas','Status','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
@@ -2661,6 +2674,10 @@ function openModalReturJual(trxId) {
     return;
   }
   const trx = store.get('trx', trxId);
+  if ((store.state.batalTrx || []).some(r => r.trxId === trxId && r.status !== 'ditolak')) {
+    showAlert('Nota memiliki pengajuan pembatalan yang belum ditolak. Retur tidak dapat diajukan.', 'Pengajuan Ditahan');
+    return;
+  }
   if (!trx || trx.status === 'dibatalkan' || !trx.items || !trx.items.length) {
     showAlert('Transaksi tidak ditemukan, sudah dibatalkan, atau tidak memiliki item');
     return;
@@ -2694,15 +2711,53 @@ function openModalReturJual(trxId) {
 }
 
 function actionCancelTrx(id) {
-  if (currentRole === 'admin') {
-    showAlert('Admin hanya dapat melihat riwayat transaksi. Pembatalan menjadi kewenangan Kasir/Pimpinan.', 'Akses Ditolak');
+  if (currentRole !== 'kasir') {
+    showAlert('Pengajuan pembatalan hanya dapat dibuat oleh Kasir.', 'Akses Ditolak');
     return;
   }
-  showConfirm('Batalkan transaksi ini? Stok obat dan sisa batch akan dikembalikan ke kondisi semula.', () => {
-    const success = store.cancelTransaction(id);
-    if (success) showAlert('Transaksi ditandai dibatalkan. Nota tetap tersimpan di riwayat dan stok obat telah dikembalikan.', 'Dibatalkan');
-    else showAlert('Transaksi tidak ditemukan atau sudah pernah dibatalkan. Tidak ada perubahan.', 'Informasi');
+  const trx = store.get('trx', id);
+  if (!trx || trx.status === 'dibatalkan') { showAlert('Nota tidak ditemukan atau sudah dibatalkan.'); return; }
+  if ((store.state.batalTrx || []).some(r => r.trxId === id && r.status !== 'ditolak')) {
+    showAlert('Pengajuan pembatalan nota ini sudah ada dan sedang diproses.'); return;
+  }
+  showFormModal('Ajukan Pembatalan Nota ' + trx.no, [
+    ['alasan', 'Alasan pembatalan', 'text', 'Kesalahan input transaksi']
+  ], async res => {
+    try {
+      const request = await window.firebaseBackend.submitCancelRequest(id, res.alasan);
+      store.state.batalTrx.unshift(request);
+      store.saveLocal(false);
+      store.logActivity('Ajukan Pembatalan', 'Transaksi', 'Nota ' + trx.no + ' menunggu persetujuan Admin');
+      showAlert('Pengajuan pembatalan terkirim. Nota dan stok belum berubah sampai Admin menyetujui.', 'Menunggu Persetujuan');
+    } catch (err) {
+      console.error('Pengajuan pembatalan gagal:', err);
+      showAlert(err.message || 'Pengajuan pembatalan gagal. Nota dan stok tidak berubah.', 'Gagal');
+    }
   });
+}
+
+function actionProcessCancelTrx(id, decision) {
+  if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
+  const process = async reason => {
+    try {
+      await window.firebaseBackend.processCancelRequest(id, decision, reason);
+      showAlert(decision === 'disetujui'
+        ? 'Pembatalan disetujui. Nota dibatalkan dan stok/batch dikembalikan di Cloud.'
+        : 'Pengajuan pembatalan ditolak. Nota dan stok tidak berubah.',
+        decision === 'disetujui' ? 'Pembatalan Disetujui' : 'Pembatalan Ditolak');
+    } catch (err) {
+      console.error('Proses pembatalan gagal:', err);
+      showAlert(err.message || 'Proses pembatalan gagal. Tidak ada perubahan stok.', 'Gagal');
+    }
+    renderApp();
+  };
+  if (decision === 'ditolak') {
+    showFormModal('Alasan Penolakan Pembatalan', [
+      ['alasan', 'Alasan penolakan', 'text', 'Tidak disetujui Admin']
+    ], res => process(res.alasan));
+  } else {
+    showConfirm('Setujui pembatalan ini? Nota dibatalkan dan stok obat/batch dikembalikan satu kali di Cloud.', () => process(''));
+  }
 }
 
 // -------------------------------------------------------------
