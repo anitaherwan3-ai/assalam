@@ -109,7 +109,7 @@ function calculateFinancials() {
     totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
       trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
-      approvedReturns.filter(r => r.metode === 'Tunai' && r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai')
+      approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai')
         .reduce((s, r) => s + Number(r.pengembalian.nominal || r.total || 0), 0) - pc
     // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
