@@ -3504,7 +3504,8 @@ function searchPasienLama() {
 
   const seen = new Set();
   const unique = [];
-  (store.state.pasien || []).filter(p => !p.deletedAt && p.status !== 'dihapus').forEach(p => {
+  (store.state.pasien || []).forEach(p => {
+    if (p.deletedAt || p.status === 'dihapus') return;
     const key = (p.nama + '|' + (p.hp || '')).toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
@@ -3834,10 +3835,15 @@ function exportKartuStok() {
 // MODULE: TAMPILAN BACA-SAJ A PIMPINAN (TANPA UBAH DATA)
 // -------------------------------------------------------------
 function viewPimpinanPasien() {
-  const patients = (store.state.pasien || []).slice().sort((a, b) =>
-    String(b.tgl || '').localeCompare(String(a.tgl || '')) ||
-    String(b.jam || '').localeCompare(String(a.jam || ''))
-  );
+  const allPatients = store.state.pasien || [];
+  const archiveMode = window.PAGE_STATE && window.PAGE_STATE.patientArchive === true;
+  const patients = allPatients
+    .filter(p => (Boolean(p.deletedAt) || p.status === 'dihapus') === archiveMode)
+    .slice()
+    .sort((a, b) =>
+      String(b.tgl || '').localeCompare(String(a.tgl || '')) ||
+      String(b.jam || '').localeCompare(String(a.jam || ''))
+    );
   const rows = patients.map(p => [
     esc(p.tgl || '-'),
     esc(p.jam || '-'),
@@ -3851,9 +3857,13 @@ function viewPimpinanPasien() {
   return `
     <div class="card">
       <h2>👥 Data Pasien</h2>
-      <p style="color:var(--mu);font-size:13px;">Tampilan baca-saja untuk Pimpinan. Tidak tersedia tombol tambah, edit, atau hapus.</p>
-      <div style="font-weight:700;margin-bottom:10px;">Total catatan pasien: ${patients.length}</div>
-      ${renderTable(['Tanggal', 'Jam', 'No. Antrean', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Petugas'], rows, { key: 'pimpinan_pasien_readonly' })}
+      <p style="color:var(--mu);font-size:13px;">Tampilan baca-saja untuk Pimpinan. Catatan arsip tetap tersimpan dan dapat dilihat melalui filter.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <button class="${archiveMode ? 's' : 'p'}" onclick="window.PAGE_STATE.patientArchive=false;renderApp()">Pasien Aktif</button>
+        <button class="${archiveMode ? 'p' : 's'}" onclick="window.PAGE_STATE.patientArchive=true;renderApp()">Arsip Pasien</button>
+      </div>
+      <div style="font-weight:700;margin-bottom:10px;">Total catatan: ${patients.length}</div>
+      ${renderTable(['Tanggal', 'Jam', 'No. Antrean', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Petugas'], rows, { key: archiveMode ? 'pimpinan_pasien_arsip' : 'pimpinan_pasien_readonly' })}
     </div>
   `;
 }
