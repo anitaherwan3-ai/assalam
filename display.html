@@ -1015,9 +1015,27 @@
             return;
           }
           try {
-            const token = await user.getIdTokenResult();
-            const claims = token.claims || {};
-            if (claims.clinic !== 'assalam-db' || !['pimpinan', 'admin', 'kasir'].includes(claims.role)) {
+            // Validasi role melalui profil Firestore, sama seperti aplikasi utama.
+            // Tidak bergantung pada custom claims yang memerlukan Admin SDK.
+            const email = String(user.email || '').toLowerCase();
+            const ownerIds = {
+              'praktekrose@gmail.com': 'praktekrose',
+              'nursalim42@gmail.com': 'pimpinan2'
+            };
+            if (!email) {
+              console.warn('Email sesi Firebase tidak tersedia untuk Display TV.');
+              return;
+            }
+            const profileId = ownerIds[email] || email;
+            const profileSnap = await fbDisplayDb.collection('k_users').doc(profileId).get();
+            if (!profileSnap.exists) {
+              console.warn('Profil akun belum tersedia untuk Display TV.');
+              return;
+            }
+            const profile = profileSnap.data() || {};
+            const role = ownerIds[email] ? 'pimpinan' : profile.role;
+            if (profile.active !== true || !['pimpinan', 'admin', 'kasir'].includes(role) ||
+                (profile.email && String(profile.email).toLowerCase() !== email)) {
               console.warn('Akun tidak memiliki akses Display TV.');
               return;
             }
