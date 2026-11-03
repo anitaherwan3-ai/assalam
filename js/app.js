@@ -130,67 +130,117 @@ function applyAppSettings() {
   document.title = (set.nama || 'Klinik Sehat') + ' - Sistem Manajemen & Keuangan';
 }
 
-// Authentication
-function doLogin() {
-  const uInput = val('login-username').trim();
-  const pInput = val('login-password');
-  const errorEl = $('login-error');
-
-  const MASTER_USER = {
-    u: 'praktekrose',
-    pw: 'Dinkes123@',
-    nama: 'Pimpinan Klinik',
-    role: 'pimpinan',
-    hp: (store.state.set && store.state.set.waOwner) ? store.state.set.waOwner : '081299998888',
-    _t: Date.now()
-  };
-
-  if (!store.state.users || store.state.users.length === 0) {
-    store.state.users = [MASTER_USER];
-    store.saveLocal(false);
-  }
-
-  let user = (store.state.users || []).find(x => x.u.toLowerCase() === uInput.toLowerCase() && x.pw === pInput);
-
-  if (!user && uInput.toLowerCase() === MASTER_USER.u.toLowerCase() && pInput === MASTER_USER.pw) {
-    user = MASTER_USER;
-    const existingIdx = store.state.users.findIndex(x => x.u.toLowerCase() === MASTER_USER.u.toLowerCase());
-    if (existingIdx >= 0) {
-      store.state.users[existingIdx] = MASTER_USER;
-    } else {
-      store.state.users.push(MASTER_USER);
-    }
-    store.saveLocal(false);
-    if (window.firebaseBackend && window.firebaseBackend.pushData) {
-      window.firebaseBackend.pushData(store.state);
-    }
-  }
-
-  if (!user) {
-    errorEl.textContent = 'Username atau password tidak sesuai!';
-    return;
-  }
-
-  errorEl.textContent = '';
+// Authentication melalui Firebase Authentication (dua akun Pimpinan awal).
+function applyOwnerSession(profile) {
+  if (!profile || profile.role !== 'pimpinan' || profile.active !== true) return;
+  const local = (store.state.users || []).find(x => x.u === profile.u);
+  const user = Object.assign({}, local || {}, {
+    u: profile.u, id: profile.u, nama: profile.nama,
+    role: 'pimpinan', email: profile.email, uid: profile.uid
+  });
+  // Password lokal lama tidak dipakai untuk autentikasi Firebase.
+  delete user.pw;
+  const idx = (store.state.users || []).findIndex(x => x.u === profile.u);
+  if (idx >= 0) {
+    store.state.users[idx] = Object.assign({}, store.state.users[idx], user);
+    delete store.state.users[idx].pw;
+  } else store.state.users.push(user);
+  store.saveLocal(false);
   currentUser = user;
-  currentRole = user.role;
-  activeTab = ROLE_TABS[currentRole][0];
+  currentRole = 'pimpinan';
+  activeTab = ROLE_TABS.pimpinan[0];
   cartItems = [];
-  
-  $('login-modal').style.display = 'none';
+  $('login-error').textContent = '';
   $('login-password').value = '';
-  
-  store.logActivity('Masuk', 'Sesi', `User ${user.nama} (${user.role}) login`);
+  $('login-modal').style.display = 'none';
   renderApp();
 }
 
+window.onFirebaseAuthUser = async (firebaseUser, profile) => {
+  if (firebaseUser && profile) applyOwnerSession(profile);
+};
+
+async function doLogin() {
+  const email = val('login-email').trim().toLowerCase();
+  const password = val('login-password');
+  const errorEl = $('login-error');
+  if (!email || !password) {
+    errorEl.textContent = 'Masukkan email dan password.';
+    return;
+  }
+  const backend = window.firebaseBackend;
+  const isOwnerEmail = backend && backend.ownerIdentity(email);
+  if (isOwnerEmail) {
+    errorEl.textContent = 'Memeriksa akun Pimpinan melalui Firebase...';
+    try {
+      const profile = await backend.login(email, password);
+      applyOwnerSession(profile);
+      store.logActivity('Masuk', 'Sesi', `Pimpinan ${profile.nama} login melalui Firebase`);
+    } catch (err) {
+      console.error('Login Firebase gagal:', err);
+      errorEl.textContent = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+        ? 'Email atau password tidak sesuai.'
+        : (err.code === 'auth/user-not-found' ? 'Akun belum terdaftar di Firebase Authentication.' : (err.message || 'Login gagal.'));
+    }
+    return;
+  }
+
+  // Kompatibilitas sementara: akun staf lama tetap dapat masuk secara lokal.
+  // Sesi lokal tidak membuka sinkronisasi Firestore karena tidak memiliki Firebase Auth.
+  const staff = (store.state.users || []).find(x =>
+    String(x.u || '').toLowerCase() === email.toLowerCase() &&
+    x.pw === password && ['kasir', 'admin'].includes(x.role)
+  );
+  if (!staff) {
+    errorEl.textContent = 'Akun tidak cocok. Pimpinan harus memakai email Firebase; staf memakai username dan password lokal.';
+    return;
+  }
+  currentUser = staff;
+  currentRole = staff.role;
+  activeTab = (ROLE_TABS[currentRole] || [])[0] || '';
+  cartItems = [];
+  errorEl.textContent = '';
+  $('login-password').value = '';
+  $('login-modal').style.display = 'none';
+  store.logActivity('Masuk', 'Sesi', `User ${staff.nama} (${staff.role}) login lokal`);
+  renderApp();
+}
+
+async function activatePimpinanAccount() {
+  const email = val('login-email').trim().toLowerCase();
+  const password = val('login-password');
+  if (!email || !password) {
+    $('login-error').textContent = 'Isi email dan password akun Pimpinan, lalu tekan tombol Aktivasi.';
+    return;
+  }
+  await doLogin();
+}
+
+async function resetLoginPassword() {
+  const email = val('login-email').trim().toLowerCase();
+  if (!email) {
+    $('login-error').textContent = 'Masukkan email Pimpinan terlebih dahulu.';
+    return;
+  }
+  try {
+    await window.firebaseBackend.resetPassword(email);
+    $('login-error').textContent = 'Tautan reset password telah dikirim. Periksa kotak masuk email.';
+  } catch (err) {
+    $('login-error').textContent = err.message || 'Permintaan reset password gagal.';
+  }
+}
+
 function doLogout() {
-  showConfirm('Apakah Anda yakin ingin keluar?', () => {
+  showConfirm('Apakah Anda yakin ingin keluar?', async () => {
     store.logActivity('Keluar', 'Sesi', `User ${currentUser ? currentUser.nama : ''} logout`);
     currentUser = null;
     currentRole = null;
     activeTab = '';
     cartItems = [];
+    if (window.firebaseBackend && window.firebaseBackend.auth) {
+      await window.firebaseBackend.performPush(store.state);
+      await window.firebaseBackend.auth.signOut().catch(err => console.warn('Firebase signOut:', err));
+    }
     $('login-modal').style.display = 'flex';
     renderApp();
   });
@@ -3208,7 +3258,8 @@ function viewPengguna() {
     </div>
 
     <div class="card">
-      <h2>Kelola Pengguna & Hak Akses</h2>
+      <h2>Kelola Pengguna Lokal (Kasir & Admin)</h2>
+      <p class="muted" style="font-size:12px;">Akun Kasir/Admin pada tahap ini masih tersimpan lokal di perangkat. Login Pimpinan menggunakan Firebase Authentication. Pembuatan akun Firebase staf dan perubahan email belum diaktifkan.</p>
       <div class="row">
         <label>Nama Lengkap *
           <input id="u-nama" placeholder="Contoh: Siti Rahmawati">
@@ -3226,7 +3277,7 @@ function viewPengguna() {
           <select id="u-role">
             <option value="kasir">Kasir</option>
             <option value="admin">Admin Gudang & Keuangan</option>
-            <option value="pimpinan">Pimpinan / Dokter Penanggung Jawab</option>
+            
           </select>
         </label>
         <button class="p" onclick="actionAddUser()">+ Tambah Pengguna</button>
@@ -3245,6 +3296,10 @@ function actionAddUser() {
 
   if (!u || !pw || !nama) {
     showAlert('Mohon lengkapi seluruh data pengguna');
+    return;
+  }
+  if (role === 'pimpinan') {
+    showAlert('Pembuatan akun Pimpinan harus melalui Firebase Authentication. Fitur provisioning akun Pimpinan tambahan belum diaktifkan agar hak akses tidak dapat dipalsukan.');
     return;
   }
   if ((store.state.users || []).some(x => x.u === u)) {
@@ -3268,14 +3323,17 @@ function editUser(username) {
   const user = (store.state.users || []).find(x => x.u === username);
   if (!user) return;
 
+  if (['praktekrose', 'pimpinan2'].includes(username)) {
+    showAlert('Profil login Pimpinan dikelola melalui Firebase Authentication. Pengubahan nama, email, dan password akun inti belum dibuka di menu lokal.');
+    return;
+  }
   showFormModal('Edit Pengguna', [
     ['nama', 'Nama Lengkap', 'text', user.nama],
     ['pw', 'Password Baru', 'text', user.pw],
     ['hp', 'Nomor WhatsApp', 'tel', user.hp || ''],
     ['role', 'Hak Akses', 'select', user.role, [
       { value: 'kasir', label: 'Kasir' },
-      { value: 'admin', label: 'Admin Gudang & Keuangan' },
-      { value: 'pimpinan', label: 'Pimpinan' }
+      { value: 'admin', label: 'Admin Gudang & Keuangan' }
     ]]
   ], res => {
     Object.assign(user, res, { _t: Date.now() });
@@ -3288,6 +3346,10 @@ function editUser(username) {
 }
 
 function delUser(username) {
+  if (['praktekrose', 'pimpinan2'].includes(username)) {
+    showAlert('Akun Pimpinan utama dan Pimpinan kedua dilindungi dan tidak dapat dihapus dari menu ini.');
+    return;
+  }
   if (currentUser && currentUser.u === username) {
     showAlert('Anda tidak dapat menghapus akun yang sedang Anda gunakan saat ini.');
     return;
@@ -3296,9 +3358,6 @@ function delUser(username) {
     store.state.users = store.state.users.filter(x => x.u !== username);
     store.logActivity('Hapus', 'Pengguna', username);
     store.saveLocal();
-    if (window.firebaseBackend && window.firebaseBackend.db) {
-      window.firebaseBackend.db.collection('k_users').doc(username).delete().catch(e => console.log(e));
-    }
   });
 }
 

@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const INITIAL_USERS = [
-  { u: 'praktekrose', pw: 'Dinkes123@', nama: 'Pimpinan / Dokter Penanggung Jawab', role: 'pimpinan', hp: '081299998888' }
+  { u: 'praktekrose', nama: 'Pimpinan / Dokter Penanggung Jawab', role: 'pimpinan', hp: '081299998888' }
 ];
 
 const INITIAL_OBAT = [

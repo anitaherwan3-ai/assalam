@@ -5,10 +5,12 @@ class FirebaseBackend {
     this.store = store;
     this.app = null;
     this.db = null;
+    this.auth = null;
     this.isOnline = false;
     this.listeners = [];
     this.syncQueue = Promise.resolve();
     this.debounceTimer = null;
+    this.authUnsubscribe = null;
     this.init();
   }
 
@@ -53,31 +55,114 @@ class FirebaseBackend {
         this.updateBadge('local');
         return;
       }
-      if (!firebase.apps.length) {
-        this.app = firebase.initializeApp(config);
-      } else {
-        this.app = firebase.app();
-      }
+      if (!firebase.apps.length) this.app = firebase.initializeApp(config);
+      else this.app = firebase.app();
       this.db = firebase.firestore();
-      this.setupRealtimeListeners();
-      this.isOnline = true;
-      this.updateBadge('online');
-      console.log('Firebase Firestore terhubung!');
+      this.auth = firebase.auth();
+      // Firestore listeners are deliberately deferred until an allowlisted owner is authenticated.
+      if (this.authUnsubscribe) this.authUnsubscribe();
+      this.authUnsubscribe = this.auth.onAuthStateChanged(async user => {
+        if (!user) {
+          this.stopSync();
+          return;
+        }
+        try {
+          const profile = await this.ensureOwnerProfile(user);
+          this.setupRealtimeListeners();
+          this.isOnline = true;
+          this.updateBadge('online');
+          if (typeof window.onFirebaseAuthUser === 'function') {
+            await window.onFirebaseAuthUser(user, profile);
+          }
+        } catch (err) {
+          console.error('Verifikasi akun Firebase gagal:', err);
+          this.stopSync();
+          this.updateBadge('error', err.code || err.message);
+          await this.auth.signOut().catch(() => {});
+        }
+      });
+      this.isOnline = false;
+      this.updateBadge('local');
+      console.log('Firebase siap; sinkronisasi menunggu autentikasi.');
     } catch (err) {
-      console.error('Koneksi Firebase gagal:', err);
+      console.error('Inisialisasi Firebase gagal:', err);
       this.isOnline = false;
       this.updateBadge('error', err.message);
     }
   }
 
+  ownerIdentity(email) {
+    const owners = {
+      'praktekrose@gmail.com': { u: 'praktekrose', nama: 'Pimpinan Utama' },
+      'nursalim42@gmail.com': { u: 'pimpinan2', nama: 'Pimpinan Kedua' }
+    };
+    return owners[String(email || '').toLowerCase()] || null;
+  }
+
+  async ensureOwnerProfile(user) {
+    if (!user || !user.email || !this.db) throw new Error('Akun Firebase tidak valid.');
+    const email = user.email.toLowerCase();
+    const identity = this.ownerIdentity(email);
+    if (!identity) throw new Error('Email ini belum terdaftar sebagai akun Pimpinan Assalam.');
+    const ref = this.db.collection('k_users').doc(identity.u);
+    const snap = await ref.get();
+    if (snap.exists) {
+      const existing = snap.data() || {};
+      if (existing.uid && existing.uid !== user.uid) {
+        throw new Error('Profil Pimpinan sudah terikat ke UID lain. Demi keamanan, profil tidak diubah.');
+      }
+      if (existing.email && existing.email.toLowerCase() !== email) {
+        throw new Error('Email profil tidak cocok dengan akun yang sedang login.');
+      }
+      if (existing.role && existing.role !== 'pimpinan') {
+        throw new Error('Peran pada profil Firebase tidak sesuai. Profil tidak diubah.');
+      }
+      if (existing.active === false) {
+        throw new Error('Akun Pimpinan ini dinonaktifkan. Hubungi administrator.');
+      }
+    }
+    const profile = {
+      uid: user.uid, email, u: identity.u,
+      nama: (snap.exists && snap.data().nama) || identity.nama,
+      role: 'pimpinan', active: true, _t: Date.now()
+    };
+    const profileWrite = Object.assign({}, profile);
+    if (snap.exists && Object.prototype.hasOwnProperty.call(snap.data() || {}, 'pw')) {
+      profileWrite.pw = firebase.firestore.FieldValue.delete();
+    }
+    await ref.set(profileWrite, { merge: true });
+    return profile;
+  }
+
+  async login(email, password) {
+    if (!this.auth) throw new Error('Firebase Authentication belum siap. Periksa koneksi internet.');
+    if (!this.ownerIdentity(email)) throw new Error('Saat ini login Firebase hanya diaktifkan untuk dua akun Pimpinan yang terdaftar.');
+    const credential = await this.auth.signInWithEmailAndPassword(email.trim().toLowerCase(), password);
+    return this.ensureOwnerProfile(credential.user);
+  }
+
+  async resetPassword(email) {
+    if (!this.auth) throw new Error('Firebase Authentication belum siap.');
+    if (!this.ownerIdentity(email)) throw new Error('Email bukan salah satu akun Pimpinan yang terdaftar.');
+    return this.auth.sendPasswordResetEmail(email.trim().toLowerCase());
+  }
+
+  stopSync() {
+    this.listeners.forEach(unsub => { try { unsub(); } catch (e) {} });
+    this.listeners = [];
+    clearTimeout(this.debounceTimer);
+    this.isOnline = false;
+    this.updateBadge('local');
+  }
+
   setupRealtimeListeners() {
-    if (!this.db) return;
+    if (!this.db || !this.auth || !this.auth.currentUser) return;
     // Bersihkan listener sebelumnya agar tidak terjadi duplikasi listener
     this.listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
     });
     this.listeners = [];
-    const collections = this.store.COLLECTIONS;
+    const collections = this.store.COLLECTIONS.filter(name => name !== 'users');
 
     // ==========================================
     // 1. LISTENER PENGATURAN APLIKASI & NOMOR URUT (SEQ)
@@ -158,20 +243,6 @@ class FirebaseBackend {
           // =================================ol
           // KHUSUS INISIALISASI USER PERTAMA
           // ==================================
-          else if (colName === 'users' && (!this.store.state.users || this.store.state.users.length === 0)) {
-            const initialUser = {
-              u: 'praktekrose',
-              pw: 'Dinkes123@',
-              nama: 'Pimpinan Klinik',
-              role: 'pimpinan',
-              _t: Date.now()
-            };
-            this.store.state.users = [initialUser];
-            this.store.saveLocal(false);
-            this.db.collection('k_users').doc(initialUser.u).set(initialUser, { merge: true }).catch(e => {
-              console.warn('Gagal inisialisasi akun pimpinan:', e);
-            });
-          }
         }
       }, err => {
         console.warn(`Listener ${colName} error:`, err);
@@ -185,7 +256,7 @@ class FirebaseBackend {
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
   pushData(state) {
-    if (!this.db || !this.isOnline) return;
+    if (!this.db || !this.isOnline || !this.auth || !this.auth.currentUser) return;
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.performPush(state);
@@ -193,7 +264,7 @@ class FirebaseBackend {
   }
 
   async performPush(state) {
-    if (!this.db) return;
+    if (!this.db || !this.auth || !this.auth.currentUser) return;
     this.updateBadge('syncing');
     
     // Gunakan antrean janji (Promise chain) untuk mencegah bentrok penulisan batch secara bersamaan
@@ -209,7 +280,7 @@ class FirebaseBackend {
         }, { merge: true });
 
         // Sinkronisasi seluruh item di collections secara aman
-        for (const col of this.store.COLLECTIONS) {
+        for (const col of this.store.COLLECTIONS.filter(name => name !== 'users')) {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
@@ -241,6 +312,7 @@ class FirebaseBackend {
   // 4. SIMPAN KONFIGURASI FIREBASE
   // ==========================================
   async saveConfig(cfg) {
+    this.stopSync();
     this.store.state.firebaseConfig = cfg;
     this.store.saveLocal(false);
     this.init();
@@ -251,10 +323,10 @@ class FirebaseBackend {
   // 5. PUTUSKAN KONEKSI FIREBASE
   // ==========================================
   disconnect() {
-    this.listeners.forEach(unsub => {
-      try { unsub(); } catch (e) {}
-    });
-    this.listeners = [];
+    this.stopSync();
+    if (this.authUnsubscribe) { this.authUnsubscribe(); this.authUnsubscribe = null; }
+    if (this.auth) this.auth.signOut().catch(() => {});
+    this.auth = null;
     this.db = null;
     this.app = null;
     this.isOnline = false;
@@ -267,4 +339,4 @@ class FirebaseBackend {
 // ==========================================
 // INISIALISASI BACKEND
 // ==========================================
-window.firebaseBackend = new FirebaseBackend(window.clinicStore);[span_0](start_span)[span_0](end_span)
+window.firebaseBackend = new FirebaseBackend(window.clinicStore);
