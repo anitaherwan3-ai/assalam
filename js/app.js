@@ -1405,6 +1405,7 @@ function printReceipt(trxId) {
   const trx = store.get('trx', trxId);
   if (!trx) return;
   const cancelled = isTrxCancelled(trx);
+  const cancellationRecord = (store.state.batalTrx || []).find(r => r && r.trxId === trx.id && r.status === 'disetujui');
   window.lastReceiptTrxId = trxId;
 
   const set = store.state.set || {};
@@ -1438,7 +1439,7 @@ function printReceipt(trxId) {
         <span style="font-size:11px;color:#475569;">${esc(set.alamat || '')}</span><br>
         <span style="font-size:11px;color:#475569;">Telp: ${esc(set.telp || '-')}</span>
       </div>
-      ${cancelled ? `<div style="margin:10px 0;padding:10px;text-align:center;border:2px solid #dc2626;color:#dc2626;font-weight:900;font-size:16px;letter-spacing:1px;">NOTA DIBATALKAN<br><span style="font-size:10px;letter-spacing:0;">Tidak berlaku sebagai bukti pembayaran</span></div>` : ''}
+      ${cancelled ? `<div style="margin:10px 0;padding:10px;text-align:center;border:2px solid #dc2626;color:#dc2626;font-weight:900;font-size:16px;letter-spacing:1px;">NOTA DIBATALKAN<br><span style="font-size:10px;letter-spacing:0;">Tidak berlaku sebagai bukti pembayaran</span></div><div style="font-size:11px;margin:5px 0;"><b>Alasan pembatalan:</b> ${esc(cancellationRecord && cancellationRecord.alasan ? cancellationRecord.alasan : 'Pembatalan disetujui Admin')}</div>` : ''}
       <hr>
       <div style="display:flex;justify-content:space-between;font-size:11px;">
         <span>Nota: ${esc(trx.no)}</span>
@@ -1450,10 +1451,10 @@ function printReceipt(trxId) {
       ${itemsHtml}
       <hr>
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;">
-        <span>${cancelled ? 'TOTAL SETELAH PEMBATALAN:' : 'TOTAL:'}</span>
-        <span>${rp(cancelled ? 0 : trx.total)}</span>
+        <span>${cancelled ? 'NOMINAL NOTA (ARSIP):' : 'TOTAL:'}</span>
+        <span>${rp(trx.total)}</span>
       </div>
-      ${cancelled ? `<div style="text-align:right;font-size:10px;color:#64748b;">Nilai transaksi awal: ${rp(trx.total)} (disimpan untuk audit)</div>` : ''}
+      ${cancelled ? `<div style="text-align:right;font-size:10px;color:#64748b;">Nominal di atas adalah nilai transaksi sebelum pembatalan; bukan tagihan yang masih harus dibayar.</div>` : ''}
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:4px;">
         <span>Metode:</span>
         <span>${esc(trx.metode || 'Tunai')}</span>
@@ -2631,7 +2632,7 @@ function viewRiwayat() {
       ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')">🏷️ Label Obat</button>` : ''}
       ${t.status === 'dibatalkan' || currentRole !== 'kasir' || cancelRequest ? '' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
       <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Ajukan Pembatalan</button>`}`;
-    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), cancelled ? `<span style="text-decoration:line-through;color:var(--mu);">${rp(t.total)}</span><br><b>${rp(0)}</b>` : rp(t.total), trxStatus, actions];
+    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total), trxStatus, actions];
   });
   const cancelRows = cancelList.map(r => {
     const status = r.status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
