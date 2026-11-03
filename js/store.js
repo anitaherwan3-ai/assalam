@@ -435,6 +435,10 @@ class ClinicStore {
         ? Number(beli.totalAwal) / Number(beli.qtyAwal)
         : Number(beli.total) / (Number(beli.qty) || 1));
     const nilaiRetur = Math.round(qty * hargaSatuan);
+    // Kunci nilai awal saat retur pertama agar faktur lama juga aman untuk retur bertahap.
+    beli.hargaBeliSatuan = hargaSatuan;
+    beli.qtyAwal = Number(beli.qtyAwal) || Number(beli.qty);
+    beli.totalAwal = Number(beli.totalAwal) || Number(beli.total);
     const stokLama = Number(obat.stok) || 0;
     const hppLama = Number(obat.hpp) || 0;
 
