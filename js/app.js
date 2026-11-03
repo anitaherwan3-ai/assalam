@@ -3254,78 +3254,17 @@ async function actionProvisionStaffAccounts() {
   });
 }
 
+// Pengelolaan akun staf lokal dinonaktifkan; autentikasi staf wajib melalui Firebase.
 function actionAddUser() {
-  const u = val('u-username').trim().toLowerCase();
-  const pw = val('u-password');
-  const nama = val('u-nama').trim();
-  const hp = val('u-hp').trim();
-  const role = val('u-role');
-
-  if (!u || !pw || !nama) {
-    showAlert('Mohon lengkapi seluruh data pengguna');
-    return;
-  }
-  if (role === 'pimpinan') {
-    showAlert('Pembuatan akun Pimpinan harus melalui Firebase Authentication. Fitur provisioning akun Pimpinan tambahan belum diaktifkan agar hak akses tidak dapat dipalsukan.');
-    return;
-  }
-  if ((store.state.users || []).some(x => x.u === u)) {
-    showAlert('Username tersebut sudah digunakan');
-    return;
-  }
-
-  store.state.users.push({ id: u, u, pw, nama, hp, role, _t: Date.now() });
-  if (role === 'pimpinan' && hp) {
-    store.state.set.waOwner = hp;
-  }
-  store.logActivity('Tambah', 'Pengguna', `${nama} (${role})`);
-  store.saveLocal();
-  $('u-username').value = '';
-  $('u-password').value = '';
-  $('u-nama').value = '';
-  if ($('u-hp')) $('u-hp').value = '';
+  showAlert('Pembuatan akun lokal sudah dinonaktifkan. Gunakan akun Firebase staf yang telah disiapkan oleh Pimpinan.');
 }
 
 function editUser(username) {
-  const user = (store.state.users || []).find(x => x.u === username);
-  if (!user) return;
-
-  if (['praktekrose', 'pimpinan2'].includes(username)) {
-    showAlert('Profil login Pimpinan dikelola melalui Firebase Authentication. Pengubahan nama, email, dan password akun inti belum dibuka di menu lokal.');
-    return;
-  }
-  showFormModal('Edit Pengguna', [
-    ['nama', 'Nama Lengkap', 'text', user.nama],
-    ['pw', 'Password Baru', 'text', user.pw],
-    ['hp', 'Nomor WhatsApp', 'tel', user.hp || ''],
-    ['role', 'Hak Akses', 'select', user.role, [
-      { value: 'kasir', label: 'Kasir' },
-      { value: 'admin', label: 'Admin Gudang & Keuangan' }
-    ]]
-  ], res => {
-    Object.assign(user, res, { _t: Date.now() });
-    if (user.role === 'pimpinan' && user.hp) {
-      store.state.set.waOwner = user.hp;
-    }
-    store.logActivity('Ubah', 'Pengguna', `${user.nama} (${user.role})`);
-    store.saveLocal();
-  });
+  showAlert('Akun lokal lama hanya dipertahankan sementara untuk menjaga data historis. Pengelolaan akun baru dilakukan melalui Firebase.');
 }
 
 function delUser(username) {
-  if (['praktekrose', 'pimpinan2'].includes(username)) {
-    showAlert('Akun Pimpinan utama dan Pimpinan kedua dilindungi dan tidak dapat dihapus dari menu ini.');
-    return;
-  }
-  if (currentUser && currentUser.u === username) {
-    showAlert('Anda tidak dapat menghapus akun yang sedang Anda gunakan saat ini.');
-    return;
-  }
-  showConfirm(`Hapus pengguna ${username}?`, () => {
-    store.state.users = store.state.users.filter(x => x.u !== username);
-    store.logActivity('Hapus', 'Pengguna', username);
-    store.saveLocal();
-  });
+  showAlert('Penghapusan akun lokal lama ditahan sampai login Firebase staf selesai diuji. Data lama tidak dihapus otomatis.');
 }
 
 // -------------------------------------------------------------
