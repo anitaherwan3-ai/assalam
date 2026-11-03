@@ -130,25 +130,15 @@ function applyAppSettings() {
   document.title = (set.nama || 'Klinik Sehat') + ' - Sistem Manajemen & Keuangan';
 }
 
-// Authentication melalui Firebase Authentication (dua akun Pimpinan awal).
-function applyOwnerSession(profile) {
-  if (!profile || profile.role !== 'pimpinan' || profile.active !== true) return;
-  const local = (store.state.users || []).find(x => x.u === profile.u);
-  const user = Object.assign({}, local || {}, {
-    u: profile.u, id: profile.u, nama: profile.nama,
-    role: 'pimpinan', email: profile.email, uid: profile.uid
-  });
-  // Password lokal lama tidak dipakai untuk autentikasi Firebase.
+// Semua peran masuk melalui Firebase Authentication dan profil Firestore aktif.
+function applyFirebaseSession(profile) {
+  if (!profile || profile.active !== true || !['pimpinan', 'admin', 'kasir'].includes(profile.role)) return;
+  const user = Object.assign({}, profile, { id: profile.u, u: profile.u });
   delete user.pw;
-  const idx = (store.state.users || []).findIndex(x => x.u === profile.u);
-  if (idx >= 0) {
-    store.state.users[idx] = Object.assign({}, store.state.users[idx], user);
-    delete store.state.users[idx].pw;
-  } else store.state.users.push(user);
-  store.saveLocal(false);
   currentUser = user;
-  currentRole = 'pimpinan';
-  activeTab = ROLE_TABS.pimpinan[0];
+  window.currentUser = user;
+  currentRole = profile.role;
+  activeTab = (ROLE_TABS[currentRole] || [])[0] || '';
   cartItems = [];
   $('login-error').textContent = '';
   $('login-password').value = '';
@@ -157,7 +147,7 @@ function applyOwnerSession(profile) {
 }
 
 window.onFirebaseAuthUser = async (firebaseUser, profile) => {
-  if (firebaseUser && profile) applyOwnerSession(profile);
+  if (firebaseUser && profile) applyFirebaseSession(profile);
 };
 
 async function doLogin() {
@@ -169,41 +159,21 @@ async function doLogin() {
     return;
   }
   const backend = window.firebaseBackend;
-  const isOwnerEmail = backend && backend.ownerIdentity(email);
-  if (isOwnerEmail) {
-    errorEl.textContent = 'Memeriksa akun Pimpinan melalui Firebase...';
-    try {
-      const profile = await backend.login(email, password);
-      applyOwnerSession(profile);
-      store.logActivity('Masuk', 'Sesi', `Pimpinan ${profile.nama} login melalui Firebase`);
-    } catch (err) {
-      console.error('Login Firebase gagal:', err);
-      errorEl.textContent = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
-        ? 'Email atau password tidak sesuai.'
-        : (err.code === 'auth/user-not-found' ? 'Akun belum terdaftar di Firebase Authentication.' : (err.message || 'Login gagal.'));
-    }
+  if (!backend || !backend.auth) {
+    errorEl.textContent = 'Firebase belum siap. Periksa koneksi internet lalu coba lagi.';
     return;
   }
-
-  // Kompatibilitas sementara: akun staf lama tetap dapat masuk secara lokal.
-  // Sesi lokal tidak membuka sinkronisasi Firestore karena tidak memiliki Firebase Auth.
-  const staff = (store.state.users || []).find(x =>
-    String(x.u || '').toLowerCase() === email.toLowerCase() &&
-    x.pw === password && ['kasir', 'admin'].includes(x.role)
-  );
-  if (!staff) {
-    errorEl.textContent = 'Akun tidak cocok. Pimpinan harus memakai email Firebase; staf memakai username dan password lokal.';
-    return;
+  errorEl.textContent = 'Memeriksa akun melalui Firebase...';
+  try {
+    const profile = await backend.login(email, password);
+    applyFirebaseSession(profile);
+    store.logActivity('Masuk', 'Sesi', `${profile.role}: ${profile.nama} login melalui Firebase`);
+  } catch (err) {
+    console.error('Login Firebase gagal:', err);
+    errorEl.textContent = err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
+      ? 'Email atau password tidak sesuai.'
+      : (err.code === 'auth/user-not-found' ? 'Akun belum terdaftar di Firebase Authentication.' : (err.message || 'Login gagal.'));
   }
-  currentUser = staff;
-  currentRole = staff.role;
-  activeTab = (ROLE_TABS[currentRole] || [])[0] || '';
-  cartItems = [];
-  errorEl.textContent = '';
-  $('login-password').value = '';
-  $('login-modal').style.display = 'none';
-  store.logActivity('Masuk', 'Sesi', `User ${staff.nama} (${staff.role}) login lokal`);
-  renderApp();
 }
 
 async function activatePimpinanAccount() {
@@ -219,7 +189,7 @@ async function activatePimpinanAccount() {
 async function resetLoginPassword() {
   const email = val('login-email').trim().toLowerCase();
   if (!email) {
-    $('login-error').textContent = 'Masukkan email Pimpinan terlebih dahulu.';
+    $('login-error').textContent = 'Masukkan email akun Assalam terlebih dahulu.';
     return;
   }
   try {
@@ -3228,16 +3198,10 @@ function viewPengguna() {
   const users = store.state.users || [];
   const ownerWa = store.getOwnerWa ? store.getOwnerWa() : (store.state.set && store.state.set.waOwner);
   const pimpinanUser = users.find(u => u.role === 'pimpinan');
-
   const rows = users.map(u => [
-    esc(u.nama),
-    `<code>${esc(u.u)}</code>`,
-    `<span class="badge-ok">${esc(u.role)}</span>`,
-    esc(u.hp || '-'),
-    `
-      <button class="s" onclick="editUser('${u.u}')">Edit</button>
-      <button class="s btn-danger" onclick="delUser('${u.u}')">Hapus</button>
-    `
+    esc(u.nama), `<code>${esc(u.u)}</code>`,
+    `<span class="badge-ok">${esc(u.role)}</span>`, esc(u.hp || '-'),
+    ['praktekrose', 'pimpinan2'].includes(u.u) ? 'Akun inti terlindungi' : 'Data lokal lama dipertahankan'
   ]);
 
   return `
@@ -3258,33 +3222,35 @@ function viewPengguna() {
     </div>
 
     <div class="card">
-      <h2>Kelola Pengguna Lokal (Kasir & Admin)</h2>
-      <p class="muted" style="font-size:12px;">Akun Kasir/Admin pada tahap ini masih tersimpan lokal di perangkat. Login Pimpinan menggunakan Firebase Authentication. Pembuatan akun Firebase staf dan perubahan email belum diaktifkan.</p>
-      <div class="row">
-        <label>Nama Lengkap *
-          <input id="u-nama" placeholder="Contoh: Siti Rahmawati">
-        </label>
-        <label>Username *
-          <input id="u-username" placeholder="siti">
-        </label>
-        <label>Password *
-          <input id="u-password" type="password" placeholder="Minimal 6 karakter">
-        </label>
-        <label>Nomor WhatsApp *
-          <input id="u-hp" type="tel" placeholder="081234567890">
-        </label>
-        <label>Peran / Hak Akses
-          <select id="u-role">
-            <option value="kasir">Kasir</option>
-            <option value="admin">Admin Gudang & Keuangan</option>
-            
-          </select>
-        </label>
-        <button class="p" onclick="actionAddUser()">+ Tambah Pengguna</button>
+      <h2>Akun Staf Firebase</h2>
+      <p class="muted" style="font-size:12px;">Akun berikut menggunakan Firebase Authentication. Tombol ini membuat profil akses Firestore untuk dua email staf yang sudah didaftarkan. Password tidak disimpan di aplikasi atau Firestore.</p>
+      <div style="margin:10px 0 14px;line-height:1.8;">
+        <div><b>Admin Gudang & Keuangan:</b> assalamadmin1@gmail.com</div>
+        <div><b>Kasir:</b> assalamkasir1@gmail.com</div>
       </div>
-      ${renderTable(['Nama Pengguna', 'Username', 'Peran', 'No. WhatsApp', 'Aksi'], rows, { key: 'user_tbl' })}
+      <button class="p" onclick="actionProvisionStaffAccounts()">Aktifkan / Perbarui Profil Akses Staf</button>
+      <p class="muted" style="font-size:11px;margin-top:10px;">Jalankan tombol ini dari akun Pimpinan. Akun lokal lama tidak dihapus selama masa pengujian.</p>
+      ${renderTable(['Nama Pengguna Lama', 'Username', 'Peran', 'No. WhatsApp', 'Status'], rows, { key: 'user_tbl' })}
     </div>
   `;
+}
+
+async function actionProvisionStaffAccounts() {
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.auth || !backend.auth.currentUser) {
+    showAlert('Silakan login sebagai Pimpinan melalui Firebase terlebih dahulu.');
+    return;
+  }
+  showConfirm('Buat profil akses Firestore untuk Admin Gudang & Keuangan dan Kasir? Password tidak akan disimpan. Akun Pimpinan dan data operasional tidak diubah.', async () => {
+    try {
+      const profiles = await backend.provisionDefaultStaffProfiles(store.state.users || []);
+      showAlert('Profil akses staf berhasil disiapkan.\n\nAdmin: ' + profiles[0].email + '\nKasir: ' + profiles[1].email + '\n\nSilakan uji login masing-masing akun pada perangkat terpisah.');
+      store.logActivity('Aktivasi', 'Pengguna', 'Profil Firebase staf disiapkan oleh Pimpinan');
+    } catch (err) {
+      console.error('Provision profil staf gagal:', err);
+      showAlert(err.message || 'Gagal menyiapkan profil staf.');
+    }
+  });
 }
 
 function actionAddUser() {
