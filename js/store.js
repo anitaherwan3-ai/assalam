@@ -331,7 +331,7 @@ class ClinicStore {
     // Reset status pasien jika terhubung
     if (trx.pid) {
       const pasien = this.get('pasien', trx.pid);
-      if (pasien) pasien.done = false;
+      if (pasien) { pasien.done = false; pasien._t = Date.now(); }
     }
 
     // Simpan nota sebagai jejak audit; jangan hapus transaksi dari riwayat.
