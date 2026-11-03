@@ -580,7 +580,7 @@ function printShiftSlip(shiftId) {
 // MODULE: PASIEN & ANTREAN
 // -------------------------------------------------------------
 function viewPasien() {
-  const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr);
+  const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus');
 
   const rows = todayPatients.map(p => [
     esc(p.no),
@@ -672,7 +672,7 @@ function actionAddPasien() {
 
 function editPasien(id) {
   const p = store.get('pasien', id);
-  if (!p) return;
+  if (!p || p.deletedAt || p.status === 'dihapus') return;
   showFormModal('Edit Data Pasien', [
     ['nama', 'Nama Lengkap Pasien', 'text', p.nama],
     ['hp', 'Nomor HP', 'tel', p.hp]
@@ -686,12 +686,16 @@ function editPasien(id) {
 }
 
 function delPasien(id) {
-  showConfirm('Hapus pasien dari antrean?', () => {
+  showConfirm('Sembunyikan pasien ini dari antrean aktif? Catatan tetap disimpan dan tidak dihapus permanen.', () => {
     const p = store.get('pasien', id);
-    if (p) {
-      store.state.pasien = store.state.pasien.filter(x => x.id !== id);
-      store.logActivity('Hapus', 'Pasien', `${p.no} - ${p.nama}`);
+    if (p && !p.deletedAt && p.status !== 'dihapus') {
+      p.status = 'dihapus';
+      p.deletedAt = Date.now();
+      p.deletedBy = currentUser ? currentUser.u : 'sistem';
+      p._t = Date.now();
+      store.logActivity('Arsipkan', 'Pasien', `${p.no} - ${p.nama}`);
       store.saveLocal();
+      if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
     }
   });
 }
@@ -700,7 +704,7 @@ function delPasien(id) {
 // MODULE: TRANSAKSI & KASIR (POS)
 // -------------------------------------------------------------
 function viewTrx() {
-  const waitingPatients = (store.state.pasien || []).filter(p => !p.done);
+  const waitingPatients = (store.state.pasien || []).filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus');
   const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   const cartRows = cartItems.map((item, idx) => [
@@ -1186,7 +1190,7 @@ function actionBayarTrx(totalCart) {
   }
   const pid = val('trx-pasien');
   const pasien = store.get('pasien', pid);
-  if (!pasien) {
+  if (!pasien || pasien.deletedAt || pasien.status === 'dihapus') {
     showAlert('Silakan pilih pasien terlebih dahulu');
     return;
   }
@@ -3500,7 +3504,7 @@ function searchPasienLama() {
 
   const seen = new Set();
   const unique = [];
-  (store.state.pasien || []).forEach(p => {
+  (store.state.pasien || []).filter(p => !p.deletedAt && p.status !== 'dihapus').forEach(p => {
     const key = (p.nama + '|' + (p.hp || '')).toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
@@ -3841,7 +3845,7 @@ function viewPimpinanPasien() {
     esc(p.nama || '-'),
     esc(p.hp || '-'),
     esc(p.layanan || '-'),
-    p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
+    p.deletedAt || p.status === 'dihapus' ? '<span class="badge-warn">Diarsipkan</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
     esc(p.kasir || '-')
   ]);
   return `
