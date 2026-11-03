@@ -66,18 +66,16 @@ function getActiveFilteredTrx() {
 function calculateFinancials() {
   const trxList = getActiveFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
-
-  const sumByJenis = j => allItems
-    .filter(i => (i.t || i.jenis) === j)
-    .reduce((s, x) => s + (Number(x.harga || 0) * Number(x.qty || 0)), 0);
-  
-  // Murni Omset Transaksi
-  const rev = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
-  
-  // HPP Obat & Paket
-  const hpp = allItems
-    .filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket')
-    .reduce((s, x) => s + (Number(x.hpp || 0) * Number(x.qty || 0)), 0);
+  const approvedReturns = inFilterRange(store.state.returJual || []).filter(r => r.status === 'disetujui' || !r.status);
+  const returnValue = approvedReturns.reduce((sum, r) => sum + Number(r.total || 0), 0);
+  const returnHpp = approvedReturns.reduce((sum, r) => sum + Number(r.hpp || 0) * Number(r.qty || 0), 0);
+  const sumByJenis = j => allItems.filter(i => (i.t || i.jenis) === j)
+    .reduce((s, x) => s + Number(x.harga || 0) * Number(x.qty || 0), 0) -
+    approvedReturns.filter(r => (r.jenis || '') === j).reduce((s, r) => s + Number(r.total || 0), 0);
+  // Omset dan HPP bersih setelah retur disetujui Admin.
+  const rev = trxList.reduce((s, t) => s + Number(t.total || 0), 0) - returnValue;
+  const hpp = allItems.filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket')
+    .reduce((s, x) => s + Number(x.hpp || 0) * Number(x.qty || 0), 0) - returnHpp;
   
   const loss = inFilterRange(store.state.loss).reduce((s, l) => s + Number(l.nilai || 0), 0);
   const op = inFilterRange(store.state.biaya)
@@ -101,8 +99,8 @@ function calculateFinancials() {
     trxList, rev, hpp, loss, op, pc, kons, tind, obat, paket, disk, laba,
     totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
-      trxList.filter(t => t.metode === 'Tunai')
-        .reduce((s, t) => s + Number(t.total || 0), 0) - pc
+      trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
+      approvedReturns.filter(r => r.metode === 'Tunai').reduce((s, r) => s + Number(r.total || 0), 0) - pc
     // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
 }
@@ -2559,48 +2557,48 @@ function actionVerifShift(id) {
 function viewRiwayat() {
   const trxList = getFilteredTrx().slice().reverse();
   const returList = (store.state.returJual || []).slice().reverse();
-
   const rows = trxList.map(t => {
     const hasMed = (t.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
-
-    return [
-      esc(t.tgl),
-      esc(t.no),
-      esc(t.nama),
-      esc(t.kasir || '-'),
-      esc(t.metode),
-      rp(t.total),
-      `
-        <button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
-        ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')" title="Cetak Label &amp; Etiket Obat">🏷️ Label Obat</button>` : ''}
-        ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole === 'admin' ? '<span class="badge-ok">Baca saja</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')" title="Retur Obat">Retur</button>
-        <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`)}
-      `
-    ];
+    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total),
+      `<button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
+      ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')">🏷️ Label Obat</button>` : ''}
+      ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole === 'admin' ? '<span class="badge-ok">Baca saja</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
+      <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`)}`];
   });
-
-  const returRows = returList.map(r => [
-    esc(r.tgl),
-    esc(r.noNota),
-    esc(r.namaPasien),
-    esc(r.namaItem),
-    r.qty,
-    rp(r.total),
-    esc(r.alasan),
-    esc(r.kasir || '-')
-  ]);
-
+  const returRows = returList.map(r => {
+    const status = r.status || 'disetujui';
+    const badge = status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
+      status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
+    const actions = currentRole === 'admin' && status === 'menunggu'
+      ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>` : '';
+    return [esc(r.tgl), esc(r.noNota), esc(r.namaPasien), esc(r.namaItem), Number(r.qty || 0), rp(r.total),
+      esc(r.alasan), esc(r.kasir || '-'), badge, actions];
+  });
   return renderFilterBar() + `
-    <div class="card">
-      <h2>Daftar Semua Transaksi Penjualan</h2>
-      ${renderTable(['Tanggal', 'No. Nota', 'Pasien', 'Kasir', 'Metode', 'Total Tagihan', 'Aksi'], rows, { key: 'all_trx' })}
-    </div>
-
-    <div class="card">
-      <h2>Riwayat Retur Penjualan Pasien</h2>
-      ${renderTable(['Tanggal', 'No. Nota', 'Nama Pasien', 'Item Diretur', 'Qty', 'Uang Dikembalikan', 'Alasan', 'Petugas'], returRows, { key: 'retur_jual_tbl' })}
-    </div>
+    <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
+      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Aksi'], rows, { key: 'all_trx' })}</div>
+    <div class="card"><h2>Riwayat Retur Penjualan Pasien</h2>
+      <p style="color:var(--mu);font-size:13px;">Retur dari Kasir harus disetujui Admin sebelum stok obat dan batch bertambah.</p>
+      ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Petugas','Status','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
   `;
+}
+
+function actionApproveReturJual(id) {
+  if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
+  showConfirm('Setujui retur ini? Stok obat dan batch asal akan bertambah setelah persetujuan.', () => {
+    if (store.approveReturJual(id)) showAlert('Retur disetujui. Stok obat dan batch asal telah diperbarui.', 'Retur Disetujui');
+    else showAlert('Persetujuan gagal. Periksa status retur dan data batch asal.', 'Gagal');
+    renderApp();
+  });
+}
+
+function actionRejectReturJual(id) {
+  if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
+  showFormModal('Alasan Penolakan Retur', [['alasan', 'Alasan penolakan', 'text', 'Barang tidak memenuhi syarat retur']], res => {
+    if (store.rejectReturJual(id, res.alasan)) showAlert('Retur ditolak. Stok tidak berubah.', 'Retur Ditolak');
+    else showAlert('Retur tidak dapat ditolak. Periksa statusnya.');
+    renderApp();
+  });
 }
 
 function openModalReturJual(trxId) {
@@ -2633,7 +2631,7 @@ function openModalReturJual(trxId) {
     });
 
     if (success) {
-      showAlert('Retur penjualan berhasil diproses. Stok obat telah dikembalikan ke sistem.', 'Sukses');
+      showAlert('Pengajuan retur berhasil dikirim dan menunggu verifikasi Admin. Stok belum berubah.', 'Retur Menunggu Verifikasi');
       renderApp();
     } else {
       showAlert('Gagal memproses retur. Periksa kembali jumlah qty retur.');
@@ -3787,11 +3785,10 @@ function viewKartuStok() {
   });
 
   (store.state.returJual || []).forEach(r => {
-    (r.items || []).forEach(it => {
-      if ((it.oid || it.id) === obat.id) {
-        muts.push({ tgl: r.tgl || '', ket: `↩️ Retur Penjualan — Nota: ${r.noNota || '-'}`, masuk: Number(it.qty || 0), keluar: 0 });
-      }
-    });
+    if (r.status && r.status !== 'disetujui') return;
+    const qty = (r.batchRestores || []).filter(x => x.oid === obat.id).reduce((sum, x) => sum + Number(x.qty || 0), 0);
+    if (qty > 0) muts.push({ tgl: r.tgl || '', ket: `↩️ Retur Penjualan — Nota: ${r.noNota || '-'}`, masuk: qty, keluar: 0 });
+    (r.items || []).forEach(it => { if ((it.oid || it.id) === obat.id) muts.push({ tgl: r.tgl || '', ket: `↩️ Retur Penjualan — Nota: ${r.noNota || '-'}`, masuk: Number(it.qty || 0), keluar: 0 }); });
   });
 
   (store.state.returBeli || []).forEach(r => {
@@ -3885,6 +3882,9 @@ function exportKartuStok() {
     if (t.status !== 'dibatalkan') (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
   });
   (store.state.returJual || []).forEach(r => {
+    if (r.status && r.status !== 'disetujui') return;
+    const qty = (r.batchRestores || []).filter(x => x.oid === obat.id).reduce((sum, x) => sum + Number(x.qty || 0), 0);
+    if (qty > 0) muts.push({ tgl: r.tgl, ket: `Retur Jual - ${r.noNota||''}`, masuk: qty, keluar: 0 });
     (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Jual - ${r.noNota||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
   });
   (store.state.returBeli || []).forEach(r => {
