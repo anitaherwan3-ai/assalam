@@ -361,10 +361,13 @@ class FirebaseBackend {
       alasan: String(alasan || '').trim(),
       tgl: new Date().toISOString().slice(0, 10), _t: Date.now()
     };
+    // Firebase compat Transaction.get hanya menerima DocumentReference, bukan Query.
+    // Ambil daftar retur terlebih dahulu; Rules juga menolak retur baru selama
+    // pengajuan pembatalan berstatus menunggu.
+    const returnSnap = await returnQuery.get();
     await this.db.runTransaction(async transaction => {
       const trxSnap = await transaction.get(trxRef);
       const requestSnap = await transaction.get(requestRef);
-      const returnSnap = await transaction.get(returnQuery);
       if (!trxSnap.exists) throw new Error('Nota tidak ditemukan di Cloud.');
       const trx = trxSnap.data() || {};
       if (trx.status === 'dibatalkan') throw new Error('Nota sudah dibatalkan.');
@@ -399,6 +402,11 @@ class FirebaseBackend {
     const id = String(trxId), now = Date.now();
     const requestRef = this.db.collection('k_batalTrx').doc(id);
     const trxRef = this.db.collection('k_trx').doc(id);
+    // Pemeriksaan retur dilakukan di luar transaksi karena Transaction.get
+    // pada Firebase compat tidak mendukung Query. Saat request menunggu,
+    // Firestore Rules menolak pembuatan retur baru untuk nota tersebut.
+    const returnQuery = this.db.collection('k_returJual').where('trxId', '==', id);
+    const returnSnap = decision === 'disetujui' ? await returnQuery.get() : null;
     await this.db.runTransaction(async transaction => {
       const requestSnap = await transaction.get(requestRef);
       const trxSnap = await transaction.get(trxRef);
@@ -413,9 +421,7 @@ class FirebaseBackend {
         });
         return;
       }
-      const returnQuery = this.db.collection('k_returJual').where('trxId', '==', id);
-      const returnSnap = await transaction.get(returnQuery);
-      if (returnSnap.docs.some(doc => (doc.data() || {}).status !== 'ditolak')) {
+      if (returnSnap && returnSnap.docs.some(doc => (doc.data() || {}).status !== 'ditolak')) {
         throw new Error('Nota memiliki retur yang sedang diproses atau sudah disetujui. Pembatalan dibatalkan.');
       }
 
