@@ -32,8 +32,8 @@ service cloud.firestore {
     function adminOrPimpinan() {
       return signedIn() && (initialOwner() || staffProfile().role == 'admin');
     }
-    function kasirOrAbove() {
-      return signedIn() && (initialOwner() || staffProfile().role in ['kasir', 'admin']);
+    function kasirOrPimpinan() {
+      return signedIn() && (initialOwner() || staffProfile().role == 'kasir');
     }
 
     match /klinik_config/{document} {
@@ -84,10 +84,10 @@ service cloud.firestore {
           request.resource.data.u == staffProfile().u);
       allow delete: if pimpinan();
     }
-    match /k_pasien/{document} { allow read, write: if kasirOrAbove(); }
-    match /k_trx/{document} { allow read, write: if kasirOrAbove(); }
-    match /k_shift/{document} { allow read, write: if kasirOrAbove(); }
-    match /k_petty/{document} { allow read, write: if kasirOrAbove(); }
+    match /k_pasien/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_trx/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_shift/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
     match /k_obat/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
     match /k_tarif/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
     match /k_paket/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
