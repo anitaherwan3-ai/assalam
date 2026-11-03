@@ -25,7 +25,7 @@ let dateFilter = {
 };
 // Navigasi Tabs per Role
 const ROLE_TABS = {
-  kasir: ['Shift', 'Pasien', 'Transaksi', 'Kas Kecil'],
+  kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
   pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
