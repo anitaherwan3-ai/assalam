@@ -209,23 +209,25 @@ class ClinicStore {
 
   // FIFO / FEFO Deduction Logic
   deductBatchFEFO(oid, qty) {
+    const amount = Number(qty);
+    if (!Number.isFinite(amount) || amount <= 0) return { deductions: [], unallocated: amount || 0 };
     const today = new Date().toISOString().slice(0, 10);
-    const deductions = [];
-    
-    // Ambil batch dengan ED terdekat dan sisa > 0, lewatkan yang sudah kedaluwarsa
-    const batches = this.state.batch
-      .filter(b => b.oid === oid && b.sisa > 0 && b.ed >= today)
-      .sort((a, b) => (a.ed < b.ed ? -1 : 1));
+    const batches = (this.state.batch || [])
+      .filter(b => b.oid === oid && Number(b.sisa) > 0 && b.ed >= today)
+      .sort((a, b) => String(a.ed).localeCompare(String(b.ed)));
+    const available = batches.reduce((sum, b) => sum + Number(b.sisa || 0), 0);
+    if (available < amount) return { deductions: [], unallocated: amount - available };
 
-    let remaining = qty;
+    const deductions = [];
+    let remaining = amount;
     for (const b of batches) {
       if (remaining <= 0) break;
-      const take = Math.min(remaining, b.sisa);
+      const take = Math.min(remaining, Number(b.sisa) || 0);
       b.sisa -= take;
+      b._t = Date.now();
       remaining -= take;
       deductions.push({ bid: b.id, qty: take, batchNo: b.no, ed: b.ed });
     }
-
     return { deductions, unallocated: remaining };
   }
 
@@ -370,37 +372,69 @@ class ClinicStore {
   // Proses Retur Penjualan Pasien
   processReturJual({ trxId, itemIndex, qtyRetur, alasan }) {
     const trx = this.get('trx', trxId);
-    if (!trx || !trx.items || !trx.items[itemIndex]) return false;
+    if (!trx || trx.status === 'dibatalkan' || !Array.isArray(trx.items) || !trx.items[itemIndex]) return false;
 
     const item = trx.items[itemIndex];
-    const qty = Math.min(Number(qtyRetur), item.qty);
-    if (qty <= 0) return false;
+    const qty = Number(qtyRetur);
+    if (!Number.isFinite(qty) || qty <= 0 || qty > Number(item.qty || 0)) return false;
 
-    const nilaiRetur = qty * item.harga;
-
-    // Kembalikan stok obat jika item adalah obat
-    if (item.oid) {
-      const obat = this.getObat(item.oid);
-      if (obat) {
-        obat.stok += qty;
+    // Retur obat wajib kembali ke batch asal penjualan, bukan batch sembarang.
+    const restoreFromOriginalBatches = (oid, deductions, amount) => {
+      if (!oid || !Array.isArray(deductions)) return false;
+      const available = deductions.reduce((sum, d) => sum + Number(d.qty || 0), 0);
+      if (available < amount) return false;
+      const obat = this.getObat(oid);
+      if (!obat) return false;
+      let remaining = amount;
+      for (const d of deductions) {
+        if (remaining <= 0) break;
+        const take = Math.min(remaining, Number(d.qty || 0));
+        const batch = this.get('batch', d.bid);
+        if (!batch) return false;
+        d.qty = Number(d.qty || 0) - take;
+        batch.sisa = Number(batch.sisa || 0) + take;
+        batch._t = Date.now();
+        remaining -= take;
       }
-      // Kembalikan ke batch pertama yang cocok jika ada
-      const batch = (this.state.batch || []).find(b => b.oid === item.oid);
-      if (batch) {
-        batch.sisa += qty;
+      obat.stok = Number(obat.stok || 0) + amount;
+      obat._t = Date.now();
+      return remaining <= 0;
+    };
+
+    // Validasi seluruh batch asal terlebih dahulu agar tidak terjadi retur parsial.
+    if (item.oid) {
+      if (!Array.isArray(item.batchDeductions) ||
+          item.batchDeductions.reduce((sum, d) => sum + Number(d.qty || 0), 0) < qty) return false;
+      if (item.batchDeductions.some(d => !this.get('batch', d.bid))) return false;
+    }
+    if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+      for (const part of item.items) {
+        if (part.type !== 'obat' || !(part.oid || part.id)) continue;
+        const partQty = (Number(part.qty) || 1) * qty;
+        if (!Array.isArray(part.batchDeductions) ||
+            part.batchDeductions.reduce((sum, d) => sum + Number(d.qty || 0), 0) < partQty ||
+            part.batchDeductions.some(d => !this.get('batch', d.bid))) return false;
       }
     }
 
-    // Catat data retur
-    const returId = uid();
+    const nilaiRetur = qty * Number(item.harga || 0);
+    if (item.oid && !restoreFromOriginalBatches(item.oid, item.batchDeductions, qty)) return false;
+    if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+      item.items.forEach(part => {
+        if (part.type === 'obat' && (part.oid || part.id)) {
+          restoreFromOriginalBatches(part.oid || part.id, part.batchDeductions, (Number(part.qty) || 1) * qty);
+        }
+      });
+    }
+
     this.state.returJual.unshift({
-      id: returId,
+      id: uid(),
       tgl: new Date().toISOString().slice(0, 10),
       trxId: trx.id,
       noNota: trx.no,
       namaPasien: trx.nama,
       namaItem: item.nama,
-      qty: qty,
+      qty,
       harga: item.harga,
       total: nilaiRetur,
       alasan: alasan || 'Retur Pasien',
@@ -408,18 +442,14 @@ class ClinicStore {
       _t: Date.now()
     });
 
-    // Update item transaksi atau tandai berkurang
     item.qty -= qty;
-    trx.total = Math.max(0, trx.total - nilaiRetur);
-    if (item.qty <= 0) {
-      trx.items.splice(itemIndex, 1);
-    }
-
+    trx.total = Math.max(0, Number(trx.total || 0) - nilaiRetur);
+    if (item.qty <= 0) trx.items.splice(itemIndex, 1);
+    trx._t = Date.now();
     this.logActivity('Retur Penjualan', 'Kasir', `Nota ${trx.no} - ${item.nama} (${qty}x = ${rp(nilaiRetur)})`);
     this.saveLocal();
     return true;
   }
-
   // Proses Retur Pembelian ke Supplier PBF
   processReturBeli({ beliId, qtyRetur, alasan }) {
     const beli = this.get('beli', beliId);
