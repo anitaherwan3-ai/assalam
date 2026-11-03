@@ -173,7 +173,8 @@ service cloud.firestore {
         // Pencatatan uang kembali hanya Pimpinan; nominal tidak boleh melebihi/mengubah nilai retur.
         (pimpinan() &&
           resource.data.status == 'disetujui' &&
-          (!('pengembalian' in resource.data) || resource.data.pengembalian.status != 'dibayar') &&
+          ('pengembalian' in resource.data) &&
+          resource.data.pengembalian.status == 'menunggu' &&
           request.resource.data.pengembalian.status == 'dibayar' &&
           request.resource.data.pengembalian.nominal == resource.data.total &&
           request.resource.data.pengembalian.dibayarOleh == staffProfile().u &&
