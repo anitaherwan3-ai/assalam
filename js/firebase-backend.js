@@ -298,6 +298,14 @@ class FirebaseBackend {
                 const localItem = mergedMap.get(remoteItem.id);
                 if (!localItem || (remoteItem._t || 0) >= (localItem._t || 0)) {
                   mergedMap.set(remoteItem.id, remoteItem);
+                } else if (colName === 'obat' && Object.prototype.hasOwnProperty.call(remoteItem, 'stok')) {
+                  // Stok dari Cloud adalah nilai bersama lintas perangkat.
+                  // Metadata lokal yang lebih baru tetap dipertahankan, tetapi angka stok
+                  // selalu mengikuti dokumen Cloud agar tidak tertahan oleh _t lokal.
+                  mergedMap.set(remoteItem.id, Object.assign({}, localItem, { stok: remoteItem.stok }));
+                } else if (colName === 'batch' && Object.prototype.hasOwnProperty.call(remoteItem, 'sisa')) {
+                  // Perlakuan yang sama untuk saldo setiap batch obat.
+                  mergedMap.set(remoteItem.id, Object.assign({}, localItem, { sisa: remoteItem.sisa }));
                 }
               }
             });
@@ -496,11 +504,26 @@ class FirebaseBackend {
 
             const docId = (col === 'users') ? (payload.u || payload.id) : payload.id;
             if (docId) {
-              operations.push({
-                ref: this.db.collection('k_' + col).doc(String(docId)),
-                data: payload,
-                merge: true
-              });
+              const docRef = this.db.collection('k_' + col).doc(String(docId));
+              // Hindari perangkat Admin/Pimpinan mengirim ulang saldo lokal lama
+              // setelah perangkat Kasir lebih dahulu mengurangi stok di Cloud.
+              // Jika dokumen Cloud lebih baru, pertahankan saldo Cloud saat push.
+              if (profile.role !== 'kasir' && (col === 'obat' || col === 'batch')) {
+                const remoteSnap = await docRef.get();
+                if (remoteSnap.exists) {
+                  const remoteItem = remoteSnap.data() || {};
+                  if ((remoteItem._t || 0) >= (payload._t || 0)) {
+                    if (col === 'obat' && Object.prototype.hasOwnProperty.call(remoteItem, 'stok')) {
+                      payload.stok = remoteItem.stok;
+                    }
+                    if (col === 'batch' && Object.prototype.hasOwnProperty.call(remoteItem, 'sisa')) {
+                      payload.sisa = remoteItem.sisa;
+                    }
+                    payload._t = Math.max(payload._t || 0, remoteItem._t || 0);
+                  }
+                }
+              }
+              operations.push({ ref: docRef, data: payload, merge: true });
             }
           }
         }
