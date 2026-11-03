@@ -2585,9 +2585,14 @@ function viewRiwayat() {
 
 function actionApproveReturJual(id) {
   if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
-  showConfirm('Setujui retur ini? Stok obat dan batch asal akan bertambah setelah persetujuan.', () => {
-    if (store.approveReturJual(id)) showAlert('Retur disetujui. Stok obat dan batch asal telah diperbarui.', 'Retur Disetujui');
-    else showAlert('Persetujuan gagal. Periksa status retur dan data batch asal.', 'Gagal');
+  showConfirm('Setujui retur ini? Stok obat, batch asal, dan status retur akan diperbarui bersama di cloud.', async () => {
+    try {
+      await window.firebaseBackend.approveReturJual(id);
+      showAlert('Retur disetujui. Stok dan batch asal sudah diperbarui di cloud.', 'Retur Disetujui');
+    } catch (err) {
+      console.error('Persetujuan retur gagal:', err);
+      showAlert(err.message || 'Persetujuan gagal. Stok tidak diubah.', 'Gagal');
+    }
     renderApp();
   });
 }
