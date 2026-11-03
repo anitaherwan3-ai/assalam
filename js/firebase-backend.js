@@ -60,7 +60,7 @@ class FirebaseBackend {
       else this.app = firebase.app();
       this.db = firebase.firestore();
       this.auth = firebase.auth();
-      // Firestore listeners are deliberately deferred until an allowlisted owner is authenticated.
+      // Firestore listeners start only after the Firebase account and Firestore role profile are verified.
       if (this.authUnsubscribe) this.authUnsubscribe();
       this.authUnsubscribe = this.auth.onAuthStateChanged(async user => {
         if (!user) {
