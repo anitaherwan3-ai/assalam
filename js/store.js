@@ -1,10 +1,10 @@
 ﻿// Store & Local State Management
 
 const DEFAULT_SETTINGS = {
-  nama: 'Klinik Sehat Pratama',
+  nama: 'Klinik Assalaam Palembang',
   logo: '🏥',
   logoImg: '',
-  alamat: 'Jl. Kesehatan Medika No. 123, Jakarta',
+  alamat: 'Jl. Kemang Manis Lr. Beringin No. 492, Kemang Manis, Kec. Ilir Barat II, Kota Palembang',
   telp: '021-5551234',
   footer: 'Semoga lekas sembuh. Simpan struk ini sebagai bukti pembayaran.',
   warna: '#0f766e',
@@ -128,6 +128,8 @@ class ClinicStore {
     });
 
     this.state.set = Object.assign({}, DEFAULT_SETTINGS, this.state.set || {});
+    // Identitas nama klinik bersifat tetap dan tidak dapat ditimpa data lokal lama.
+    this.state.set.nama = 'Klinik Assalaam Palembang';
     if (!this.state.set.waOwner) this.state.set.waOwner = '081299998888';
     this.state.seq = this.state.seq || {};
     this.state.firebaseConfig = this.state.firebaseConfig || null;
