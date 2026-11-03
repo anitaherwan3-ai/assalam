@@ -225,7 +225,7 @@ class FirebaseBackend {
     const role = this.currentProfile && this.currentProfile.role;
     let allowedCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
     if (role === 'kasir') {
-      allowedCollections = ['obat', 'tarif', 'paket', 'batch', 'pasien', 'trx', 'shift', 'petty', 'returJual'];
+      allowedCollections = ['obat', 'tarif', 'paket', 'batch', 'pasien', 'trx', 'shift', 'petty', 'returJual', 'batalTrx'];
     } else if (role === 'admin') {
       allowedCollections = allowedCollections;
     } else if (role !== 'pimpinan') {
@@ -329,6 +329,145 @@ class FirebaseBackend {
       });
       this.listeners.push(unsub);
     });
+  }
+
+  // Pengajuan pembatalan dibuat satu kali per nota; stok tidak berubah saat pengajuan.
+  async submitCancelRequest(trxId, alasan) {
+    const profile = this.currentProfile;
+    if (!profile || profile.role !== 'kasir' || !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Hanya Kasir yang terhubung ke Firebase dapat mengajukan pembatalan.');
+    }
+    const id = String(trxId);
+    const trxRef = this.db.collection('k_trx').doc(id);
+    const requestRef = this.db.collection('k_batalTrx').doc(id);
+    const returnQuery = this.db.collection('k_returJual').where('trxId', '==', id);
+    const request = {
+      id, trxId: id, status: 'menunggu', kasir: profile.u,
+      alasan: String(alasan || '').trim(),
+      tgl: new Date().toISOString().slice(0, 10), _t: Date.now()
+    };
+    await this.db.runTransaction(async transaction => {
+      const trxSnap = await transaction.get(trxRef);
+      const requestSnap = await transaction.get(requestRef);
+      const returnSnap = await transaction.get(returnQuery);
+      if (!trxSnap.exists) throw new Error('Nota tidak ditemukan di Cloud.');
+      const trx = trxSnap.data() || {};
+      if (trx.status === 'dibatalkan') throw new Error('Nota sudah dibatalkan.');
+      if (requestSnap.exists) throw new Error('Nota ini sudah memiliki pengajuan pembatalan.');
+      if (returnSnap.docs.some(doc => (doc.data() || {}).status !== 'ditolak')) {
+        throw new Error('Nota memiliki retur yang sedang diproses atau sudah disetujui. Pembatalan tidak dapat diajukan.');
+      }
+      request.noNota = trx.no || id;
+      request.namaPasien = trx.nama || '-';
+      transaction.set(requestRef, request);
+    });
+    return request;
+  }
+
+  // Persetujuan/penolakan pembatalan dan pengembalian stok berlangsung atomik.
+  async processCancelRequest(trxId, decision, reason) {
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role) ||
+        !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Hanya Admin/Pimpinan yang terhubung ke Firebase dapat memproses pembatalan.');
+    }
+    if (!['disetujui', 'ditolak'].includes(decision)) throw new Error('Keputusan pembatalan tidak valid.');
+    const id = String(trxId), now = Date.now();
+    const requestRef = this.db.collection('k_batalTrx').doc(id);
+    const trxRef = this.db.collection('k_trx').doc(id);
+    await this.db.runTransaction(async transaction => {
+      const requestSnap = await transaction.get(requestRef);
+      const trxSnap = await transaction.get(trxRef);
+      if (!requestSnap.exists || !trxSnap.exists) throw new Error('Pengajuan atau nota tidak ditemukan di Cloud.');
+      const request = requestSnap.data() || {}, trx = trxSnap.data() || {};
+      if (request.status !== 'menunggu') throw new Error('Pengajuan sudah pernah diproses.');
+      if (trx.status === 'dibatalkan') throw new Error('Nota sudah dibatalkan.');
+      if (decision === 'ditolak') {
+        transaction.update(requestRef, {
+          status: 'ditolak', alasanPenolakan: String(reason || '').trim() || 'Tidak disetujui Admin',
+          diverifikasiOleh: profile.u || profile.email || '-', diverifikasiPada: now, _t: now
+        });
+        return;
+      }
+      const returnQuery = this.db.collection('k_returJual').where('trxId', '==', id);
+      const returnSnap = await transaction.get(returnQuery);
+      if (returnSnap.docs.some(doc => (doc.data() || {}).status !== 'ditolak')) {
+        throw new Error('Nota memiliki retur yang sedang diproses atau sudah disetujui. Pembatalan dibatalkan.');
+      }
+
+      const medicineQty = new Map(), batchQty = new Map(), batchOwners = new Map();
+      const addMedicine = (oid, qty, deductions) => {
+        const amount = Number(qty);
+        if (!oid || !Number.isFinite(amount) || amount <= 0) throw new Error('Rincian obat transaksi tidak valid.');
+        medicineQty.set(String(oid), (medicineQty.get(String(oid)) || 0) + amount);
+        if (Array.isArray(deductions)) {
+          let allocated = 0;
+          deductions.forEach(d => {
+            const q = Number(d.qty);
+            if (!d.bid || !Number.isFinite(q) || q <= 0) throw new Error('Rincian batch transaksi tidak valid.');
+            allocated += q;
+            const bid = String(d.bid);
+            batchQty.set(bid, (batchQty.get(bid) || 0) + q);
+            if (batchOwners.has(bid) && batchOwners.get(bid) !== String(oid)) throw new Error('Batch tercatat pada lebih dari satu obat.');
+            batchOwners.set(bid, String(oid));
+          });
+          if (deductions.length && Math.abs(allocated - amount) > 0.000001) {
+            throw new Error('Jumlah batch tidak sama dengan jumlah obat pada nota. Stok tidak diubah.');
+          }
+        }
+      };
+      (trx.items || []).forEach(item => {
+        if (item.oid) addMedicine(item.oid, item.qty, item.batchDeductions);
+        else if ((item.t || item.jenis) === 'Obat' && item.id) addMedicine(item.id, item.qty, item.batchDeductions);
+        else if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+          item.items.forEach(part => {
+            const oid = part.type === 'obat' ? (part.oid || part.id) : '';
+            if (oid) addMedicine(oid, (Number(part.qty) || 1) * Number(item.qty || 0), part.batchDeductions);
+          });
+        }
+      });
+
+      const medRefs = new Map(), batchRefs = new Map();
+      medicineQty.forEach((qty, oid) => medRefs.set(oid, this.db.collection('k_obat').doc(oid)));
+      batchQty.forEach((qty, bid) => batchRefs.set(bid, this.db.collection('k_batch').doc(bid)));
+      const medSnaps = new Map(), batchSnaps = new Map();
+      for (const [oid, ref] of medRefs) medSnaps.set(oid, await transaction.get(ref));
+      for (const [bid, ref] of batchRefs) batchSnaps.set(bid, await transaction.get(ref));
+      const patientRef = trx.pid ? this.db.collection('k_pasien').doc(String(trx.pid)) : null;
+      const patientSnap = patientRef ? await transaction.get(patientRef) : null;
+
+      for (const [oid] of medicineQty) {
+        const snap = medSnaps.get(oid);
+        if (!snap || !snap.exists) throw new Error('Data obat tidak ditemukan: ' + oid + '. Stok tidak diubah.');
+        const stock = Number((snap.data() || {}).stok);
+        if (!Number.isFinite(stock) || stock < 0) throw new Error('Saldo stok obat tidak valid: ' + oid);
+      }
+      for (const [bid] of batchQty) {
+        const snap = batchSnaps.get(bid), data = snap && snap.exists ? snap.data() || {} : {};
+        if (!snap || !snap.exists) throw new Error('Batch asal tidak ditemukan: ' + bid + '. Stok tidak diubah.');
+        if (String(data.oid || '') !== batchOwners.get(bid)) throw new Error('Batch tidak cocok dengan obat pada nota: ' + bid);
+        if (!Number.isFinite(Number(data.sisa)) || Number(data.sisa) < 0) throw new Error('Saldo batch tidak valid: ' + bid);
+      }
+
+      medicineQty.forEach((qty, oid) => {
+        const ref = medRefs.get(oid), data = medSnaps.get(oid).data() || {};
+        transaction.update(ref, { stok: Number(data.stok || 0) + qty, _t: now });
+      });
+      batchQty.forEach((qty, bid) => {
+        const ref = batchRefs.get(bid), data = batchSnaps.get(bid).data() || {};
+        transaction.update(ref, { sisa: Number(data.sisa || 0) + qty, _t: now });
+      });
+      if (patientRef && patientSnap && patientSnap.exists) transaction.update(patientRef, { done: false, _t: now });
+      transaction.update(trxRef, {
+        status: 'dibatalkan', dibatalkanPada: now,
+        dibatalkanOleh: profile.u || profile.email || '-', _t: now
+      });
+      transaction.update(requestRef, {
+        status: 'disetujui', diverifikasiOleh: profile.u || profile.email || '-',
+        diverifikasiPada: now, _t: now
+      });
+    });
+    return true;
   }
 
   // Persetujuan retur dan penambahan stok dilakukan atomik di Firestore.
@@ -488,6 +627,8 @@ class FirebaseBackend {
           // transaksi kasir, shift, dan kas kecil tetap menjadi kewenangan Kasir/Pimpinan.
           writableCollections = writableCollections.filter(name => !['pasien', 'trx', 'petty'].includes(name));
         }
+
+        writableCollections = writableCollections.filter(name => name !== 'batalTrx');
 
         for (const col of writableCollections) {
           const items = state[col] || [];
