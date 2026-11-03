@@ -163,9 +163,22 @@ service cloud.firestore {
           get(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)).data.status == 'ditolak') &&
         (!('status' in get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data) ||
           get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.status != 'dibatalkan');
-      allow update: if adminOrPimpinan() ||
-        (kasirOrPimpinan() && resource.data.kasir == staffProfile().u &&
-          request.resource.data.kasir == staffProfile().u && request.resource.data.status == 'menunggu');
+      // Admin/Pimpinan hanya memproses keputusan retur yang masih menunggu.
+      allow update: if
+        (adminOrPimpinan() &&
+          resource.data.status == 'menunggu' &&
+          request.resource.data.status in ['disetujui', 'ditolak'] &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', '_t'])) ||
+        // Pencatatan uang kembali hanya Pimpinan; nominal tidak boleh melebihi/mengubah nilai retur.
+        (pimpinan() &&
+          resource.data.status == 'disetujui' &&
+          (!('pengembalian' in resource.data) || resource.data.pengembalian.status != 'dibayar') &&
+          request.resource.data.pengembalian.status == 'dibayar' &&
+          request.resource.data.pengembalian.nominal == resource.data.total &&
+          request.resource.data.pengembalian.dibayarOleh == staffProfile().u &&
+          request.resource.data.pengembalian.metode in ['Tunai', 'Transfer'] &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t']));
       allow delete: if pimpinan();
     }
     match /k_returBeli/{document} { allow read, write: if adminOrPimpinan(); }
