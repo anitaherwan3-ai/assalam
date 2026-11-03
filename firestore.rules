@@ -90,8 +90,39 @@ service cloud.firestore {
           request.resource.data.u == staffProfile().u);
       allow delete: if pimpinan();
     }
-    match /k_pasien/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
-    match /k_trx/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_pasien/{document} {
+      allow read: if signedIn();
+      allow write: if kasirOrPimpinan();
+      allow update: if adminOrPimpinan() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+        request.resource.data.done == false;
+    }
+    match /k_trx/{document} {
+      allow read: if signedIn();
+      allow create: if kasirOrPimpinan();
+      allow update: if (kasirOrPimpinan() && request.resource.data.status != 'dibatalkan') ||
+        (adminOrPimpinan() && resource.data.status != 'dibatalkan' &&
+          request.resource.data.status == 'dibatalkan' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'dibatalkanPada', 'dibatalkanOleh', '_t']) &&
+          exists(/databases/$(database)/documents/k_batalTrx/$(document)) &&
+          get(/databases/$(database)/documents/k_batalTrx/$(document)).data.status == 'menunggu');
+      allow delete: if pimpinan();
+    }
+    match /k_batalTrx/{document} {
+      allow read: if signedIn();
+      allow create: if staffActive() && staffProfile().role == 'kasir' &&
+        request.resource.data.id == document &&
+        request.resource.data.trxId == document &&
+        request.resource.data.status == 'menunggu' &&
+        request.resource.data.kasir == staffProfile().u;
+      allow update: if adminOrPimpinan() &&
+        resource.data.status == 'menunggu' &&
+        request.resource.data.status in ['disetujui', 'ditolak'] &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', '_t']);
+      allow delete: if pimpinan();
+    }
     match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
     match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
     match /k_obat/{document} {
@@ -121,7 +152,10 @@ service cloud.firestore {
     match /k_loss/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_returJual/{document} {
       allow read: if signedIn();
-      allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu';
+      allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu' &&
+        (!exists(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)) ||
+          get(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)).data.status == 'ditolak') &&
+        get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.status != 'dibatalkan';
       allow update: if adminOrPimpinan() ||
         (kasirOrPimpinan() && resource.data.kasir == staffProfile().u &&
           request.resource.data.kasir == staffProfile().u && request.resource.data.status == 'menunggu');
