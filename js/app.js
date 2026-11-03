@@ -1225,7 +1225,7 @@ function actionAddDiskon() {
   renderApp();
 }
 
-function actionBayarTrx(totalCart) {
+async function actionBayarTrx(totalCart) {
   const shift = getCurrentShift();
   if (!shift) {
     showAlert('Shift kasir belum dibuka! Silakan buka shift terlebih dahulu di tab Shift.', 'Peringatan');
@@ -1257,6 +1257,14 @@ function actionBayarTrx(totalCart) {
       return;
     }
     kembalian = bayarTunai - totalCart;
+  }
+
+  // Transaksi Kasir harus tersambung agar stok lintas perangkat tetap konsisten.
+  if (currentUser && currentUser.role === 'kasir' &&
+      (!window.firebaseBackend || !window.firebaseBackend.isOnline ||
+       !window.firebaseBackend.currentProfile || window.firebaseBackend.currentProfile.role !== 'kasir')) {
+    showAlert('Transaksi belum dapat disimpan karena koneksi Firebase belum siap. Pastikan status Cloud Tersambung, lalu coba lagi.', 'Koneksi Cloud');
+    return;
   }
 
   // Validasi total stok utama DAN stok batch sebelum mengubah satu pun data.
@@ -1330,6 +1338,47 @@ function actionBayarTrx(totalCart) {
     kembalian: Number(kembalian),
     _t: Date.now()
   };
+
+  // Susun pengurangan stok per obat dan batch sesuai alokasi FEFO transaksi.
+  if (currentUser && currentUser.role === 'kasir') {
+    const stockMap = new Map();
+    const addStock = (oid, qty, deductions) => {
+      if (!oid || !(Number(qty) > 0)) return;
+      if (!stockMap.has(oid)) stockMap.set(oid, { oid, qty: 0, batches: [] });
+      const entry = stockMap.get(oid);
+      entry.qty += Number(qty);
+      (deductions || []).forEach(d => {
+        const found = entry.batches.find(x => x.bid === d.bid);
+        if (found) found.qty += Number(d.qty) || 0;
+        else entry.batches.push({ bid: d.bid, qty: Number(d.qty) || 0 });
+      });
+    };
+    (newTrx.items || []).forEach(item => {
+      if (item.oid) addStock(item.oid, item.qty, item.batchDeductions);
+      else if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+        item.items.forEach(part => {
+          const oid = part.type === 'obat' ? (part.oid || part.id) : null;
+          if (oid) addStock(oid, (Number(part.qty) || 1) * Number(item.qty || 0), part.batchDeductions);
+        });
+      }
+    });
+    try {
+      await window.firebaseBackend.commitCashierTransaction(newTrx, pasien.id, Array.from(stockMap.values()));
+    } catch (err) {
+      // Kembalikan perubahan lokal jika transaksi atomik di server gagal.
+      stockMap.forEach(entry => {
+        const obat = store.getObat(entry.oid);
+        if (obat) { obat.stok = Number(obat.stok || 0) + entry.qty; obat._t = Date.now(); }
+        entry.batches.forEach(b => {
+          const batch = store.get('batch', b.bid);
+          if (batch) { batch.sisa = Number(batch.sisa || 0) + b.qty; batch._t = Date.now(); }
+        });
+      });
+      store.saveLocal(false);
+      showAlert(err.message || 'Transaksi gagal disimpan ke Firebase. Stok lokal telah dikembalikan.', 'Transaksi Gagal');
+      return;
+    }
+  }
 
   store.state.trx.push(newTrx);
   pasien.done = true;
