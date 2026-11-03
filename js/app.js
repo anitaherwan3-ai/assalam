@@ -588,11 +588,13 @@ function viewPasien() {
     esc(p.nama),
     esc(p.hp || '-'),
     esc(p.layanan),
-    p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
-    p.done ? '-' : `
+    p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
+    p.done ? '-' : p.status === 'batal_berobat' ? `
+      <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
+    ` : `
       <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
-      <button class="s btn-danger" onclick="delPasien('${p.id}')">Hapus</button>
+      <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
     `
   ]);
 
@@ -685,18 +687,61 @@ function editPasien(id) {
   });
 }
 
+function actionBatalBerobat(id) {
+  if (currentRole !== 'kasir') {
+    showAlert('Hanya Kasir yang dapat mencatat pembatalan berobat.', 'Akses Ditolak');
+    return;
+  }
+  const p = store.get('pasien', id);
+  if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat') return;
+  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', () => {
+    p.status = 'batal_berobat';
+    p.batalBerobatPada = Date.now();
+    p.batalBerobatOleh = currentUser ? currentUser.u : 'kasir';
+    p.calling = false;
+    p._t = Date.now();
+    store.logActivity('Batal Berobat', 'Pasien', `${p.no} - ${p.nama}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+  });
+}
+
+function actionPulihkanBatalBerobat(id) {
+  if (currentRole !== 'kasir') {
+    showAlert('Hanya Kasir yang dapat mengaktifkan kembali antrean.', 'Akses Ditolak');
+    return;
+  }
+  const p = store.get('pasien', id);
+  if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr) return;
+  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', () => {
+    p.status = 'aktif';
+    p.batalBerobatPada = null;
+    p.batalBerobatOleh = null;
+    p._t = Date.now();
+    store.logActivity('Pulihkan Antrean', 'Pasien', `${p.no} - ${p.nama}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+  });
+}
+
 function delPasien(id) {
-  showConfirm('Sembunyikan pasien ini dari antrean aktif? Catatan tetap disimpan dan tidak dihapus permanen.', () => {
-    const p = store.get('pasien', id);
-    if (p && !p.deletedAt && p.status !== 'dihapus') {
-      p.status = 'dihapus';
-      p.deletedAt = Date.now();
-      p.deletedBy = currentUser ? currentUser.u : 'sistem';
-      p._t = Date.now();
-      store.logActivity('Arsipkan', 'Pasien', `${p.no} - ${p.nama}`);
-      store.saveLocal();
-      if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
-    }
+  if (currentRole !== 'pimpinan') {
+    showAlert('Hanya Pimpinan yang dapat mengarsipkan pasien.', 'Akses Ditolak');
+    return;
+  }
+  const p = store.get('pasien', id);
+  if (!p || p.done || p.deletedAt || p.status === 'dihapus') {
+    showAlert('Pasien tidak dapat diarsipkan. Periksa status pasien dan riwayat pelayanannya.');
+    return;
+  }
+  showConfirm('Arsipkan pasien ini? Data dan riwayatnya tetap disimpan.', () => {
+    p.status = 'dihapus';
+    p.deletedAt = Date.now();
+    p.deletedBy = currentUser ? currentUser.u : 'sistem';
+    p._t = Date.now();
+    store.logActivity('Arsipkan', 'Pasien', `${p.no} - ${p.nama}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
   });
 }
 
@@ -704,7 +749,7 @@ function delPasien(id) {
 // MODULE: TRANSAKSI & KASIR (POS)
 // -------------------------------------------------------------
 function viewTrx() {
-  const waitingPatients = (store.state.pasien || []).filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus');
+  const waitingPatients = (store.state.pasien || []).filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat');
   const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   const cartRows = cartItems.map((item, idx) => [
@@ -1190,8 +1235,8 @@ function actionBayarTrx(totalCart) {
   }
   const pid = val('trx-pasien');
   const pasien = store.get('pasien', pid);
-  if (!pasien || pasien.deletedAt || pasien.status === 'dihapus') {
-    showAlert('Silakan pilih pasien terlebih dahulu');
+  if (!pasien || pasien.deletedAt || pasien.status === 'dihapus' || pasien.status === 'batal_berobat') {
+    showAlert('Pasien tidak aktif untuk transaksi. Pilih pasien dari antrean aktif.');
     return;
   }
   if (cartItems.length === 0) {
@@ -3851,9 +3896,9 @@ function viewPimpinanPasien() {
     esc(p.nama || '-'),
     esc(p.hp || '-'),
     esc(p.layanan || '-'),
-    p.deletedAt || p.status === 'dihapus' ? '<span class="badge-warn">Diarsipkan</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
+    p.deletedAt || p.status === 'dihapus' ? '<span class="badge-warn">Diarsipkan</span>' : p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : '<span class="badge-warn">Menunggu</span>',
     esc(p.kasir || '-'),
-    archiveMode ? `<button class="s p" onclick="actionRestorePasien('${p.id}')">Pulihkan</button>` : '-'
+    archiveMode ? `<button class="s p" onclick="actionRestorePasien('${p.id}')">Pulihkan</button>` : (!p.done && !p.deletedAt ? `<button class="s btn-danger" onclick="delPasien('${p.id}')">Arsipkan</button>` : '-')
   ]);
   return `
     <div class="card">
