@@ -204,6 +204,7 @@ function doLogout() {
   showConfirm('Apakah Anda yakin ingin keluar?', async () => {
     store.logActivity('Keluar', 'Sesi', `User ${currentUser ? currentUser.nama : ''} logout`);
     currentUser = null;
+    window.currentUser = null;
     currentRole = null;
     activeTab = '';
     cartItems = [];
