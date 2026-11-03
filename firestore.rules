@@ -10,42 +10,81 @@ service cloud.firestore {
       return request.auth.token.email == 'praktekrose@gmail.com' ? 'praktekrose' :
         (request.auth.token.email == 'nursalim42@gmail.com' ? 'pimpinan2' : '');
     }
+    // Profil staf menggunakan alamat email sebagai ID dokumen. Email Firebase
+    // yang terverifikasi menjadi identitas; staf tidak dapat mengubah profilnya.
+    function staffProfileExists() {
+      return request.auth != null &&
+        exists(/databases/$(database)/documents/k_users/$(request.auth.token.email));
+    }
+    function staffProfile() {
+      return get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data;
+    }
+    function staffActive() {
+      return staffProfileExists() &&
+        staffProfile().email == request.auth.token.email &&
+        staffProfile().active == true &&
+        staffProfile().role in ['admin', 'kasir'];
+    }
     function signedIn() {
-      return request.auth != null && (initialOwner() || (
-        request.auth.token.clinic == 'assalam-db' &&
-        request.auth.token.role in ['pimpinan', 'admin', 'kasir']
-      ));
+      return request.auth != null && (initialOwner() || staffActive());
     }
-    function pimpinan() {
-      return signedIn() && (initialOwner() || request.auth.token.role == 'pimpinan');
-    }
+    function pimpinan() { return initialOwner(); }
     function adminOrPimpinan() {
-      return signedIn() && (initialOwner() || request.auth.token.role in ['admin', 'pimpinan']);
+      return signedIn() && (initialOwner() || staffProfile().role == 'admin');
     }
     function kasirOrAbove() {
-      return signedIn() && (initialOwner() || request.auth.token.role in ['kasir', 'admin', 'pimpinan']);
+      return signedIn() && (initialOwner() || staffProfile().role in ['kasir', 'admin']);
     }
 
-    match /klinik_config/{document} { allow read: if signedIn(); allow write: if pimpinan(); }
-    match /k_users/{document} {
+    match /klinik_config/{document} {
       allow read: if signedIn();
-      // Bootstrap hanya boleh menulis profil milik email+UID yang sedang login.
+      allow write: if pimpinan();
+    }
+
+    match /k_users/{document} {
+      // Pimpinan dapat melihat semua profil; staf hanya dapat membaca profil sendiri.
+      allow read: if initialOwner() ||
+        (request.auth != null && document == request.auth.token.email);
+      // Bootstrap dua profil Pimpinan yang sudah ada tetap dipertahankan.
       allow create: if initialOwner() && document == ownerDocId() &&
         request.resource.data.uid == request.auth.uid &&
         request.resource.data.email == request.auth.token.email &&
         request.resource.data.role == 'pimpinan' && request.resource.data.active == true;
-      allow update: if initialOwner() && document == ownerDocId() &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == request.auth.token.email &&
-        request.resource.data.role == 'pimpinan' && request.resource.data.active == true &&
-        (!('uid' in resource.data) || resource.data.uid == null || resource.data.uid == request.auth.uid);
-      allow delete: if false;
+      allow update: if initialOwner() && (
+        (document == ownerDocId() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == 'pimpinan' &&
+          request.resource.data.active == true &&
+          (!('uid' in resource.data) || resource.data.uid == null || resource.data.uid == request.auth.uid))
+        ||
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+          request.resource.data.email == document &&
+          request.resource.data.role in ['admin', 'kasir'] &&
+          request.resource.data.active is bool)
+      );
+      allow create: if initialOwner() && (
+        (document == ownerDocId() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == 'pimpinan' &&
+          request.resource.data.active == true)
+        ||
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+          request.resource.data.email == document &&
+          request.resource.data.role in ['admin', 'kasir'] &&
+          request.resource.data.active == true)
+      );
+      allow delete: if initialOwner() &&
+        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
     }
+
     match /k_log/{document} {
       allow read: if adminOrPimpinan();
-      allow create: if signedIn() && (initialOwner() ||
-        (request.resource.data.uid == request.auth.uid && request.resource.data.u == request.auth.token.username));
-      allow update: if pimpinan() || (signedIn() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid && request.resource.data.u == request.auth.token.username);
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if pimpinan() ||
+        (signedIn() && resource.data.uid == request.auth.uid &&
+          request.resource.data.uid == request.auth.uid);
       allow delete: if pimpinan();
     }
     match /k_pasien/{document} { allow read, write: if kasirOrAbove(); }
