@@ -178,7 +178,15 @@ service cloud.firestore {
           request.resource.data.pengembalian.nominal == resource.data.total &&
           request.resource.data.pengembalian.dibayarOleh == staffProfile().u &&
           request.resource.data.pengembalian.metode in ['Tunai', 'Transfer'] &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t']));
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t'])) ||
+        // Cache Kasir tidak boleh menghidupkan kembali retur yang sudah diputuskan.
+        (kasirOrPimpinan() &&
+          staffProfile().role == 'kasir' &&
+          resource.data.status == 'menunggu' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.status == 'menunggu' &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t']));
       allow delete: if pimpinan();
     }
     match /k_returBeli/{document} { allow read, write: if adminOrPimpinan(); }
