@@ -1,70 +1,107 @@
 # Migrasi Firebase Authentication Assalam
 
-## Prinsip keselamatan
-- Arsip `assalam-main-development.zip` adalah baseline hasil uji sebelumnya dan tidak diubah.
-- Migrasi hanya menyentuh identitas login/profil `k_users` serta konfigurasi autentikasi.
-- Koleksi pasien, transaksi, obat, batch, stok, pembelian, retur, shift, dan keuangan tidak dihapus oleh skrip bootstrap.
-- Akun master dengan username tetap `praktekrose` dilindungi dari penghapusan, penonaktifan, dan penurunan role.
-- Password tidak lagi disimpan di Firestore; pengelolaan akun dilakukan melalui Cloud Functions.
+## Tujuan dan perlindungan data
+- Arsip baseline dan data operasional yang sudah diuji tidak dihapus.
+- Bootstrap master hanya membaca/menulis `k_users/praktekrose` dan custom claims akun Authentication terkait.
+- Skrip tidak membuat ulang akun jika email sudah ada, tidak mengganti password akun yang sudah ada, dan tidak menyentuh pasien, transaksi, obat, batch, stok, pembelian, retur, shift, maupun keuangan.
+- Jika email sudah terikat ke username lain atau profil master terikat ke UID berbeda, proses berhenti tanpa memaksa perubahan.
+- Akun master `praktekrose` dilindungi dari penghapusan, penonaktifan, dan penurunan role melalui Cloud Functions.
 
-## Persiapan sebelum deployment
-1. Pastikan email Pimpinan adalah alamat nyata yang dapat menerima email. Alamat contoh `@assalamklinik.id` tidak boleh dipakai sebelum domain/email tersebut benar-benar dimiliki dan dikonfigurasi.
-2. Di Firebase Console untuk project `assalam-db`, aktifkan Authentication > Sign-in method > Email/Password.
-3. Pastikan Firestore sudah memiliki backup/export yang dapat dipulihkan sebelum migrasi produksi.
-4. Pasang Firebase CLI dan Node.js 20.
-5. Jalankan `npm install` di folder `functions`.
-
-## Bootstrap akun master
-Lakukan dari komputer administrator tepercaya yang sudah memiliki Application Default Credentials untuk project `assalam-db`:
+## Menghubungkan akun master yang SUDAH dibuat manual
+1. Di Firebase Console > Authentication > Users, pastikan `praktekrose@gmail.com` sudah ada.
+2. Di komputer administrator tepercaya, pasang Node.js 20 dan Firebase CLI.
+3. Login ke Google Cloud/Firebase dengan akun yang memiliki hak Admin SDK pada project `assalam-db`:
 
 ```bash
 gcloud auth application-default login
 ```
 
-Set `OWNER_EMAIL` ke email Pimpinan yang nyata dan `OWNER_PASSWORD` ke password baru yang kuat, lalu jalankan:
+4. Dari folder proyek:
 
 ```bash
+cd functions
+npm install
+cd ..
+```
+
+5. Jalankan bootstrap. **Jangan isi `OWNER_PASSWORD` untuk akun yang sudah ada** agar password yang baru Anda buat di Firebase Console tidak diubah.
+
+Linux/macOS:
+
+```bash
+OWNER_EMAIL=praktekrose@gmail.com node scripts/bootstrap-owner.cjs
+```
+
+Windows PowerShell:
+
+```powershell
+$env:OWNER_EMAIL = 'praktekrose@gmail.com'
 node scripts/bootstrap-owner.cjs
 ```
 
-Skrip akan membuat/memperbarui akun Authentication Pimpinan, memasang custom claims, menghubungkan UID ke `k_users/praktekrose`, dan menghapus hanya field password teks biasa dari dokumen `k_users`. Skrip tidak menghapus koleksi operasional.
+Skrip akan menggunakan UID akun yang sudah ada, memasang custom claims `role=pimpinan`, `username=praktekrose`, `clinic=assalam-db`, dan menghubungkannya ke `k_users/praktekrose`. Password akun existing tetap sama.
 
-## Deploy rules dan Cloud Functions
+Jika akun belum ada, set `OWNER_PASSWORD` (minimal 8 karakter) untuk membuat akun baru. Jangan menaruh password di chat atau commit ke Git.
+
+## Deploy setelah bootstrap berhasil
+Jangan deploy rules sebelum bootstrap master selesai dan hasilnya diverifikasi. Setelah itu:
 
 ```bash
 firebase use assalam-db
 firebase deploy --only firestore:rules,functions
 ```
 
-Rules yang baru menolak akses anonim. Jangan deploy rules baru sebelum akun master berhasil dibuat dan bootstrap selesai, agar tidak mengunci akses Pimpinan.
+## Pimpinan kedua
+Setelah Pimpinan utama berhasil login, buat Pimpinan kedua dari menu Pengguna:
+- Username tetap: `pimpinan2`
+- Email: `nursalim42@gmail.com`
+- Role: `pimpinan`
+- Password sementara dibuat langsung oleh administrator pada perangkatnya.
 
-## Dua akun Pimpinan yang direncanakan
+Kedua akun memiliki UID berbeda. Perubahan email di kemudian hari mempertahankan UID dan username audit.
 
-Setelah akun master berhasil di-bootstrap dan login pertama berhasil, buat Pimpinan kedua dari menu **Pengguna** di aplikasi (jangan membuat akun ini sebelum master dapat login):
+## Pemeriksaan setelah bootstrap
+1. Authentication > Users: email master tetap ada dan UID tidak berubah.
+2. Authentication user details: custom claims memuat `role`, `username`, dan `clinic` yang benar.
+3. Firestore `k_users/praktekrose`: field `uid` sama persis dengan UID Authentication, `role=pimpinan`, `active=true`.
+4. Login aplikasi menggunakan email dan password yang dibuat sebelumnya.
+5. Jalankan regresi lokal dan uji dua perangkat terhadap Firebase project nyata.
 
-- Pimpinan utama: email `praktekrose@gmail.com`, username/ID tetap `praktekrose`.
-- Pimpinan kedua: email `nursalim42@gmail.com`, username/ID tetap `pimpinan2`, role `pimpinan`.
+## Batasan
+- Bootstrap ini memerlukan kredensial Admin SDK pada komputer administrator. Jangan pernah memasukkan service-account private key ke aplikasi browser atau mengirimkannya melalui chat.
+- Sinkronisasi live dan multi-device belum dinyatakan lulus sampai dites pada Firebase project nyata.
 
-Pada menu Pengguna, isi nama tampilan Pimpinan kedua sesuai nama yang akan digunakan, masukkan email tersebut, buat password sementara minimal 8 karakter langsung di perangkat administrator, lalu pilih role **Pimpinan / Dokter Penanggung Jawab**. Password tidak perlu dan jangan dikirim melalui chat. Pembuatan akun melalui Cloud Function akan membuat Firebase Authentication, custom claims `role=pimpinan`, serta profil `k_users/pimpinan2`; tidak menyentuh koleksi pasien, transaksi, stok, batch, atau keuangan.
+## Aktivasi Pimpinan satu tombol (tanpa Admin SDK di komputer)
+Versi ini menyediakan tombol **Aktivasi Akun Pimpinan** pada layar login. Tombol hanya menerima dua email yang di-allowlist di Cloud Function:
+- `praktekrose@gmail.com` -> username `praktekrose`
+- `nursalim42@gmail.com` -> username `pimpinan2`
 
-Kedua akun memiliki UID Firebase berbeda dan hak akses Pimpinan. Mengubah email akun kedua di kemudian hari tidak mengubah UID atau username audit `pimpinan2`. Akun master `praktekrose` tetap dilindungi dari penghapusan, penonaktifan, dan penurunan role.
+Sebelum tombol dapat dipakai, administrator proyek perlu deploy Cloud Function sekali saja. Deploy hanya function aktivasi agar tidak mengubah koleksi data atau rules yang sedang dipakai:
 
-## Migrasi pengguna lama
-- Dokumen pengguna lama tetap dipertahankan dengan username/ID yang sama.
-- Pimpinan membuka menu Pengguna, mengisi username lama yang belum memiliki UID, email nyata milik pengguna, dan password sementara.
-- Fungsi `createClinicUser` akan menghubungkan akun Authentication baru ke dokumen pengguna lama; tidak membuat duplikat ID.
-- Setelah berhasil, email dapat diubah dari menu Edit. Firebase UID dan username/ID audit tetap stabil.
-- Password sementara disampaikan secara aman kepada pengguna; pengguna kemudian dapat menggantinya. Jangan mengirim password melalui chat grup.
+```bash
+firebase use assalam-db
+firebase deploy --only functions:activateInitialPimpinan
+```
 
-## Pengujian wajib sebelum produksi
-1. Login Pimpinan dengan email/password dan verifikasi role.
-2. Login akun admin dan kasir; pastikan hak akses berbeda sesuai role.
-3. Ubah email satu akun uji, login kembali dengan email baru, dan pastikan UID serta riwayat transaksi tetap sama.
-4. Nonaktifkan akun uji; pastikan login ditolak.
-5. Uji reset password ke inbox nyata.
-6. Uji dua perangkat untuk stok, batch, transaksi, dan perubahan profil.
-7. Jalankan seluruh tes regresi yang sudah ada.
+Sesudah deployment:
+1. Buka aplikasi Assalam dengan koneksi internet.
+2. Isi email dan password akun yang sudah dibuat di Firebase Authentication.
+3. Tekan **Aktivasi Akun Pimpinan** satu kali.
+4. Function memverifikasi bahwa pengguna sudah login, email cocok dengan daftar yang diizinkan, klaim lama tidak bertentangan, dan dokumen profil tidak terikat ke UID lain.
+5. Jika lolos, function memasang custom claims dan menghubungkan `k_users/{username}` dengan UID Authentication yang sama. Data operasional tidak disentuh.
+6. Setelah aktivasi sukses, aplikasi langsung membuka dashboard. Jika gagal, pesan kesalahan ditampilkan dan proses tidak menghapus akun Authentication.
 
-## Batasan yang diketahui
-- Email akun kerja pada domain fiktif tidak dapat menerima tautan reset password. Gunakan email yang benar-benar dikuasai klinik atau siapkan domain dan mailbox terlebih dahulu.
-- Live Firebase dan multi-device belum dinyatakan lulus sampai diuji terhadap project Firebase yang sebenarnya.
+Aktivasi bersifat idempotent untuk UID yang sama. Jangan deploy `firestore.rules` atau seluruh Functions sebagai bagian dari langkah ini. Rules saat ini perlu ditinjau dan diuji terpisah sebelum dipasang.
+
+
+## Aktivasi Pimpinan dari tablet (tanpa Bash/CLI)
+Versi tablet-friendly menggunakan Firebase Authentication + Firestore Security Rules untuk bootstrap dua email yang diizinkan. Tidak perlu deploy Cloud Functions untuk aktivasi awal.
+
+1. Buka Firebase Console pada project `assalam-db` lalu pilih Firestore Database > Rules.
+2. Simpan salinan rules lama terlebih dahulu.
+3. Ganti rules dengan isi file `firestore.rules` dari paket ini, lalu klik Publish. Rules ini tidak memberi akses tulis profil ke pengguna lain; dua email Pimpinan hanya dapat menghubungkan UID miliknya ke dokumen profil masing-masing (`k_users/praktekrose` atau `k_users/pimpinan2`).
+4. Buka aplikasi versi ini. Pada layar login, masukkan email dan password Firebase yang sudah dibuat.
+5. Tekan **Aktivasi Akun Pimpinan**. Aplikasi akan memverifikasi Firebase Authentication, memeriksa konflik UID, lalu menulis profil Pimpinan milik akun itu saja.
+6. Ulangi untuk akun Pimpinan kedua.
+
+Catatan: cara ini menggunakan email Firebase yang telah diautentikasi sebagai allowlist di Firestore Rules; tidak membuat Custom Claims. Fungsi administrasi akun yang memerlukan Admin SDK tetap disiapkan untuk tahap berikutnya. Jangan gunakan rules terbuka dengan tanggal kedaluwarsa. Jangan menghapus dokumen atau koleksi operasional. Jika dokumen profil telah memiliki UID berbeda, aktivasi akan berhenti.
