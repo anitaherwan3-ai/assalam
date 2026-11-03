@@ -275,6 +275,10 @@ class ClinicStore {
       tempo,
       lunas: isLunas,
       tglBayar: isLunas ? today : '',
+      // Nilai awal menjaga harga satuan faktur pada retur bertahap.
+      qtyAwal: qtyMasuk,
+      totalAwal: totalTagihan,
+      hargaBeliSatuan: totalTagihan / qtyMasuk,
       batchId,
       _t: Date.now()
     });
@@ -299,19 +303,26 @@ class ClinicStore {
     const trx = this.get('trx', trxId);
     if (!trx) return false;
 
-    // Rollback stok obat dan sisa batch
+    // Rollback stok obat dan batch, termasuk komponen obat dalam paket.
+    const restoreBatchDeductions = deductions => {
+      if (!Array.isArray(deductions)) return;
+      deductions.forEach(d => {
+        const batch = this.get('batch', d.bid);
+        if (batch) batch.sisa += Number(d.qty) || 0;
+      });
+    };
     (trx.items || []).forEach(item => {
       if (item.oid) {
         const obat = this.getObat(item.oid);
-        if (obat) {
-          obat.stok += item.qty;
-        }
-      }
-      if (Array.isArray(item.batchDeductions)) {
-        item.batchDeductions.forEach(d => {
-          const batch = this.get('batch', d.bid);
-          if (batch) {
-            batch.sisa += d.qty;
+        if (obat) obat.stok += Number(item.qty) || 0;
+        restoreBatchDeductions(item.batchDeductions);
+      } else if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
+        item.items.forEach(pkgIt => {
+          const oid = pkgIt.oid || pkgIt.id;
+          if (pkgIt.type === 'obat' && oid) {
+            const obat = this.getObat(oid);
+            if (obat) obat.stok += (Number(pkgIt.qty) || 1) * (Number(item.qty) || 1);
+            restoreBatchDeductions(pkgIt.batchDeductions);
           }
         });
       }
@@ -413,26 +424,35 @@ class ClinicStore {
     const obat = this.getObat(beli.oid);
     if (!obat) return false;
 
-    const qty = Math.min(Number(qtyRetur), beli.qty);
-    if (qty <= 0) return false;
+    // Retur hanya boleh diambil dari batch faktur yang tepat dan jumlah yang tersedia.
+    const batch = (this.state.batch || []).find(b => b.beli === beli.id);
+    if (!batch) return false;
+    const qty = Math.min(Number(qtyRetur), Number(beli.qty) || 0, Number(batch.sisa) || 0, Number(obat.stok) || 0);
+    if (!Number.isFinite(qty) || qty <= 0) return false;
 
-    const hargaSatuan = beli.total / (beli.qty || 1);
+    const hargaSatuan = Number(beli.hargaBeliSatuan) ||
+      (Number(beli.totalAwal) > 0 && Number(beli.qtyAwal) > 0
+        ? Number(beli.totalAwal) / Number(beli.qtyAwal)
+        : Number(beli.total) / (Number(beli.qty) || 1));
     const nilaiRetur = Math.round(qty * hargaSatuan);
+    const stokLama = Number(obat.stok) || 0;
+    const hppLama = Number(obat.hpp) || 0;
 
-    // Kurangi stok fisik obat
-    obat.stok = Math.max(0, obat.stok - qty);
-
-    // Kurangi sisa batch terkait
-    const batch = (this.state.batch || []).find(b => b.beli === beli.id || b.oid === obat.id);
-    if (batch) {
-      batch.sisa = Math.max(0, batch.sisa - qty);
+    // Kurangi stok fisik dan hanya batch milik faktur ini.
+    obat.stok = Math.max(0, stokLama - qty);
+    batch.sisa = Math.max(0, (Number(batch.sisa) || 0) - qty);
+    if (obat.stok > 0) {
+      obat.hpp = Math.max(0, Math.round(((stokLama * hppLama) - nilaiRetur) / obat.stok));
     }
 
-    // Kurangi sisa tagihan jika belum lunas
+    // Faktur lunas mempertahankan nilai historis; utang dikurangi sesuai nilai retur.
     if (!beli.lunas) {
-      beli.total = Math.max(0, beli.total - nilaiRetur);
+      beli.total = Math.max(0, (Number(beli.total) || 0) - nilaiRetur);
     }
-    beli.qty = Math.max(0, beli.qty - qty);
+    beli.qty = Math.max(0, (Number(beli.qty) || 0) - qty);
+    beli._t = Date.now();
+    batch._t = Date.now();
+    obat._t = Date.now();
 
     const returId = uid();
     this.state.returBeli.unshift({
