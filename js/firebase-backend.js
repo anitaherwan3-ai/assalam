@@ -323,6 +323,58 @@ class FirebaseBackend {
     });
   }
 
+  // Persetujuan retur dan penambahan stok dilakukan atomik di Firestore.
+  async approveReturJual(returId) {
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) {
+      throw new Error('Hanya Admin/Pimpinan yang dapat menyetujui retur.');
+    }
+    if (!this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Koneksi Firebase belum siap. Retur belum disetujui.');
+    }
+    const returRef = this.db.collection('k_returJual').doc(String(returId));
+    await this.db.runTransaction(async transaction => {
+      const returSnap = await transaction.get(returRef);
+      if (!returSnap.exists) throw new Error('Pengajuan retur tidak ditemukan di cloud.');
+      const retur = returSnap.data() || {};
+      if (retur.status !== 'menunggu') throw new Error('Retur sudah diproses atau bukan status menunggu.');
+      if (!Array.isArray(retur.batchRestores) || !retur.batchRestores.length) {
+        throw new Error('Data batch asal retur tidak lengkap. Stok tidak diubah.');
+      }
+      const obatQty = new Map(), batchQty = new Map(), refs = new Map();
+      retur.batchRestores.forEach(item => {
+        const qty = Number(item.qty);
+        if (!item.oid || !item.bid || !Number.isFinite(qty) || qty <= 0) {
+          throw new Error('Rincian batch retur tidak valid. Stok tidak diubah.');
+        }
+        const obatPath = 'k_obat/' + item.oid, batchPath = 'k_batch/' + item.bid;
+        obatQty.set(obatPath, (obatQty.get(obatPath) || 0) + qty);
+        batchQty.set(batchPath, (batchQty.get(batchPath) || 0) + qty);
+        refs.set(obatPath, this.db.doc(obatPath));
+        refs.set(batchPath, this.db.doc(batchPath));
+      });
+      const snapshots = new Map();
+      for (const [path, ref] of refs.entries()) snapshots.set(path, await transaction.get(ref));
+      for (const [path, qty] of obatQty.entries()) {
+        const snap = snapshots.get(path);
+        if (!snap || !snap.exists) throw new Error('Data obat asal tidak ditemukan: ' + path);
+        transaction.update(refs.get(path), { stok: Number(snap.data().stok || 0) + qty, _t: Date.now() });
+      }
+      for (const [path, qty] of batchQty.entries()) {
+        const snap = snapshots.get(path);
+        if (!snap || !snap.exists) throw new Error('Batch asal tidak ditemukan: ' + path);
+        transaction.update(refs.get(path), { sisa: Number(snap.data().sisa || 0) + qty, _t: Date.now() });
+      }
+      transaction.update(returRef, {
+        status: 'disetujui',
+        diverifikasiOleh: profile.u || profile.email || '-',
+        diverifikasiPada: Date.now(),
+        _t: Date.now()
+      });
+    });
+    return true;
+  }
+
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
