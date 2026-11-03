@@ -369,87 +369,93 @@ class ClinicStore {
     return true;
   }
 
-  // Proses Retur Penjualan Pasien
+  // Kasir hanya mengajukan retur. Stok berubah setelah Admin menyetujui.
   processReturJual({ trxId, itemIndex, qtyRetur, alasan }) {
     const trx = this.get('trx', trxId);
     if (!trx || trx.status === 'dibatalkan' || !Array.isArray(trx.items) || !trx.items[itemIndex]) return false;
-
-    const item = trx.items[itemIndex];
-    const qty = Number(qtyRetur);
-    if (!Number.isFinite(qty) || qty <= 0 || qty > Number(item.qty || 0)) return false;
-
-    // Retur obat wajib kembali ke batch asal penjualan, bukan batch sembarang.
-    const restoreFromOriginalBatches = (oid, deductions, amount) => {
+    const item = trx.items[itemIndex], qty = Number(qtyRetur);
+    if (!Number.isFinite(qty) || qty <= 0) return false;
+    const jenis = item.t || item.jenis || '';
+    const directOid = item.oid || (jenis === 'Obat' ? item.id : '');
+    const isPackage = jenis === 'Paket' && Array.isArray(item.items);
+    if (!directOid && !isPackage) return false;
+    const priorQty = (this.state.returJual || []).filter(r => r.trxId === trx.id &&
+      Number(r.itemIndex) === Number(itemIndex) && r.status !== 'ditolak')
+      .reduce((sum, r) => sum + Number(r.qty || 0), 0);
+    if (qty + priorQty > Number(item.qty || 0)) return false;
+    const batchRestores = [];
+    const allocate = (oid, deductions, amount, offset) => {
       if (!oid || !Array.isArray(deductions)) return false;
-      const available = deductions.reduce((sum, d) => sum + Number(d.qty || 0), 0);
-      if (available < amount) return false;
-      const obat = this.getObat(oid);
-      if (!obat) return false;
-      let remaining = amount;
+      let skip = offset, left = amount;
       for (const d of deductions) {
-        if (remaining <= 0) break;
-        const take = Math.min(remaining, Number(d.qty || 0));
-        const batch = this.get('batch', d.bid);
-        if (!batch) return false;
-        d.qty = Number(d.qty || 0) - take;
-        batch.sisa = Number(batch.sisa || 0) + take;
-        batch._t = Date.now();
-        remaining -= take;
-      }
-      obat.stok = Number(obat.stok || 0) + amount;
-      obat._t = Date.now();
-      return remaining <= 0;
-    };
-
-    // Validasi seluruh batch asal terlebih dahulu agar tidak terjadi retur parsial.
-    if (item.oid) {
-      if (!Array.isArray(item.batchDeductions) ||
-          item.batchDeductions.reduce((sum, d) => sum + Number(d.qty || 0), 0) < qty) return false;
-      if (item.batchDeductions.some(d => !this.get('batch', d.bid))) return false;
-    }
-    if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
-      for (const part of item.items) {
-        if (part.type !== 'obat' || !(part.oid || part.id)) continue;
-        const partQty = (Number(part.qty) || 1) * qty;
-        if (!Array.isArray(part.batchDeductions) ||
-            part.batchDeductions.reduce((sum, d) => sum + Number(d.qty || 0), 0) < partQty ||
-            part.batchDeductions.some(d => !this.get('batch', d.bid))) return false;
-      }
-    }
-
-    const nilaiRetur = qty * Number(item.harga || 0);
-    if (item.oid && !restoreFromOriginalBatches(item.oid, item.batchDeductions, qty)) return false;
-    if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
-      item.items.forEach(part => {
-        if (part.type === 'obat' && (part.oid || part.id)) {
-          restoreFromOriginalBatches(part.oid || part.id, part.batchDeductions, (Number(part.qty) || 1) * qty);
+        const available = Number(d.qty || 0);
+        if (skip >= available) { skip -= available; continue; }
+        const take = Math.min(left, available - skip);
+        if (take > 0) {
+          if (!this.get('batch', d.bid) || !this.getObat(oid)) return false;
+          batchRestores.push({ oid, bid: d.bid, qty: take, batchNo: d.batchNo || '', ed: d.ed || '' });
+          left -= take;
         }
-      });
+        skip = 0;
+        if (left <= 0) break;
+      }
+      return left <= 0;
+    };
+    if (directOid) {
+      if (!allocate(directOid, item.batchDeductions, qty, priorQty)) return false;
+    } else {
+      for (const part of item.items) {
+        const oid = part.type === 'obat' ? (part.oid || part.id) : '';
+        if (oid && !allocate(oid, part.batchDeductions, (Number(part.qty) || 1) * qty,
+          (Number(part.qty) || 1) * priorQty)) return false;
+      }
+      if (!batchRestores.length) return false;
     }
-
+    const nilaiRetur = qty * Number(item.harga || 0), now = Date.now();
     this.state.returJual.unshift({
-      id: uid(),
-      tgl: new Date().toISOString().slice(0, 10),
-      trxId: trx.id,
-      noNota: trx.no,
-      namaPasien: trx.nama,
-      namaItem: item.nama,
-      qty,
-      harga: item.harga,
-      total: nilaiRetur,
-      alasan: alasan || 'Retur Pasien',
-      kasir: window.currentUser ? window.currentUser.u : '-',
-      _t: Date.now()
+      id: uid(), status: 'menunggu', tgl: new Date().toISOString().slice(0, 10),
+      trxId: trx.id, itemIndex: Number(itemIndex), noNota: trx.no, namaPasien: trx.nama,
+      namaItem: item.nama, oid: directOid || '', jenis, hpp: Number(item.hpp || 0),
+      metode: trx.metode || '', qty, harga: Number(item.harga || 0), total: nilaiRetur,
+      batchRestores, alasan: alasan || 'Retur Pasien',
+      kasir: window.currentUser ? window.currentUser.u : '-', _t: now
     });
-
-    item.qty -= qty;
-    trx.total = Math.max(0, Number(trx.total || 0) - nilaiRetur);
-    if (item.qty <= 0) trx.items.splice(itemIndex, 1);
-    trx._t = Date.now();
-    this.logActivity('Retur Penjualan', 'Kasir', `Nota ${trx.no} - ${item.nama} (${qty}x = ${rp(nilaiRetur)})`);
+    this.logActivity('Ajukan Retur', 'Kasir', `Nota ${trx.no} - ${item.nama} (${qty}x = ${rp(nilaiRetur)}) menunggu verifikasi Admin`);
     this.saveLocal();
     return true;
   }
+
+  approveReturJual(returId) {
+    const user = window.currentUser || {};
+    if (!['admin', 'pimpinan'].includes(user.role)) return false;
+    const retur = this.get('returJual', returId);
+    if (!retur || retur.status !== 'menunggu' || !Array.isArray(retur.batchRestores) || !retur.batchRestores.length) return false;
+    for (const item of retur.batchRestores) {
+      if (!this.getObat(item.oid) || !this.get('batch', item.bid) || Number(item.qty) <= 0) return false;
+    }
+    const now = Date.now();
+    for (const item of retur.batchRestores) {
+      const obat = this.getObat(item.oid), batch = this.get('batch', item.bid);
+      obat.stok = Number(obat.stok || 0) + Number(item.qty); obat._t = now;
+      batch.sisa = Number(batch.sisa || 0) + Number(item.qty); batch._t = now;
+    }
+    retur.status = 'disetujui'; retur.diverifikasiOleh = user.u || user.email || '-';
+    retur.diverifikasiPada = now; retur._t = now;
+    this.logActivity('Setujui Retur', 'Persetujuan Retur', `Nota ${retur.noNota} - ${retur.namaItem} (+${retur.qty})`);
+    this.saveLocal(); return true;
+  }
+
+  rejectReturJual(returId, alasanTolak) {
+    const user = window.currentUser || {};
+    if (!['admin', 'pimpinan'].includes(user.role)) return false;
+    const retur = this.get('returJual', returId);
+    if (!retur || retur.status !== 'menunggu') return false;
+    retur.status = 'ditolak'; retur.alasanPenolakan = String(alasanTolak || '').trim() || 'Tidak disetujui Admin';
+    retur.diverifikasiOleh = user.u || user.email || '-'; retur.diverifikasiPada = Date.now(); retur._t = Date.now();
+    this.logActivity('Tolak Retur', 'Persetujuan Retur', `Nota ${retur.noNota} - ${retur.namaItem}: ${retur.alasanPenolakan}`);
+    this.saveLocal(); return true;
+  }
+
   // Proses Retur Pembelian ke Supplier PBF
   processReturBeli({ beliId, qtyRetur, alasan }) {
     const beli = this.get('beli', beliId);
