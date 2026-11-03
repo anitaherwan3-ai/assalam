@@ -174,6 +174,8 @@ class FirebaseBackend {
           const remoteData = doc.data() || {};
           if (remoteData.set && typeof remoteData.set === 'object') {
             this.store.state.set = Object.assign({}, this.store.state.set || {}, remoteData.set);
+            // Tolak perubahan nama klinik dari data cloud lama/perangkat lain.
+            this.store.state.set.nama = 'Klinik Assalaam Palembang';
             
             // Sinkronisasi nomor urut / sequence agar tidak tumpang tindih antar kasir/perangkat
             if (remoteData.seq && typeof remoteData.seq === 'object') {
