@@ -366,6 +366,10 @@ class FirebaseBackend {
         let writableCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
         if (profile.role === 'kasir') {
           writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log'];
+        } else if (profile.role === 'admin') {
+          // Admin hanya menulis data operasional gudang/keuangan; data pasien,
+          // transaksi kasir, shift, dan kas kecil tetap menjadi kewenangan Kasir/Pimpinan.
+          writableCollections = writableCollections.filter(name => !['pasien', 'trx', 'shift', 'petty'].includes(name));
         }
 
         for (const col of writableCollections) {
