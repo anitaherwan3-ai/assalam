@@ -169,7 +169,12 @@ service cloud.firestore {
           resource.data.status == 'menunggu' &&
           request.resource.data.status in ['disetujui', 'ditolak'] &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', '_t'])) ||
+            .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', 'pengembalian', '_t']) &&
+          ((request.resource.data.status == 'disetujui' &&
+            request.resource.data.pengembalian.status == 'menunggu' &&
+            request.resource.data.pengembalian.nominal == resource.data.total) ||
+           (request.resource.data.status == 'ditolak' &&
+            !('pengembalian' in request.resource.data)))) ||
         // Pencatatan uang kembali hanya Pimpinan; nominal tidak boleh melebihi/mengubah nilai retur.
         (pimpinan() &&
           resource.data.status == 'disetujui' &&
