@@ -1087,7 +1087,7 @@ function addTouchItem(type, id) {
         jenis: 'Paket',
         harga: Number(paket.harga) || 0,
         qty: 1,
-        items: paket.items || [],
+        items: (paket.items || []).map(({ batchDeductions, ...component }) => component),
         hpp: (paket.items || []).filter(i => i.type === 'obat').reduce((s, it) => {
           const o = store.getObat(it.oid || it.id);
           return s + ((o ? Number(o.hpp) : 0) * (Number(it.qty) || 1));
