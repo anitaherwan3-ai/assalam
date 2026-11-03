@@ -86,7 +86,7 @@ service cloud.firestore {
     }
     match /k_pasien/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
     match /k_trx/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
-    match /k_shift/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
     match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
     match /k_obat/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
     match /k_tarif/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
