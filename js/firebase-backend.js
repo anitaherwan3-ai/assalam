@@ -493,6 +493,9 @@ class FirebaseBackend {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
+            // Kasir hanya boleh menyinkronkan nota yang dibuat atas identitasnya sendiri.
+            // Nota kasir lain tetap tersimpan di cache lokal untuk dibaca, bukan ditulis ulang.
+            if (col === 'trx' && profile.role === 'kasir' && item.kasir !== profile.u) continue;
             // Staf hanya mengirim log miliknya sendiri.
             if (col === 'log' && profile.role !== 'pimpinan' && item.u !== profile.u) continue;
             // Kasir hanya mengirim pengajuan retur miliknya yang masih menunggu.
