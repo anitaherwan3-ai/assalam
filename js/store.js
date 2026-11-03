@@ -301,27 +301,27 @@ class ClinicStore {
   // Batalkan Transaksi Kasir (Kembalikan stok obat & sisa batch)
   cancelTransaction(trxId) {
     const trx = this.get('trx', trxId);
-    if (!trx) return false;
+    if (!trx || trx.status === 'dibatalkan') return false;
 
     // Rollback stok obat dan batch, termasuk komponen obat dalam paket.
     const restoreBatchDeductions = deductions => {
       if (!Array.isArray(deductions)) return;
       deductions.forEach(d => {
         const batch = this.get('batch', d.bid);
-        if (batch) batch.sisa += Number(d.qty) || 0;
+        if (batch) { batch.sisa += Number(d.qty) || 0; batch._t = Date.now(); }
       });
     };
     (trx.items || []).forEach(item => {
       if (item.oid) {
         const obat = this.getObat(item.oid);
-        if (obat) obat.stok += Number(item.qty) || 0;
+        if (obat) { obat.stok += Number(item.qty) || 0; obat._t = Date.now(); }
         restoreBatchDeductions(item.batchDeductions);
       } else if ((item.t || item.jenis) === 'Paket' && Array.isArray(item.items)) {
         item.items.forEach(pkgIt => {
           const oid = pkgIt.oid || pkgIt.id;
           if (pkgIt.type === 'obat' && oid) {
             const obat = this.getObat(oid);
-            if (obat) obat.stok += (Number(pkgIt.qty) || 1) * (Number(item.qty) || 1);
+            if (obat) { obat.stok += (Number(pkgIt.qty) || 1) * (Number(item.qty) || 1); obat._t = Date.now(); }
             restoreBatchDeductions(pkgIt.batchDeductions);
           }
         });
@@ -334,7 +334,11 @@ class ClinicStore {
       if (pasien) pasien.done = false;
     }
 
-    this.state.trx = this.state.trx.filter(t => t.id !== trxId);
+    // Simpan nota sebagai jejak audit; jangan hapus transaksi dari riwayat.
+    trx.status = 'dibatalkan';
+    trx.dibatalkanPada = Date.now();
+    trx.dibatalkanOleh = window.currentUser ? window.currentUser.u : 'sistem';
+    trx._t = Date.now();
     this.logActivity('Batalkan', 'Transaksi', `Nota ${trx.no} - Pasien ${trx.nama}`);
     this.saveLocal();
     return true;
