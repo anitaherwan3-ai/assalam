@@ -3373,7 +3373,7 @@ function viewPengaturan() {
       <h2>Identitas & Profil Klinik</h2>
       <div class="row">
         <label style="flex:1;min-width:240px;">Nama Klinik
-          <input id="set-nama" value="${esc(set.nama)}">
+          <input id="set-nama" value="Klinik Assalaam Palembang" readonly aria-readonly="true" title="Nama klinik ditetapkan dan tidak dapat diubah">
         </label>
         <label style="width:120px;">Logo Emoji
           <input id="set-logo" value="${esc(set.logo)}">
@@ -3528,7 +3528,7 @@ function deleteClinicLogo() {
 
 function actionSaveSettings() {
   const set = store.state.set;
-  set.nama = val('set-nama');
+  set.nama = 'Klinik Assalaam Palembang';
   set.logo = val('set-logo');
   set.alamat = val('set-alamat');
   set.telp = val('set-telp');
