@@ -11,6 +11,7 @@ class FirebaseBackend {
     this.syncQueue = Promise.resolve();
     this.debounceTimer = null;
     this.authUnsubscribe = null;
+    this.currentProfile = null;
     this.init();
   }
 
@@ -68,6 +69,7 @@ class FirebaseBackend {
         }
         try {
           const profile = await this.verifyAuthProfile(user);
+          this.currentProfile = profile;
           this.setupRealtimeListeners();
           this.isOnline = true;
           this.updateBadge('online');
@@ -208,6 +210,7 @@ class FirebaseBackend {
     this.listeners.forEach(unsub => { try { unsub(); } catch (e) {} });
     this.listeners = [];
     clearTimeout(this.debounceTimer);
+    this.currentProfile = null;
     this.isOnline = false;
     this.updateBadge('local');
   }
@@ -219,7 +222,16 @@ class FirebaseBackend {
       try { unsub(); } catch (e) {}
     });
     this.listeners = [];
-    const collections = this.store.COLLECTIONS.filter(name => name !== 'users');
+    const role = this.currentProfile && this.currentProfile.role;
+    let allowedCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
+    if (role === 'kasir') {
+      allowedCollections = ['obat', 'tarif', 'paket', 'batch', 'pasien', 'trx', 'shift', 'petty'];
+    } else if (role === 'admin') {
+      allowedCollections = allowedCollections;
+    } else if (role !== 'pimpinan') {
+      return;
+    }
+    const collections = allowedCollections;
 
     // ==========================================
     // 1. LISTENER PENGATURAN APLIKASI & NOMOR URUT (SEQ)
@@ -244,8 +256,8 @@ class FirebaseBackend {
               window.renderCurrentTab();
             }
           }
-        } else {
-          console.log('Dokumen pengaturan belum tersedia. Inisialisasi awal.');
+        } else if (this.currentProfile && this.currentProfile.role === 'pimpinan') {
+          console.log('Dokumen pengaturan belum tersedia. Inisialisasi oleh Pimpinan.');
           await settingsRef.set({
             set: this.store.state.set || {},
             seq: this.store.state.seq || {}
@@ -331,18 +343,30 @@ class FirebaseBackend {
       try {
         const batch = this.db.batch();
         
-        // Sinkronisasi pengaturan dan sequence nomor urut pendapatan/pasien
-        const setRef = this.db.doc('klinik_config/settings');
-        batch.set(setRef, {
-          set: state.set,
-          seq: state.seq || {}
-        }, { merge: true });
+        const profile = this.currentProfile;
+        if (!profile || !['pimpinan', 'admin', 'kasir'].includes(profile.role)) {
+          throw new Error('Profil peran Firebase belum terverifikasi; sinkronisasi dibatalkan.');
+        }
+        // Hanya Pimpinan yang boleh menulis pengaturan klinik dan sequence global.
+        if (profile.role === 'pimpinan') {
+          const setRef = this.db.doc('klinik_config/settings');
+          batch.set(setRef, {
+            set: state.set,
+            seq: state.seq || {}
+          }, { merge: true });
+        }
 
-        // Sinkronisasi seluruh item di collections secara aman
-        for (const col of this.store.COLLECTIONS.filter(name => name !== 'users')) {
+        // Batasi penulisan berdasarkan hak akses masing-masing peran.
+        let writableCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
+        if (profile.role === 'kasir') {
+          writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log'];
+        }
+        for (const col of writableCollections) {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
+            // Staf hanya boleh mengirim log aktivitas miliknya sendiri.
+            if (col === 'log' && profile.role !== 'pimpinan' && item.u !== profile.u) continue;
             // Pastikan setiap item memiliki properti _t (timestamp) agar sinkronisasi akurat
             if (!item._t) {
               item._t = Date.now();
