@@ -298,6 +298,15 @@ class FirebaseBackend {
                 const localItem = mergedMap.get(remoteItem.id);
                 if (!localItem || (remoteItem._t || 0) >= (localItem._t || 0)) {
                   mergedMap.set(remoteItem.id, remoteItem);
+                } else if (colName === 'trx' && Object.prototype.hasOwnProperty.call(remoteItem, 'status')) {
+                  // Status nota dari Cloud harus selalu menang, terutama status dibatalkan.
+                  // Timestamp lokal tidak boleh menghidupkan kembali nota yang sudah dibatalkan.
+                  mergedMap.set(remoteItem.id, Object.assign({}, localItem, {
+                    status: remoteItem.status,
+                    dibatalkanPada: remoteItem.dibatalkanPada,
+                    dibatalkanOleh: remoteItem.dibatalkanOleh,
+                    _t: Math.max(localItem._t || 0, remoteItem._t || 0)
+                  }));
                 } else if (colName === 'obat' && Object.prototype.hasOwnProperty.call(remoteItem, 'stok')) {
                   // Stok dari Cloud adalah nilai bersama lintas perangkat.
                   // Metadata lokal yang lebih baru tetap dipertahankan, tetapi angka stok
