@@ -814,13 +814,18 @@
       }
     }
 
+    // Data cloud menjadi sumber utama di perangkat display setelah listener aktif.
+    let displayCloudSettings = null;
+    let displayCloudPatients = null;
+
     // State & Sync Loader
     function loadDisplayData() {
       try {
         const raw = localStorage.getItem('klinik_data');
         if (!raw) return;
         const data = JSON.parse(raw);
-        const set = data.set || {};
+        const set = Object.assign({}, data.set || {}, displayCloudSettings || {});
+        const patientData = Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []);
         const today = new Date().toISOString().slice(0, 10);
 
         // Update clinic branding
@@ -843,10 +848,10 @@
         showVideoOrFallback(videoId, enableVideo);
 
         // Patients waiting today
-        const patients = (data.pasien || []).filter(p => p.tgl === today && !p.done);
+        const patients = patientData.filter(p => p.tgl === today && !p.done);
         
         // Active called patient
-        const called = (data.pasien || []).filter(p => p.tgl === today && p.calling).pop();
+        const called = patientData.filter(p => p.tgl === today && p.calling).pop();
         if (called) {
           document.getElementById('active-no').textContent = called.no;
           document.getElementById('active-name').textContent = called.nama;
@@ -933,6 +938,7 @@
         if (doc.exists) {
           const remote = doc.data() || {};
           const set = remote.set || {};
+          displayCloudSettings = set;
           if (set.nama) document.getElementById('display-clinic-name').textContent = set.nama;
           if (set.alamat) document.getElementById('display-clinic-addr').textContent = set.alamat;
           if (set.logoImg) {
@@ -953,6 +959,7 @@
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
         const today = new Date().toISOString().slice(0, 10);
         const docs = snapshot.docs.map(d => d.data());
+        displayCloudPatients = docs;
         const patients = docs.filter(p => p.tgl === today && !p.done);
         const called = docs.filter(p => p.tgl === today && p.calling).pop();
 
