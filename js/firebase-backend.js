@@ -409,20 +409,21 @@ class FirebaseBackend {
         const amount = Number(qty);
         if (!oid || !Number.isFinite(amount) || amount <= 0) throw new Error('Rincian obat transaksi tidak valid.');
         medicineQty.set(String(oid), (medicineQty.get(String(oid)) || 0) + amount);
-        if (Array.isArray(deductions)) {
-          let allocated = 0;
-          deductions.forEach(d => {
-            const q = Number(d.qty);
-            if (!d.bid || !Number.isFinite(q) || q <= 0) throw new Error('Rincian batch transaksi tidak valid.');
-            allocated += q;
-            const bid = String(d.bid);
-            batchQty.set(bid, (batchQty.get(bid) || 0) + q);
-            if (batchOwners.has(bid) && batchOwners.get(bid) !== String(oid)) throw new Error('Batch tercatat pada lebih dari satu obat.');
-            batchOwners.set(bid, String(oid));
-          });
-          if (deductions.length && Math.abs(allocated - amount) > 0.000001) {
-            throw new Error('Jumlah batch tidak sama dengan jumlah obat pada nota. Stok tidak diubah.');
-          }
+        if (!Array.isArray(deductions) || !deductions.length) {
+          throw new Error('Alokasi batch pada nota tidak tercatat. Pembatalan ditahan agar stok obat dan batch tidak berbeda.');
+        }
+        let allocated = 0;
+        deductions.forEach(d => {
+          const q = Number(d.qty);
+          if (!d.bid || !Number.isFinite(q) || q <= 0) throw new Error('Rincian batch transaksi tidak valid.');
+          allocated += q;
+          const bid = String(d.bid);
+          batchQty.set(bid, (batchQty.get(bid) || 0) + q);
+          if (batchOwners.has(bid) && batchOwners.get(bid) !== String(oid)) throw new Error('Batch tercatat pada lebih dari satu obat.');
+          batchOwners.set(bid, String(oid));
+        });
+        if (Math.abs(allocated - amount) > 0.000001) {
+          throw new Error('Jumlah batch tidak sama dengan jumlah obat pada nota. Stok tidak diubah.');
         }
       };
       (trx.items || []).forEach(item => {
