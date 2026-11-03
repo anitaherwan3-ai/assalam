@@ -67,7 +67,7 @@ class FirebaseBackend {
           return;
         }
         try {
-          const profile = await this.ensureOwnerProfile(user);
+          const profile = await this.verifyAuthProfile(user);
           this.setupRealtimeListeners();
           this.isOnline = true;
           this.updateBadge('online');
@@ -134,17 +134,74 @@ class FirebaseBackend {
     return profile;
   }
 
+  async verifyAuthProfile(user) {
+    if (!user || !user.email || !this.db) throw new Error('Akun Firebase tidak valid.');
+    const email = user.email.toLowerCase();
+    if (this.ownerIdentity(email)) return this.ensureOwnerProfile(user);
+    const snap = await this.db.collection('k_users').doc(email).get();
+    if (!snap.exists) throw new Error('Akun belum diaktifkan oleh Pimpinan Assalam.');
+    const profile = snap.data() || {};
+    if (String(profile.email || '').toLowerCase() !== email) throw new Error('Email profil tidak cocok.');
+    if (profile.active !== true) throw new Error('Akun ini dinonaktifkan. Hubungi Pimpinan.');
+    if (!['admin', 'kasir'].includes(profile.role)) throw new Error('Hak akses akun tidak valid.');
+    return Object.assign({}, profile, { email, uid: user.uid });
+  }
+
+  async provisionDefaultStaffProfiles(localUsers) {
+    if (!this.auth || !this.auth.currentUser || !this.ownerIdentity(this.auth.currentUser.email)) {
+      throw new Error('Hanya Pimpinan yang dapat mengaktifkan akun staf.');
+    }
+    const local = Array.isArray(localUsers) ? localUsers : [];
+    const definitions = [
+      { email: 'assalamadmin1@gmail.com', role: 'admin', u: 'admin-gudang', fallbackName: 'Admin Gudang & Keuangan' },
+      { email: 'assalamkasir1@gmail.com', role: 'kasir', u: 'kasir', fallbackName: 'Kasir' }
+    ];
+    const results = [];
+    for (const item of definitions) {
+      const prior = local.find(x => x.role === item.role && x.role !== 'pimpinan') || {};
+      const profile = {
+        email: item.email, u: item.u,
+        nama: prior.nama || item.fallbackName,
+        hp: prior.hp || '',
+        role: item.role, active: true,
+        updatedAt: Date.now()
+      };
+      const ref = this.db.collection('k_users').doc(item.email);
+      const snap = await ref.get();
+      if (snap.exists) {
+        const existing = snap.data() || {};
+        if (String(existing.email || '').toLowerCase() !== item.email ||
+            ![item.role].includes(existing.role)) {
+          throw new Error('Profil '+item.email+' sudah ada dengan data/peran berbeda. Tidak ditimpa.');
+        }
+        await ref.set(Object.assign({}, profile, { active: existing.active === true }), { merge: true });
+      } else {
+        await ref.set(profile);
+      }
+      results.push(profile);
+    }
+    return results;
+  }
+
   async login(email, password) {
     if (!this.auth) throw new Error('Firebase Authentication belum siap. Periksa koneksi internet.');
-    if (!this.ownerIdentity(email)) throw new Error('Saat ini login Firebase hanya diaktifkan untuk dua akun Pimpinan yang terdaftar.');
-    const credential = await this.auth.signInWithEmailAndPassword(email.trim().toLowerCase(), password);
-    return this.ensureOwnerProfile(credential.user);
+    const normalized = String(email || '').trim().toLowerCase();
+    const credential = await this.auth.signInWithEmailAndPassword(normalized, password);
+    try {
+      return await this.verifyAuthProfile(credential.user);
+    } catch (err) {
+      await this.auth.signOut().catch(() => {});
+      throw err;
+    }
   }
 
   async resetPassword(email) {
     if (!this.auth) throw new Error('Firebase Authentication belum siap.');
-    if (!this.ownerIdentity(email)) throw new Error('Email bukan salah satu akun Pimpinan yang terdaftar.');
-    return this.auth.sendPasswordResetEmail(email.trim().toLowerCase());
+    const normalized = String(email || '').trim().toLowerCase();
+    const allowed = ['praktekrose@gmail.com', 'nursalim42@gmail.com',
+      'assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+    if (!allowed.includes(normalized)) throw new Error('Email belum terdaftar sebagai akun Assalam.');
+    return this.auth.sendPasswordResetEmail(normalized);
   }
 
   stopSync() {
