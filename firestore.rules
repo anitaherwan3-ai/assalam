@@ -38,7 +38,13 @@ service cloud.firestore {
 
     match /klinik_config/{document} {
       allow read: if signedIn();
-      allow write: if pimpinan();
+      allow create: if pimpinan();
+      allow update: if pimpinan() ||
+        (adminOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
+          request.resource.data.set.diff(resource.data.set).affectedKeys()
+            .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
+      allow delete: if pimpinan();
     }
 
     match /k_users/{document} {
@@ -95,7 +101,14 @@ service cloud.firestore {
     match /k_beli/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_biaya/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_loss/{document} { allow read, write: if adminOrPimpinan(); }
-    match /k_returJual/{document} { allow read, write: if adminOrPimpinan(); }
+    match /k_returJual/{document} {
+      allow read: if signedIn();
+      allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu';
+      allow update: if adminOrPimpinan() ||
+        (kasirOrPimpinan() && resource.data.kasir == staffProfile().u &&
+          request.resource.data.kasir == staffProfile().u && request.resource.data.status == 'menunggu');
+      allow delete: if pimpinan();
+    }
     match /k_returBeli/{document} { allow read, write: if adminOrPimpinan(); }
   }
 }
