@@ -2548,8 +2548,8 @@ function viewRiwayat() {
       `
         <button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
         ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')" title="Cetak Label &amp; Etiket Obat">🏷️ Label Obat</button>` : ''}
-        ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')" title="Retur Obat">Retur</button>
-        <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`}
+        ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole === 'admin' ? '<span class="badge-ok">Baca saja</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')" title="Retur Obat">Retur</button>
+        <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`)}
       `
     ];
   });
@@ -2579,6 +2579,10 @@ function viewRiwayat() {
 }
 
 function openModalReturJual(trxId) {
+  if (currentRole === 'admin') {
+    showAlert('Admin hanya dapat melihat riwayat transaksi. Perubahan transaksi menjadi kewenangan Kasir/Pimpinan.', 'Akses Ditolak');
+    return;
+  }
   const trx = store.get('trx', trxId);
   if (!trx || trx.status === 'dibatalkan' || !trx.items || !trx.items.length) {
     showAlert('Transaksi tidak ditemukan, sudah dibatalkan, atau tidak memiliki item');
@@ -2613,6 +2617,10 @@ function openModalReturJual(trxId) {
 }
 
 function actionCancelTrx(id) {
+  if (currentRole === 'admin') {
+    showAlert('Admin hanya dapat melihat riwayat transaksi. Pembatalan menjadi kewenangan Kasir/Pimpinan.', 'Akses Ditolak');
+    return;
+  }
   showConfirm('Batalkan transaksi ini? Stok obat dan sisa batch akan dikembalikan ke kondisi semula.', () => {
     const success = store.cancelTransaction(id);
     if (success) showAlert('Transaksi ditandai dibatalkan. Nota tetap tersimpan di riwayat dan stok obat telah dikembalikan.', 'Dibatalkan');
