@@ -55,11 +55,16 @@ function getFilteredTrx() {
   });
 }
 
+// Transaksi batal tetap tampil di riwayat, tetapi tidak dihitung sebagai pemasukan.
+function getActiveFilteredTrx() {
+  return getFilteredTrx().filter(t => t.status !== 'dibatalkan');
+}
+
 // ==========================================
 // PERHITUNGAN FINANSIAL & REKAP (SINKRON & AMAN)
 // ==========================================
 function calculateFinancials() {
-  const trxList = getFilteredTrx();
+  const trxList = getActiveFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
 
   const sumByJenis = j => allItems
@@ -280,7 +285,7 @@ function getCurrentShift() {
 }
 
 function getShiftTrx(shift) {
-  return (store.state.trx || []).filter(t => t.sh === shift.id);
+  return (store.state.trx || []).filter(t => t.sh === shift.id && t.status !== 'dibatalkan');
 }
 
 function calcShiftCash(shift) {
@@ -504,7 +509,7 @@ function printShiftSlip(shiftId) {
   const shift = store.get('shift', shiftId);
   if (!shift) return;
   const set = store.state.set || {};
-  const trxList = (store.state.trx || []).filter(t => t.sh === shift.id);
+  const trxList = (store.state.trx || []).filter(t => t.sh === shift.id && t.status !== 'dibatalkan');
   const tunaiTrx = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const nonTunaiTrx = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const pettyList = (store.state.petty || []).filter(p => p.sh === shift.id);
@@ -712,7 +717,7 @@ function viewTrx() {
     o.nama.toLowerCase().includes(searchLower)
   );
 
-  const todayTrx   = (store.state.trx || []).filter(t => t.tgl === todayStr);
+  const todayTrx   = (store.state.trx || []).filter(t => t.tgl === todayStr && t.status !== 'dibatalkan');
   const todayTotal  = todayTrx.reduce((s, t) => s + Number(t.total || 0), 0);
   const todayCount  = todayTrx.length;
 
@@ -2494,8 +2499,8 @@ function viewRiwayat() {
       `
         <button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
         ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')" title="Cetak Label &amp; Etiket Obat">🏷️ Label Obat</button>` : ''}
-        <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')" title="Retur Obat">Retur</button>
-        <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>
+        ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')" title="Retur Obat">Retur</button>
+        <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Batalkan</button>`}
       `
     ];
   });
@@ -2526,8 +2531,8 @@ function viewRiwayat() {
 
 function openModalReturJual(trxId) {
   const trx = store.get('trx', trxId);
-  if (!trx || !trx.items || !trx.items.length) {
-    showAlert('Transaksi tidak ditemukan atau tidak memiliki item');
+  if (!trx || trx.status === 'dibatalkan' || !trx.items || !trx.items.length) {
+    showAlert('Transaksi tidak ditemukan, sudah dibatalkan, atau tidak memiliki item');
     return;
   }
 
@@ -2560,8 +2565,9 @@ function openModalReturJual(trxId) {
 
 function actionCancelTrx(id) {
   showConfirm('Batalkan transaksi ini? Stok obat dan sisa batch akan dikembalikan ke kondisi semula.', () => {
-    store.cancelTransaction(id);
-    showAlert('Transaksi berhasil dibatalkan dan stok obat telah dikembalikan.', 'Dibatalkan');
+    const success = store.cancelTransaction(id);
+    if (success) showAlert('Transaksi ditandai dibatalkan. Nota tetap tersimpan di riwayat dan stok obat telah dikembalikan.', 'Dibatalkan');
+    else showAlert('Transaksi tidak ditemukan atau sudah pernah dibatalkan. Tidak ada perubahan.', 'Informasi');
   });
 }
 
@@ -2988,7 +2994,7 @@ function viewLabaRugi() {
 // MODULE: ARUS KAS (PIMPINAN)
 // -------------------------------------------------------------
 function viewArusKas() {
-  const trxList = getFilteredTrx();
+  const trxList = getActiveFilteredTrx();
   const totalMasuk = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
   const masukTunai = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const masukNonTunai = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
@@ -3691,7 +3697,7 @@ function viewKartuStok() {
 
   (store.state.trx || []).forEach(t => {
     (t.items || []).forEach(it => {
-      if ((it.oid || it.id) === obat.id && (it.t || it.jenis) === 'Obat') {
+      if (t.status !== 'dibatalkan' && (it.oid || it.id) === obat.id && (it.t || it.jenis) === 'Obat') {
         muts.push({ tgl: t.tgl || '', ket: `🧾 Penjualan — Nota: ${t.no || '-'} / ${t.nama || '-'}`, masuk: 0, keluar: Number(it.qty || 0) });
       }
     });
@@ -3793,7 +3799,7 @@ function exportKartuStok() {
     (b.items || []).forEach(it => { if (it.oid === obat.id) muts.push({ tgl: b.tgl, ket: `Pembelian - ${b.supplier||''} / ${b.faktur||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
   });
   (store.state.trx || []).forEach(t => {
-    (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
+    if (t.status !== 'dibatalkan') (t.items || []).forEach(it => { if ((it.oid||it.id) === obat.id && (it.t||it.jenis) === 'Obat') muts.push({ tgl: t.tgl, ket: `Penjualan - ${t.no||''} / ${t.nama||''}`, masuk: 0, keluar: Number(it.qty||0) }); });
   });
   (store.state.returJual || []).forEach(r => {
     (r.items || []).forEach(it => { if ((it.oid||it.id) === obat.id) muts.push({ tgl: r.tgl, ket: `Retur Jual - ${r.noNota||''}`, masuk: Number(it.qty||0), keluar: 0 }); });
