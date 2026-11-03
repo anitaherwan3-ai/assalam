@@ -2609,11 +2609,15 @@ function viewRiwayat() {
   const cancelList = (store.state.batalTrx || []).slice().reverse();
   const rows = trxList.map(t => {
     const hasMed = (t.items || []).some(i => i.oid || (i.t || i.jenis) === 'Obat' || ((i.t || i.jenis) === 'Paket' && Array.isArray(i.items) && i.items.some(x => x.type === 'obat')));
-    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total),
-      `<button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
+    const cancelRequest = cancelList.find(r => r.trxId === t.id && r.status !== 'ditolak');
+    const trxStatus = t.status === 'dibatalkan'
+      ? '<span class="badge-bad">DIBATALKAN</span>'
+      : (cancelRequest ? '<span class="badge-warn">Menunggu Pembatalan</span>' : '<span class="badge-ok">Selesai</span>');
+    const actions = `<button class="s" onclick="printReceipt('${t.id}')">Lihat Nota</button>
       ${hasMed ? `<button class="s" style="background:rgba(2,132,199,0.15);border-color:#0284c7;color:#0284c7;" onclick="openModalLabelObat('${t.id}')">🏷️ Label Obat</button>` : ''}
-      ${t.status === 'dibatalkan' ? '<span class="badge-bad">DIBATALKAN</span>' : (currentRole !== 'kasir' ? '<span class="badge-ok">Baca saja</span>' : (() => { const request = cancelList.find(r => r.trxId === t.id && r.status !== 'ditolak'); return request ? '<span class="badge-warn">Menunggu Pembatalan</span>' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
-      <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Ajukan Pembatalan</button>`; })())}`];
+      ${t.status === 'dibatalkan' || currentRole !== 'kasir' || cancelRequest ? '' : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturJual('${t.id}')">Ajukan Retur</button>
+      <button class="s btn-danger" onclick="actionCancelTrx('${t.id}')">Ajukan Pembatalan</button>`}`;
+    return [esc(t.tgl), esc(t.no), esc(t.nama), esc(t.kasir || '-'), esc(t.metode), rp(t.total), trxStatus, actions];
   });
   const cancelRows = cancelList.map(r => {
     const status = r.status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
@@ -2635,7 +2639,7 @@ function viewRiwayat() {
   });
   return renderFilterBar() + `
     <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
-      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Aksi'], rows, { key: 'all_trx' })}</div>
+      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Status Nota','Aksi'], rows, { key: 'all_trx' })}</div>
     ${currentRole === 'admin' ? `<div class="card"><h2>Pengajuan Pembatalan Transaksi</h2>
       <p style="color:var(--mu);font-size:13px;">Nota dan stok hanya berubah setelah Admin menyetujui pengajuan.</p>
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
