@@ -45,11 +45,7 @@ service cloud.firestore {
       // Pimpinan dapat melihat semua profil; staf hanya dapat membaca profil sendiri.
       allow read: if initialOwner() ||
         (request.auth != null && document == request.auth.token.email);
-      // Bootstrap dua profil Pimpinan yang sudah ada tetap dipertahankan.
-      allow create: if initialOwner() && document == ownerDocId() &&
-        request.resource.data.uid == request.auth.uid &&
-        request.resource.data.email == request.auth.token.email &&
-        request.resource.data.role == 'pimpinan' && request.resource.data.active == true;
+      // Bootstrap profil Pimpinan dan provisioning staf hanya oleh Pimpinan.
       allow update: if initialOwner() && (
         (document == ownerDocId() &&
           request.resource.data.uid == request.auth.uid &&
