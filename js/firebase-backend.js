@@ -337,23 +337,29 @@ class FirebaseBackend {
   async performPush(state) {
     if (!this.db || !this.auth || !this.auth.currentUser) return;
     this.updateBadge('syncing');
-    
-    // Gunakan antrean janji (Promise chain) untuk mencegah bentrok penulisan batch secara bersamaan
+
+    // Antrean mencegah beberapa proses sinkronisasi menulis bersamaan.
     this.syncQueue = this.syncQueue.then(async () => {
       try {
-        const batch = this.db.batch();
-        
         const profile = this.currentProfile;
         if (!profile || !['pimpinan', 'admin', 'kasir'].includes(profile.role)) {
           throw new Error('Profil peran Firebase belum terverifikasi; sinkronisasi dibatalkan.');
         }
+
+        // Kumpulkan operasi terlebih dahulu. Batas aman 400 operasi per batch,
+        // di bawah batas maksimum Firestore 500 operasi.
+        const operations = [];
+
         // Hanya Pimpinan yang boleh menulis pengaturan klinik dan sequence global.
         if (profile.role === 'pimpinan') {
-          const setRef = this.db.doc('klinik_config/settings');
-          batch.set(setRef, {
-            set: state.set,
-            seq: state.seq || {}
-          }, { merge: true });
+          operations.push({
+            ref: this.db.doc('klinik_config/settings'),
+            data: {
+              set: state.set || {},
+              seq: state.seq || {}
+            },
+            merge: true
+          });
         }
 
         // Batasi penulisan berdasarkan hak akses masing-masing peran.
@@ -361,26 +367,40 @@ class FirebaseBackend {
         if (profile.role === 'kasir') {
           writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log'];
         }
+
         for (const col of writableCollections) {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
             // Staf hanya boleh mengirim log aktivitas miliknya sendiri.
             if (col === 'log' && profile.role !== 'pimpinan' && item.u !== profile.u) continue;
-            // Pastikan setiap item memiliki properti _t (timestamp) agar sinkronisasi akurat
-            if (!item._t) {
-              item._t = Date.now();
-            }
-            
-            const docId = (col === 'users') ? (item.u || item.id) : item.id;
+
+            const payload = JSON.parse(JSON.stringify(item));
+            if (!payload._t) payload._t = Date.now();
+
+            const docId = (col === 'users') ? (payload.u || payload.id) : payload.id;
             if (docId) {
-              const docRef = this.db.collection('k_' + col).doc(String(docId));
-              batch.set(docRef, JSON.parse(JSON.stringify(item)), { merge: true });
+              operations.push({
+                ref: this.db.collection('k_' + col).doc(String(docId)),
+                data: payload,
+                merge: true
+              });
             }
           }
         }
 
-        await batch.commit();
+        const batchSize = 400;
+        for (let i = 0; i < operations.length; i += batchSize) {
+          const batch = this.db.batch();
+          const chunk = operations.slice(i, i + batchSize);
+          for (const op of chunk) {
+            batch.set(op.ref, op.data, { merge: op.merge });
+          }
+          // Jika batch berikutnya gagal, antrean akan menampilkan status error.
+          // Batch yang sudah berhasil bersifat idempoten karena memakai set+merge.
+          await batch.commit();
+        }
+
         this.updateBadge('online');
       } catch (err) {
         console.error('Push ke Firebase gagal:', err);
@@ -390,7 +410,6 @@ class FirebaseBackend {
 
     return this.syncQueue;
   }
-
   // ==========================================
   // 4. SIMPAN KONFIGURASI FIREBASE
   // ==========================================
