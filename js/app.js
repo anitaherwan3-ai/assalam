@@ -16,7 +16,14 @@ let selectedKartuStokOid = '';
 let kartuStokSearch = '';
 
 // Filter rentang tanggal
-const todayStr = new Date().toISOString().slice(0, 10);
+function getClinicTodayStr() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const part = type => (parts.find(item => item.type === type) || {}).value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+const todayStr = getClinicTodayStr();
 let dateFilter = {
   from: todayStr.slice(0, 7) + '-01',
   to: todayStr,
