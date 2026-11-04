@@ -72,25 +72,42 @@ function getActiveFilteredTrx() {
 // ==========================================
 // PERHITUNGAN FINANSIAL & REKAP (SINKRON & AMAN)
 // ==========================================
+function reportDateFromTimestamp(value) {
+  if (value === null || value === undefined || value === '') return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  // Gunakan tanggal lokal klinik (WIB), bukan UTC, agar transaksi malam tidak bergeser hari.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(date);
+}
+
 function calculateFinancials() {
   const trxList = getActiveFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
   const allTrx = store.state.trx || [];
   const trxById = new Map(allTrx.map(t => [t.id, t]));
-  // Retur dibukukan pada tanggal persetujuan, bukan tanggal nota awal atau pengajuan.
-  // Filter metode dan kasir mengikuti transaksi asal agar laporan tidak mencampur kelompok.
-  const approvedReturns = (store.state.returJual || []).filter(r => {
+  const returnRecords = (store.state.returJual || []).filter(r => {
     if (!(r.status === 'disetujui' || !r.status)) return false;
-    const returnDate = r.diverifikasiPada
-      ? new Date(r.diverifikasiPada).toISOString().slice(0, 10)
-      : (r.tgl || '');
-    if (returnDate && (returnDate < dateFilter.from || returnDate > dateFilter.to)) return false;
     const original = trxById.get(r.trxId);
     if (original && isTrxCancelled(original)) return false;
     const method = original ? original.metode : r.metode;
     const cashier = original ? original.kasir : r.kasir;
     if (dateFilter.metode && method !== dateFilter.metode) return false;
     if (dateFilter.kasir && cashier !== dateFilter.kasir) return false;
+    return true;
+  });
+  // Pendapatan mengikuti tanggal persetujuan retur.
+  const approvedReturns = returnRecords.filter(r => {
+    const returnDate = reportDateFromTimestamp(r.diverifikasiPada) || r.tgl || '';
+    return !returnDate || (returnDate >= dateFilter.from && returnDate <= dateFilter.to);
+  });
+  // Arus kas keluar mengikuti tanggal uang benar-benar dibayarkan, bukan tanggal approval.
+  const paidReturnsInPeriod = returnRecords.filter(r => {
+    if (!r.pengembalian || r.pengembalian.status !== 'dibayar') return false;
+    const paidDate = reportDateFromTimestamp(r.pengembalian.dibayarPada);
+    if (!paidDate || paidDate < dateFilter.from || paidDate > dateFilter.to) return false;
+    if (dateFilter.metode && r.pengembalian.metode !== dateFilter.metode) return false;
     return true;
   });
   const grossRevenue = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
@@ -100,16 +117,15 @@ function calculateFinancials() {
   const returnServices = returnValue - returnGoods;
   const returnHpp = approvedReturns.filter(r => ['Obat', 'Paket'].includes(r.jenis || ''))
     .reduce((sum, r) => sum + Number(r.hpp || 0) * Number(r.qty || 0), 0);
-  const refundPaid = approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'dibayar')
+  const refundPaid = paidReturnsInPeriod.reduce((sum, r) =>
+    sum + Number(r.pengembalian.nominal || r.total || 0), 0);
+  const refundPaidCash = paidReturnsInPeriod.filter(r => r.pengembalian.metode === 'Tunai')
     .reduce((sum, r) => sum + Number(r.pengembalian.nominal || r.total || 0), 0);
   const refundPending = approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'menunggu')
     .reduce((sum, r) => sum + Number(r.pengembalian.nominal || r.total || 0), 0);
   const legacyReturnValue = approvedReturns.filter(r => !r.pengembalian)
     .reduce((sum, r) => sum + Number(r.total || 0), 0);
-  const sumByJenis = j => allItems.filter(i => (i.t || i.jenis) === j)
-    .reduce((s, x) => s + Number(x.harga || 0) * Number(x.qty || 0), 0) -
-    approvedReturns.filter(r => (r.jenis || '') === j).reduce((s, r) => s + Number(r.total || 0), 0);
-  // Pendapatan bersih = transaksi bruto dikurangi retur yang sudah disetujui.
+  // Nota.total sudah merupakan nilai akhir setelah diskon; jangan kurangi diskon lagi.
   const rev = grossRevenue - returnValue;
   const hpp = allItems.filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket')
     .reduce((s, x) => s + Number(x.hpp || 0) * Number(x.qty || 0), 0) - returnHpp;
@@ -119,29 +135,17 @@ function calculateFinancials() {
     .filter(b => b.status === 'approved')
     .reduce((s, b) => s + Number(b.jml || 0), 0);
   const pc = inFilterRange(store.state.petty).reduce((s, p) => s + Number(p.jml || 0), 0);
-
-  const kons = sumByJenis('Konsultasi');
-  const tind = sumByJenis('Tindakan');
-  const obat = sumByJenis('Obat');
-  const paket = sumByJenis('Paket');
-  const disk = Math.abs(sumByJenis('Diskon'));
-
   const totalModalAwalShift = inFilterRange(store.state.shift || []).reduce((s, sh) => s + Number(sh.modal || 0), 0);
   const laba = rev - hpp - loss - op - pc;
-
   return {
-    trxList, approvedReturns, grossRevenue, returnValue, returnGoods, returnServices,
-    refundPaid, refundPending, legacyReturnValue, rev, hpp, loss, op, pc,
-    kons, tind, obat, paket, disk, laba, totalModalAwalShift,
+    trxList, approvedReturns, paidReturnsInPeriod, grossRevenue, returnValue,
+    returnGoods, returnServices, refundPaid, refundPaidCash, refundPending,
+    legacyReturnValue, rev, hpp, loss, op, pc, laba, totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
       trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
-      approvedReturns.filter(r =>
-        (r.metode === 'Tunai' && !r.pengembalian) ||
-        (r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai'))
-        .reduce((s, r) => s + Number(r.pengembalian ? (r.pengembalian.nominal || r.total || 0) : (r.total || 0)), 0) - pc
+      refundPaidCash - pc
   };
 }
-
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
@@ -3194,7 +3198,7 @@ function initDashboardCharts(fin) {
   // Kurangi retur pada tanggal retur agar tren harian menunjukkan pendapatan bersih periode berjalan.
   (fin.approvedReturns || []).forEach(r => {
     const returnDate = r.diverifikasiPada
-      ? new Date(r.diverifikasiPada).toISOString().slice(0, 10)
+      ? reportDateFromTimestamp(r.diverifikasiPada)
       : (r.tgl || '');
     if (!returnDate) return;
     dailyOmset[returnDate] = (dailyOmset[returnDate] || 0) - Number(r.total || 0);
