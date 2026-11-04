@@ -1,5 +1,45 @@
 // Firebase Firestore Free Backend Adapter
 // Firebase Web SDK v10 Compat - Dioptimalkan untuk Sinkronisasi Pendapatan & Anti Tumpang Tindih
+// Hitung nilai bersih baris retur dari nota asli; jangan percaya nominal kiriman Kasir.
+function calculateVerifiedReturnAmount(trx, itemIndex, qtyReturn, priorQty = 0) {
+  const items = Array.isArray(trx && trx.items) ? trx.items : [];
+  const target = items[Number(itemIndex)];
+  if (!target) throw new Error('Item nota asli tidak ditemukan.');
+  const rows = [];
+  let grossTotal = 0, discountTotal = 0;
+  items.forEach((item, index) => {
+    const kind = String(item.t || item.jenis || '');
+    const qty = Number(item.qty || 0), price = Number(item.harga || 0);
+    if (['Diskon', 'Potongan Diskon'].includes(kind) || price < 0) {
+      discountTotal += Math.round(Math.abs(price * (Number.isFinite(qty) ? qty : 1)));
+      return;
+    }
+    const gross = Math.round(Math.max(0, qty * price));
+    if (gross > 0) { rows.push({ index, gross, allocated: 0, remainder: 0 }); grossTotal += gross; }
+  });
+  discountTotal = Math.round(discountTotal);
+  if (discountTotal > grossTotal || grossTotal <= 0) throw new Error('Nilai diskon/nota asli tidak valid.');
+  let allocated = 0;
+  rows.forEach(row => {
+    const exact = discountTotal * row.gross / grossTotal;
+    row.allocated = Math.floor(exact);
+    row.remainder = exact - row.allocated;
+    allocated += row.allocated;
+  });
+  const left = discountTotal - allocated;
+  rows.slice().sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+    .slice(0, left).forEach(row => { row.allocated += 1; });
+  const row = rows.find(entry => entry.index === Number(itemIndex));
+  if (!row) throw new Error('Item nota tidak dapat diretur.');
+  const lineQty = Number(target.qty || 0), before = Number(priorQty || 0), requested = Number(qtyReturn || 0);
+  if (!Number.isFinite(lineQty) || lineQty <= 0 || before < 0 ||
+      requested <= 0 || before + requested > lineQty) {
+    throw new Error('Jumlah retur kumulatif melebihi jumlah pada nota asli.');
+  }
+  const net = row.gross - row.allocated;
+  return Math.round(net * (before + requested) / lineQty) - Math.round(net * before / lineQty);
+}
+
 class FirebaseBackend {
   constructor(store) {
     this.store = store;
@@ -501,7 +541,7 @@ class FirebaseBackend {
     return true;
   }
 
-  // Persetujuan retur dan penambahan stok dilakukan atomik di Firestore.
+  // Persetujuan retur memverifikasi ulang nominal terhadap nota asli di Cloud.
   async approveReturJual(returId) {
     const profile = this.currentProfile;
     if (!profile || !['admin', 'pimpinan'].includes(profile.role)) {
@@ -511,15 +551,59 @@ class FirebaseBackend {
       throw new Error('Koneksi Firebase belum siap. Retur belum disetujui.');
     }
     const returRef = this.db.collection('k_returJual').doc(String(returId));
+    // Ambil ID pengajuan pada nota yang sama, lalu baca ulang dokumen-dokumennya
+    // di dalam transaksi agar nominal bertahap memakai kuantitas yang telah tercatat.
+    const initialReturSnap = await returRef.get();
+    if (!initialReturSnap.exists) throw new Error('Pengajuan retur tidak ditemukan di cloud.');
+    const initialRetur = initialReturSnap.data() || {};
+    const trxId = String(initialRetur.trxId || '');
+    if (!trxId) throw new Error('Referensi nota pada retur tidak valid.');
+    const trxRef = this.db.collection('k_trx').doc(trxId);
+    const relatedReturns = await this.db.collection('k_returJual').where('trxId', '==', trxId).get();
+    const priorRefs = relatedReturns.docs
+      .filter(doc => doc.id !== String(returId) &&
+        Number(doc.data().itemIndex) === Number(initialRetur.itemIndex) &&
+        doc.data().status !== 'ditolak')
+      .map(doc => doc.ref);
+
     await this.db.runTransaction(async transaction => {
       const returSnap = await transaction.get(returRef);
-      if (!returSnap.exists) throw new Error('Pengajuan retur tidak ditemukan di cloud.');
-      const retur = returSnap.data() || {};
+      const trxSnap = await transaction.get(trxRef);
+      if (!returSnap.exists || !trxSnap.exists) throw new Error('Retur atau nota asli tidak ditemukan.');
+      const retur = returSnap.data() || {}, trx = trxSnap.data() || {};
       if (retur.status !== 'menunggu') throw new Error('Retur sudah diproses atau bukan status menunggu.');
+      if (trx.status === 'dibatalkan') throw new Error('Nota asli sudah dibatalkan.');
       if (!Array.isArray(retur.batchRestores)) {
         throw new Error('Rincian retur tidak valid. Stok tidak diubah.');
       }
+      const priorSnaps = [];
+      for (const ref of priorRefs) priorSnaps.push(await transaction.get(ref));
+      const priorQty = priorSnaps.reduce((sum, snap) => {
+        if (!snap.exists) return sum;
+        const prior = snap.data() || {};
+        return prior.status !== 'ditolak' ? sum + Number(prior.qty || 0) : sum;
+      }, 0);
+      const itemIndex = Number(retur.itemIndex), qty = Number(retur.qty);
+      const originalItem = Array.isArray(trx.items) ? trx.items[itemIndex] : null;
+      if (!originalItem || !Number.isInteger(itemIndex) || qty <= 0 ||
+          Number(retur.harga) !== Number(originalItem.harga) ||
+          String(retur.namaItem || '') !== String(originalItem.nama || '')) {
+        throw new Error('Rincian retur tidak cocok dengan nota asli. Retur ditahan.');
+      }
+      let expectedTotal;
+      try {
+        expectedTotal = calculateVerifiedReturnAmount(trx, itemIndex, qty, priorQty);
+      } catch (err) {
+        throw new Error(err.message || 'Perhitungan nominal retur tidak valid.');
+      }
+      if (Number(retur.total) !== expectedTotal) {
+        throw new Error('Nominal retur tidak sesuai nilai bersih nota setelah diskon. Retur ditahan untuk pemeriksaan.');
+      }
       const returJenis = String(retur.jenis || '');
+      const originalJenis = String(originalItem.t || originalItem.jenis || '');
+      if (returJenis !== originalJenis) {
+        throw new Error('Jenis item retur tidak sesuai nota asli.');
+      }
       const isStockReturn = returJenis === 'Obat' ||
         (returJenis === 'Paket' && retur.batchRestores.length > 0);
       if (isStockReturn && !retur.batchRestores.length) {
@@ -527,27 +611,28 @@ class FirebaseBackend {
       }
       const obatQty = new Map(), batchQty = new Map(), refs = new Map();
       retur.batchRestores.forEach(item => {
-        const qty = Number(item.qty);
-        if (!item.oid || !item.bid || !Number.isFinite(qty) || qty <= 0) {
+        const amount = Number(item.qty);
+        if (!item.oid || !item.bid || !Number.isFinite(amount) || amount <= 0) {
           throw new Error('Rincian batch retur tidak valid. Stok tidak diubah.');
         }
         const obatPath = 'k_obat/' + item.oid, batchPath = 'k_batch/' + item.bid;
-        obatQty.set(obatPath, (obatQty.get(obatPath) || 0) + qty);
-        batchQty.set(batchPath, (batchQty.get(batchPath) || 0) + qty);
+        obatQty.set(obatPath, (obatQty.get(obatPath) || 0) + amount);
+        batchQty.set(batchPath, (batchQty.get(batchPath) || 0) + amount);
         refs.set(obatPath, this.db.doc(obatPath));
         refs.set(batchPath, this.db.doc(batchPath));
       });
       const snapshots = new Map();
       for (const [path, ref] of refs.entries()) snapshots.set(path, await transaction.get(ref));
-      for (const [path, qty] of obatQty.entries()) {
+      // Semua pembacaan selesai sebelum transaksi mulai menulis.
+      for (const [path, amount] of obatQty.entries()) {
         const snap = snapshots.get(path);
         if (!snap || !snap.exists) throw new Error('Data obat asal tidak ditemukan: ' + path);
-        transaction.update(refs.get(path), { stok: Number(snap.data().stok || 0) + qty, _t: Date.now() });
+        transaction.update(refs.get(path), { stok: Number(snap.data().stok || 0) + amount, _t: Date.now() });
       }
-      for (const [path, qty] of batchQty.entries()) {
+      for (const [path, amount] of batchQty.entries()) {
         const snap = snapshots.get(path);
         if (!snap || !snap.exists) throw new Error('Batch asal tidak ditemukan: ' + path);
-        transaction.update(refs.get(path), { sisa: Number(snap.data().sisa || 0) + qty, _t: Date.now() });
+        transaction.update(refs.get(path), { sisa: Number(snap.data().sisa || 0) + amount, _t: Date.now() });
       }
       const approvedAt = Date.now();
       transaction.update(returRef, {
@@ -556,7 +641,7 @@ class FirebaseBackend {
         diverifikasiPada: approvedAt,
         pengembalian: {
           status: 'menunggu',
-          nominal: Number(retur.total),
+          nominal: expectedTotal,
           metode: null,
           referensi: '',
           dibayarOleh: null,
