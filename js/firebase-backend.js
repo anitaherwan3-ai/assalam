@@ -516,8 +516,14 @@ class FirebaseBackend {
       if (!returSnap.exists) throw new Error('Pengajuan retur tidak ditemukan di cloud.');
       const retur = returSnap.data() || {};
       if (retur.status !== 'menunggu') throw new Error('Retur sudah diproses atau bukan status menunggu.');
-      if (!Array.isArray(retur.batchRestores) || !retur.batchRestores.length) {
-        throw new Error('Data batch asal retur tidak lengkap. Stok tidak diubah.');
+      if (!Array.isArray(retur.batchRestores)) {
+        throw new Error('Rincian retur tidak valid. Stok tidak diubah.');
+      }
+      const returJenis = String(retur.jenis || '');
+      const isStockReturn = returJenis === 'Obat' ||
+        (returJenis === 'Paket' && retur.batchRestores.length > 0);
+      if (isStockReturn && !retur.batchRestores.length) {
+        throw new Error('Data batch asal retur obat tidak lengkap. Stok tidak diubah.');
       }
       const obatQty = new Map(), batchQty = new Map(), refs = new Map();
       retur.batchRestores.forEach(item => {
