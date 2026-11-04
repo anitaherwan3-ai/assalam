@@ -4112,21 +4112,35 @@ function previewRunningTextAdmin() {
   preview.textContent = input.value || 'Pratinjau teks berjalan...';
 }
 
-function actionSaveDisplayTV() {
-  const set      = store.state.set;
+async function actionSaveDisplayTV() {
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';
-
   const vid = parseYouTubeIdAdmin(rawYt);
-  set.youtubeVideoId      = vid || rawYt;
-  set.enableYoutubeDisplay = enableYt;
-  set.runningTextDisplay  = rtxt;
+  const settings = {
+    youtubeVideoId: vid || rawYt,
+    enableYoutubeDisplay: enableYt,
+    runningTextDisplay: rtxt
+  };
 
-  store.logActivity('Ubah', 'Display TV', `YouTube: ${set.youtubeVideoId}, Enable: ${enableYt}`);
-  store.saveLocal();
-  if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
-  showAlert('Pengaturan Layar TV berhasil disimpan dan disinkronkan!', '📺 Display TV');
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.isOnline || !backend.currentProfile ||
+      !['admin', 'pimpinan'].includes(backend.currentProfile.role)) {
+    showAlert('Pengaturan belum disimpan. Pastikan akun Admin/Pimpinan terhubung ke Firebase, lalu coba lagi.', 'Koneksi Cloud');
+    return;
+  }
+
+  try {
+    await backend.saveDisplaySettings(settings);
+    Object.assign(store.state.set, settings);
+    store.logActivity('Ubah', 'Display TV', `YouTube: ${settings.youtubeVideoId}, Enable: ${enableYt}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+    showAlert('Pengaturan Display TV berhasil disimpan ke Cloud dan akan digunakan oleh perangkat lain.', '📺 Display TV');
+  } catch (err) {
+    console.error('Simpan pengaturan Display TV gagal:', err);
+    showAlert(err.message || 'Pengaturan gagal disimpan ke Cloud. Periksa koneksi lalu coba lagi.', 'Gagal Menyimpan');
+  }
 }
 
 // -------------------------------------------------------------
