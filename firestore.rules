@@ -169,6 +169,7 @@ service cloud.firestore {
         (staffActive() && staffProfile().role == 'kasir' &&
           request.resource.data.qtyTerpakai == 0 &&
           request.resource.data.originTrx == true &&
+          document == request.resource.data.trxId + '__' + string(request.resource.data.itemIndex) &&
           !exists(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)) &&
           getAfter(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.id == request.resource.data.trxId);
       allow update: if pimpinan() ||
