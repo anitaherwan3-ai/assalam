@@ -220,16 +220,6 @@ async function doLogin() {
   }
 }
 
-async function activatePimpinanAccount() {
-  const email = val('login-email').trim().toLowerCase();
-  const password = val('login-password');
-  if (!email || !password) {
-    $('login-error').textContent = 'Isi email dan password akun Pimpinan, lalu tekan tombol Aktivasi.';
-    return;
-  }
-  await doLogin();
-}
-
 async function resetLoginPassword() {
   const email = val('login-email').trim().toLowerCase();
   if (!email) {
@@ -4057,18 +4047,6 @@ function viewDisplayTV() {
           Tautan Video YouTube ATAU URL Video MP4
           <input id="dtv-ytId" value="${esc(currentVideoId)}" placeholder="Contoh: https://www.youtube.com/watch?v=... ATAU https://.../video.mp4">
         </label>
-      </div>
-
-      <div style="background:var(--bg);border-left:4px solid var(--warn);padding:14px 16px;border-radius:10px;font-size:12px;color:var(--tx);line-height:1.8;margin-bottom:14px;">
-        <b style="color:var(--warn);font-size:13px;">💡 Mengapa YouTube Muncul Error 153 (Meskipun dari Akun Resmi Kemenkes)?</b><br>
-        Error 153 terjadi <b>bukan karena videonya rusak</b>, melainkan karena sistem YouTube <b>memblokir pemutaran video jika file HTML dibuka langsung dari harddisk komputer (protokol <code>file:///</code>)</b>.<br>
-        <br>
-        <b>Pilihan Solusi Terbaik untuk Klinik Anda:</b>
-        <ol style="margin:6px 0 6px 18px;padding:0;">
-          <li><b>Paling Direkomendasikan (Bebas Error 153 & Bebas Iklan):</b> Gunakan tombol <b>🎬 Video File Lokal</b> di pojok kanan atas Layar TV (<code>display.html</code>) untuk memilih video MP4 langsung dari komputer. Video diputar otomatis terus-menerus secara <b>offline 100% tanpa internet & tanpa iklan</b>!</li>
-          <li><b>Jika Ingin Tetap Memutar YouTube:</b> Jalankan aplikasi via file <b><code>Jalankan_Klinik.bat</code></b> di folder aplikasi (klik 2x). Browser akan membuka <code>http://localhost:8080</code> dan semua video YouTube akan berputar lancar tanpa Error 153.</li>
-          <li><b>Slide Tips Kesehatan Otomatis:</b> Jika kolom ini dikosongkan atau video gagal dibuka, layar TV akan otomatis menampilkan animasi <b>Slide Edukasi Kesehatan Pasien</b> yang elegan dan bermanfaat.</li>
-        </ol>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
