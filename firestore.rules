@@ -182,7 +182,8 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.kasir == staffProfile().u &&
           request.resource.data.lastQty is number && request.resource.data.lastQty > 0 &&
-          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty) ||
+          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty &&
+          request.resource.data.qtyTerpakai <= get(/databases/$(database)/documents/k_trx/$(resource.data.trxId)).data.items[resource.data.itemIndex].qty) ||
         (adminOrPimpinan() &&
           request.resource.data.trxId == resource.data.trxId &&
           request.resource.data.itemIndex == resource.data.itemIndex &&
