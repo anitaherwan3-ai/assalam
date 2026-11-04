@@ -659,6 +659,7 @@ class FirebaseBackend {
       transaction.update(quotaRef, {
         qtyTerpakai: priorQty + qty,
         lastReturId: String(input.id),
+        lastPriorQty: priorQty,
         lastQty: qty,
         _t: now
       });
