@@ -1059,7 +1059,7 @@ class FirebaseBackend {
         // Batasi penulisan berdasarkan hak akses masing-masing peran.
         let writableCollections = this.store.COLLECTIONS.filter(name => name !== 'users');
         if (profile.role === 'kasir') {
-          writableCollections = ['pasien', 'trx', 'shift', 'petty', 'log', 'returJual'];
+          writableCollections = ['pasien', 'shift', 'petty', 'log']; // Nota Kasir wajib dibuat melalui commitCashierTransaction agar kuota retur ikut dibuat atomik.
         } else if (profile.role === 'admin') {
           // Admin hanya menulis data operasional gudang/keuangan; data pasien,
           // transaksi kasir, shift, dan kas kecil tetap menjadi kewenangan Kasir/Pimpinan.
