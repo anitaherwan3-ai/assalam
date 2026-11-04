@@ -919,13 +919,6 @@ function viewTrx() {
           }
         </div>
 
-        <div style="padding:8px 14px;border-top:1px solid var(--bdr);display:flex;gap:8px;align-items:flex-end;">
-          <label style="flex:1;font-size:12px;">Diskon (Rp)
-            <input id="trx-diskon" type="number" min="0" placeholder="0" style="margin-top:3px;">
-          </label>
-          <button class="s" onclick="actionAddDiskon()" style="white-space:nowrap;">Terapkan</button>
-        </div>
-
         <div class="pos-total-bar">
           <span>TOTAL</span>
           <span style="font-size:22px;font-weight:900;">${rp(totalCart)}</span>
@@ -1252,20 +1245,6 @@ function actionAddObatToCart() {
   renderApp();
 }
 
-function actionAddDiskon() {
-  const disk = numVal('trx-diskon');
-  if (disk <= 0) return;
-  cartItems = cartItems.filter(i => i.t !== 'Diskon');
-  cartItems.push({
-    nama: 'Potongan Diskon',
-    t: 'Diskon',
-    harga: -Math.abs(Number(disk)),
-    qty: 1,
-    hpp: 0
-  });
-  renderApp();
-}
-
 async function actionBayarTrx(totalCart) {
   const shift = getCurrentShift();
   if (!shift) {
@@ -1282,8 +1261,15 @@ async function actionBayarTrx(totalCart) {
     showAlert('Keranjang transaksi masih kosong');
     return;
   }
+  // Diskon bebas tidak diperbolehkan; potongan harga hanya melalui harga paket resmi.
+  if (cartItems.some(item =>
+      String(item.t || item.jenis || '') === 'Diskon' ||
+      Number(item.harga || 0) < 0)) {
+    showAlert('Diskon bebas tidak tersedia. Potongan harga hanya berlaku melalui paket layanan yang telah ditetapkan.', 'Transaksi Tidak Valid');
+    return;
+  }
   if (totalCart < 0) {
-    showAlert('Nominal diskon tidak boleh melebihi total tagihan');
+    showAlert('Total transaksi tidak valid.');
     return;
   }
 
