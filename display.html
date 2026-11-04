@@ -636,7 +636,10 @@
     let lastNotifiedCallKey = '';
     function notifyPatientCall(patient, poli) {
       if (!patient) return;
-      const key = String(patient.id || '') || [patient.no || '', patient.nama || '', patient._t || ''].join('|');
+      // ID pasien saja tidak cukup: pasien yang sama bisa dipanggil ulang.
+      // _t berubah setiap panggilan, dan sama pada jalur BroadcastChannel + Firestore,
+      // sehingga panggilan baru berbunyi lagi tetapi snapshot duplikat tidak menggandakan bunyi.
+      const key = [patient.id || patient.no || '', patient._t || ''].join('|');
       if (!key || key === lastNotifiedCallKey) return;
       lastNotifiedCallKey = key;
       const hero = document.getElementById('hero-card');
