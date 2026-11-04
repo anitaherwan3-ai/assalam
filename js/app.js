@@ -2700,10 +2700,11 @@ function viewRiwayat() {
       : (refund && refund.status === 'dibayar'
         ? '<span class="badge-ok">Uang Sudah Dikembalikan</span>'
         : (status === 'disetujui' ? '<span class="badge-warn">Menunggu Pimpinan</span>' : '-'));
-    const actions = status === 'menunggu' && (currentRole === 'admin' || currentRole === 'pimpinan')
+    const processActions = status === 'menunggu' && (currentRole === 'admin' || currentRole === 'pimpinan')
       ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>`
       : (status === 'disetujui' && refund && refund.status === 'menunggu' && currentRole === 'pimpinan'
         ? `<button class="p" onclick="actionPayReturJual('${r.id}')">Catat Uang Kembali</button>` : '');
+    const actions = `<button class="s" onclick="printReturJual('${r.id}')">Nota Retur</button> ${processActions}`;
     const refundDetail = legacyRefund ? 'Periksa catatan lama' : (refund && refund.status === 'dibayar'
       ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') + ' / ' + esc(refund.dibayarOleh || '-') +
         (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '')
@@ -2725,6 +2726,79 @@ function viewRiwayat() {
       <p style="color:var(--mu);font-size:13px;">Retur disetujui Admin untuk mengembalikan stok. Pengembalian uang dicatat terpisah dan hanya dapat dilakukan Pimpinan.</p>
       ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Kasir','Status Retur','Diputuskan Oleh / Waktu','Status Uang','Bukti / Metode / Waktu Bayar','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
   `;
+}
+
+function printReturJual(returId) {
+  const retur = store.get('returJual', returId);
+  if (!retur) { showAlert('Data retur tidak ditemukan.'); return; }
+  const trx = store.get('trx', retur.trxId);
+  const set = store.state.set || {};
+  const refund = retur.pengembalian || null;
+  const statusRetur = retur.status === 'disetujui' ? 'DISETUJUI' :
+    retur.status === 'ditolak' ? 'DITOLAK' : 'MENUNGGU VERIFIKASI';
+  const statusUang = !refund ? 'Belum ada pencatatan pengembalian uang' :
+    refund.status === 'dibayar' ? 'SUDAH DIKEMBALIKAN' : 'MENUNGGU PIMPINAN';
+  const dateText = value => value
+    ? new Date(value).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+    : '-';
+  const modal = $('modal-nota'), body = $('modal-nota-body');
+  if (!modal || !body) return;
+  body.innerHTML = `
+    <div class="nota-box">
+      <div style="text-align:center;">
+        <b style="font-size:15px;">${esc(set.nama || 'Klinik Assalaam Palembang')}</b><br>
+        <span style="font-size:11px;">${esc(set.alamat || '')}</span><br>
+        <span style="font-size:10px;">${esc(set.telp || '')}</span>
+        <hr>
+        <b style="font-size:14px;letter-spacing:1px;">NOTA RETUR</b>
+      </div>
+      <hr>
+      <div style="font-size:11px;line-height:1.6;">
+        <div>No. Retur: <b>${esc(retur.id)}</b></div>
+        <div>Tanggal Pengajuan: <b>${esc(retur.tgl || '-')}</b></div>
+        <div>Nota Asli: <b>${esc(retur.noNota || (trx && trx.no) || retur.trxId || '-')}</b></div>
+        <div>Pasien: <b>${esc(retur.namaPasien || (trx && trx.nama) || '-')}</b></div>
+        <div>Kasir: ${esc(retur.kasir || '-')}</div>
+      </div>
+      <hr>
+      <div style="font-size:11px;line-height:1.6;">
+        <b>Rincian Item Retur</b>
+        <div>Nama item/jasa: <b>${esc(retur.namaItem || '-')}</b></div>
+        <div>Jenis: ${esc(retur.jenis || '-')}</div>
+        <div>Qty: <b>${Number(retur.qty || 0)}</b></div>
+        <div>Harga satuan pada nota asli: <b>${rp(retur.harga || 0)}</b></div>
+        <div>Alasan: ${esc(retur.alasan || '-')}</div>
+        <hr style="border-top:1px dashed #94a3b8;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;">
+          <span>NILAI RETUR</span><span>${rp(retur.total || 0)}</span>
+        </div>
+      </div>
+      <hr>
+      <div style="font-size:11px;line-height:1.6;">
+        <div>Status retur: <b>${statusRetur}</b></div>
+        <div>Diputuskan oleh: ${esc(retur.diverifikasiOleh || '-')}</div>
+        <div>Waktu keputusan: ${dateText(retur.diverifikasiPada)}</div>
+        ${retur.status === 'ditolak' ? '<div>Alasan penolakan: ' + esc(retur.alasanPenolakan || '-') + '</div>' : ''}
+        <hr style="border-top:1px dashed #94a3b8;">
+        <div>Status pengembalian uang: <b>${statusUang}</b></div>
+        ${refund && refund.status === 'dibayar' ? `
+          <div>Nominal dibayar: <b>${rp(refund.nominal || 0)}</b></div>
+          <div>Metode: ${esc(refund.metode || '-')}</div>
+          <div>Referensi: ${esc(refund.referensi || '-')}</div>
+          <div>Dicatat oleh: ${esc(refund.dibayarOleh || '-')}</div>
+          <div>Waktu pembayaran: ${dateText(refund.dibayarPada)}</div>
+        ` : ''}
+      </div>
+      <hr>
+      <div style="font-size:10px;text-align:center;color:#475569;line-height:1.5;">
+        Dokumen ini merupakan catatan penyesuaian retur. Nota transaksi asli tetap tersimpan dan tidak dihapus.
+      </div>
+    </div>
+  `;
+  const waBtn = $('btn-wa-receipt'), labelBtn = $('btn-label-obat-nota');
+  if (waBtn) waBtn.style.display = 'none';
+  if (labelBtn) labelBtn.style.display = 'none';
+  modal.style.display = 'flex';
 }
 
 function actionApproveReturJual(id) {
