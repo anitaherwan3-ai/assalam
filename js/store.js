@@ -83,6 +83,52 @@ const INITIAL_PAKET = [
   }
 ];
 
+// Mengalokasikan diskon nota secara proporsional ke seluruh baris bernilai positif.
+// Pembulatan sisa rupiah memakai metode largest remainder agar total alokasi tepat.
+function calculateNetReturnAmount(trx, itemIndex, qtyReturn, priorQty = 0) {
+  const items = Array.isArray(trx && trx.items) ? trx.items : [];
+  const target = items[Number(itemIndex)];
+  if (!target) throw new Error('Item nota asli tidak ditemukan.');
+  const grossRows = [];
+  let grossTotal = 0, discountTotal = 0;
+  items.forEach((item, index) => {
+    const kind = String(item.t || item.jenis || '');
+    const qty = Number(item.qty || 0);
+    const price = Number(item.harga || 0);
+    if (['Diskon', 'Potongan Diskon'].includes(kind) || price < 0) {
+      discountTotal += Math.round(Math.abs(price * (Number.isFinite(qty) ? qty : 1)));
+      return;
+    }
+    const gross = Math.round(Math.max(0, qty * price));
+    if (gross > 0) {
+      grossRows.push({ index, gross, allocated: 0, remainder: 0 });
+      grossTotal += gross;
+    }
+  });
+  discountTotal = Math.round(discountTotal);
+  if (discountTotal > grossTotal) throw new Error('Diskon nota melebihi nilai barang dan jasa.');
+  if (!grossTotal) throw new Error('Nota tidak memiliki nilai yang dapat diretur.');
+  let allocated = 0;
+  grossRows.forEach(row => {
+    const exact = discountTotal * row.gross / grossTotal;
+    row.allocated = Math.floor(exact);
+    row.remainder = exact - row.allocated;
+    allocated += row.allocated;
+  });
+  let centsLeft = discountTotal - allocated;
+  grossRows.slice().sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+    .slice(0, centsLeft).forEach(row => { row.allocated += 1; });
+  const targetRow = grossRows.find(row => row.index === Number(itemIndex));
+  if (!targetRow) throw new Error('Item nota tidak memiliki nilai retur.');
+  const lineNet = targetRow.gross - targetRow.allocated;
+  const lineQty = Number(target.qty || 0);
+  const before = Number(priorQty || 0), requested = Number(qtyReturn || 0);
+  if (!Number.isFinite(lineQty) || lineQty <= 0 || before < 0 || requested <= 0 ||
+      before + requested > lineQty) throw new Error('Jumlah retur melebihi jumlah pada nota.');
+  return Math.round(lineNet * (before + requested) / lineQty) -
+    Math.round(lineNet * before / lineQty);
+}
+
 class ClinicStore {
   constructor() {
     this.COLLECTIONS = [
@@ -372,7 +418,15 @@ class ClinicStore {
       }
       // Paket layanan tanpa komponen obat tidak mengubah stok.
     }
-    const nilaiRetur = qty * Number(item.harga || 0), now = Date.now();
+    let nilaiRetur;
+    try {
+      nilaiRetur = calculateNetReturnAmount(trx, itemIndex, qty, priorQty);
+    } catch (err) {
+      console.warn('Perhitungan nominal retur gagal:', err);
+      return false;
+    }
+    if (!Number.isFinite(nilaiRetur) || nilaiRetur < 0) return false;
+    const now = Date.now();
     this.state.returJual.unshift({
       id: uid(), status: 'menunggu', tgl: new Date().toISOString().slice(0, 10),
       trxId: trx.id, itemIndex: Number(itemIndex), noNota: trx.no, namaPasien: trx.nama,
