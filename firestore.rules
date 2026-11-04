@@ -195,6 +195,7 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
           request.resource.data.lastQty is number &&
           request.resource.data.lastQty == -getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty &&
+          request.resource.data.qtyTerpakai >= 0 &&
           request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty);
       allow delete: if pimpinan();
     }
