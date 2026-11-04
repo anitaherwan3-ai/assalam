@@ -1012,9 +1012,20 @@
             }
           }
         } else {
-          document.getElementById('active-no').textContent = '-';
-          document.getElementById('active-name').textContent = 'Menunggu panggilan';
-          document.getElementById('active-poli').textContent = 'Poli Umum';
+          // Pertahankan nomor pasien terakhir yang selesai dilayani saat tidak ada panggilan aktif.
+          const lastServed = docs
+            .filter(p => p.tgl === today && p.done === true)
+            .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
+
+          if (lastServed) {
+            document.getElementById('active-no').textContent = lastServed.no || '-';
+            document.getElementById('active-name').textContent = 'Terakhir dilayani: ' + (lastServed.nama || '-');
+            document.getElementById('active-poli').textContent = lastServed.layanan || 'Poli Umum';
+          } else {
+            document.getElementById('active-no').textContent = '-';
+            document.getElementById('active-name').textContent = 'Belum ada pasien dilayani';
+            document.getElementById('active-poli').textContent = 'Poli Umum';
+          }
         }
 
         const nextList = patients.filter(p => !called || p.id !== called.id);
