@@ -75,12 +75,16 @@ function getActiveFilteredTrx() {
 function calculateFinancials() {
   const trxList = getActiveFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
-  const allActiveTrx = (store.state.trx || []).filter(t => !isTrxCancelled(t));
-  const trxById = new Map(allActiveTrx.map(t => [t.id, t]));
-  // Retur dibukukan pada tanggal persetujuan/retur, bukan mengubah tanggal nota asli.
+  const allTrx = store.state.trx || [];
+  const trxById = new Map(allTrx.map(t => [t.id, t]));
+  // Retur dibukukan pada tanggal persetujuan, bukan tanggal nota awal atau pengajuan.
   // Filter metode dan kasir mengikuti transaksi asal agar laporan tidak mencampur kelompok.
-  const approvedReturns = inFilterRange(store.state.returJual || []).filter(r => {
+  const approvedReturns = (store.state.returJual || []).filter(r => {
     if (!(r.status === 'disetujui' || !r.status)) return false;
+    const returnDate = r.diverifikasiPada
+      ? new Date(r.diverifikasiPada).toISOString().slice(0, 10)
+      : (r.tgl || '');
+    if (returnDate && (returnDate < dateFilter.from || returnDate > dateFilter.to)) return false;
     const original = trxById.get(r.trxId);
     if (original && isTrxCancelled(original)) return false;
     const method = original ? original.metode : r.metode;
@@ -3189,8 +3193,11 @@ function initDashboardCharts(fin) {
   });
   // Kurangi retur pada tanggal retur agar tren harian menunjukkan pendapatan bersih periode berjalan.
   (fin.approvedReturns || []).forEach(r => {
-    if (!r.tgl) return;
-    dailyOmset[r.tgl] = (dailyOmset[r.tgl] || 0) - Number(r.total || 0);
+    const returnDate = r.diverifikasiPada
+      ? new Date(r.diverifikasiPada).toISOString().slice(0, 10)
+      : (r.tgl || '');
+    if (!returnDate) return;
+    dailyOmset[returnDate] = (dailyOmset[returnDate] || 0) - Number(r.total || 0);
   });
   const daysSorted = Object.keys(dailyOmset).sort();
   const omsetValues = daysSorted.map(d => dailyOmset[d]);
@@ -3301,10 +3308,6 @@ function viewLabaRugi() {
     ['(-) Retur Obat / Barang Disetujui', `(-) ${rp(fin.returnGoods)}`],
     ['(-) Retur Jasa / Pelayanan Disetujui', `(-) ${rp(fin.returnServices)}`],
     ['<b>PENDAPATAN SETELAH RETUR</b>', `<b>${rp(fin.grossRevenue - fin.returnValue)}</b>`],
-    ['Pendapatan Jasa Konsultasi Dokter (rincian nota)', rp(fin.kons)],
-    ['Pendapatan Tindakan Medis (rincian nota)', rp(fin.tind)],
-    ['Pendapatan Penjualan Obat & Alkes (rincian nota)', rp(fin.obat)],
-    ['<b>(-) Potongan Diskon</b>', `<b>(-) ${rp(fin.disk)}</b>`],
     ['<b>TOTAL PENDAPATAN BERSIH</b>', `<b>${rp(fin.rev)}</b>`],
     ['(-) HPP Obat Terjual', `(-) ${rp(fin.hpp)}`],
     ['(-) Kerugian Obat Rusak & Kedaluwarsa', `(-) ${rp(fin.loss)}`],
@@ -3316,6 +3319,7 @@ function viewLabaRugi() {
   return renderFilterBar() + `
     <div class="card">
       <h2>Laporan Laba Rugi Komprehensif</h2>
+      <p style="font-size:12px;color:var(--mu);">Transaksi bruto menggunakan total nota setelah diskon. Retur dikurangkan satu kali setelah disetujui Admin dan dibukukan pada tanggal persetujuan.</p>
       ${renderTable(['Akun / Pos Keuangan', 'Nominal (Rp)'], pnlRows, { key: 'pnl_tbl' })}
     </div>
   `;
