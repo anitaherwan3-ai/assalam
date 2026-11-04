@@ -606,9 +606,44 @@ class FirebaseBackend {
         throw new Error('Nominal retur dari nota asli tidak valid.');
       }
       if (!Array.isArray(input.batchRestores)) throw new Error('Rincian batch retur tidak valid.');
-      const isStockReturn = jenis === 'Obat' ||
-        (jenis === 'Paket' && input.batchRestores.length > 0);
-      if (isStockReturn && input.batchRestores.length === 0) {
+      // Susun ulang batch dari nota asli memakai offset kuota Cloud, bukan offset cache perangkat.
+      const verifiedBatchRestores = [];
+      const allocateOriginalBatches = (oid, deductions, amount, offset) => {
+        if (!oid || !Array.isArray(deductions)) return amount <= 0;
+        let skip = offset, left = amount;
+        for (const deduction of deductions) {
+          const available = Number(deduction.qty || 0);
+          if (skip >= available) { skip -= available; continue; }
+          const take = Math.min(left, available - skip);
+          if (take > 0) {
+            verifiedBatchRestores.push({
+              oid, bid: String(deduction.bid || ''),
+              qty: take, batchNo: deduction.batchNo || '', ed: deduction.ed || ''
+            });
+            left -= take;
+          }
+          skip = 0;
+          if (left <= 0) break;
+        }
+        return left <= 0;
+      };
+      const directOid = originalItem.oid || (jenis === 'Obat' ? originalItem.id : '');
+      const isPackage = jenis === 'Paket' && Array.isArray(originalItem.items);
+      if (directOid && !allocateOriginalBatches(directOid, originalItem.batchDeductions, qty, priorQty)) {
+        throw new Error('Batch asal pada nota tidak cukup untuk jumlah retur. Stok tidak diubah.');
+      }
+      if (isPackage) {
+        for (const part of originalItem.items) {
+          const partOid = part.type === 'obat' ? (part.oid || part.id) : '';
+          const partQty = (Number(part.qty) || 1) * qty;
+          const partOffset = (Number(part.qty) || 1) * priorQty;
+          if (partOid && !allocateOriginalBatches(partOid, part.batchDeductions, partQty, partOffset)) {
+            throw new Error('Batch obat dalam paket tidak cukup untuk jumlah retur. Stok tidak diubah.');
+          }
+        }
+      }
+      const isStockReturn = jenis === 'Obat' || (jenis === 'Paket' && verifiedBatchRestores.length > 0);
+      if (isStockReturn && verifiedBatchRestores.length === 0) {
         throw new Error('Rincian batch obat asal tidak tersedia. Retur tidak dikirim.');
       }
       const returnData = Object.assign({}, input, {
@@ -616,6 +651,7 @@ class FirebaseBackend {
         quotaId: quotaRef.id, status: 'menunggu',
         total: expectedTotal, harga: Number(originalItem.harga),
         namaItem: String(originalItem.nama || ''),
+        batchRestores: verifiedBatchRestores,
         jenis, kasir: profile.role === 'kasir' ? profile.u : (input.kasir || profile.u),
         tgl: input.tgl || new Date(now).toISOString().slice(0, 10),
         _t: now
