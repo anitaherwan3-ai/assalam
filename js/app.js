@@ -920,8 +920,8 @@ function viewTrx() {
         </div>
 
         <div style="padding:8px 14px;border-top:1px solid var(--bdr);display:flex;gap:8px;align-items:flex-end;">
-          <label style="flex:1;font-size:12px;">Diskon (Rp)
-            <input id="trx-diskon" type="number" min="0" placeholder="0" style="margin-top:3px;">
+          <label style="flex:1;font-size:12px;">Diskon Pelayanan (Rp)
+            <input id="trx-diskon" type="number" min="0" placeholder="Khusus jasa / lab / konsultasi" style="margin-top:3px;">
           </label>
           <button class="s" onclick="actionAddDiskon()" style="white-space:nowrap;">Terapkan</button>
         </div>
@@ -1253,12 +1253,24 @@ function actionAddObatToCart() {
 }
 
 function actionAddDiskon() {
-  const disk = numVal('trx-diskon');
+  const disk = Math.round(numVal('trx-diskon'));
   if (disk <= 0) return;
+  const totalPelayanan = cartItems
+    .filter(i => !['Obat', 'Paket', 'Diskon', 'Potongan Diskon'].includes(String(i.t || i.jenis || '')))
+    .reduce((sum, i) => sum + Math.max(0, Number(i.harga || 0) * Number(i.qty || 0)), 0);
+  if (totalPelayanan <= 0) {
+    showAlert('Diskon pelayanan hanya dapat diberikan jika ada komponen jasa, konsultasi, atau laboratorium.', 'Diskon Tidak Berlaku');
+    return;
+  }
+  if (disk > totalPelayanan) {
+    showAlert(`Diskon pelayanan (${rp(disk)}) tidak boleh melebihi total pelayanan (${rp(totalPelayanan)}). Obat dan paket tidak termasuk dasar diskon ini.`, 'Nominal Diskon Tidak Valid');
+    return;
+  }
   cartItems = cartItems.filter(i => i.t !== 'Diskon');
   cartItems.push({
-    nama: 'Potongan Diskon',
+    nama: 'Potongan Diskon Pelayanan',
     t: 'Diskon',
+    scope: 'pelayanan',
     harga: -Math.abs(Number(disk)),
     qty: 1,
     hpp: 0
