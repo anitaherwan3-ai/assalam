@@ -633,6 +633,22 @@
     let audioCtx = null;
     let audioEnabled = false;
     let currentYtVideoId = '';
+    let lastNotifiedCallKey = '';
+    function notifyPatientCall(patient, poli) {
+      if (!patient) return;
+      const key = String(patient.id || '') || [patient.no || '', patient.nama || '', patient._t || ''].join('|');
+      if (!key || key === lastNotifiedCallKey) return;
+      lastNotifiedCallKey = key;
+      const hero = document.getElementById('hero-card');
+      hero.classList.remove('flash');
+      void hero.offsetWidth;
+      hero.classList.add('flash');
+      if (audioEnabled) {
+        playChime();
+        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 420);
+      }
+    }
+
 
     function enableAudio() {
       if (!audioCtx) {
@@ -648,66 +664,52 @@
       playChime();
     }
 
-    // Pleasant 2-Tone Ding Dong Chime
+    // Digital futuristic notification: soft layered synth chime.
     function playChime() {
       try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         const now = audioCtx.currentTime;
-
-        // Tone 1 (High: 554.37 Hz - C#5)
-        const osc1 = audioCtx.createOscillator();
-        const gain1 = audioCtx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(554.37, now);
-        gain1.gain.setValueAtTime(0.35, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-        osc1.connect(gain1);
-        gain1.connect(audioCtx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.55);
-
-        // Tone 2 (Lower: 440 Hz - A4)
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(440, now + 0.28);
-        gain2.gain.setValueAtTime(0.35, now + 0.28);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.start(now + 0.28);
-        osc2.stop(now + 0.95);
+        const notes = [
+          { freq: 740, delay: 0, duration: 0.42, volume: 0.10, type: 'triangle' },
+          { freq: 988, delay: 0.12, duration: 0.52, volume: 0.075, type: 'sine' },
+          { freq: 1480, delay: 0.22, duration: 0.36, volume: 0.035, type: 'sine' }
+        ];
+        notes.forEach(note => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const start = now + note.delay;
+          osc.type = note.type;
+          osc.frequency.setValueAtTime(note.freq * 0.94, start);
+          osc.frequency.exponentialRampToValueAtTime(note.freq, start + 0.09);
+          gain.gain.setValueAtTime(0.001, start);
+          gain.gain.exponentialRampToValueAtTime(note.volume, start + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + note.duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(start);
+          osc.stop(start + note.duration + 0.03);
+        });
       } catch (e) {
         console.warn('Audio chime error:', e);
       }
     }
 
-    // Voice Announcement in Indonesian
+    // Pengumuman suara manusia melalui voice bahasa Indonesia yang tersedia di perangkat.
     function speakCall(noAntrean, poli) {
-      if (!('speechSynthesis' in window)) return;
+      if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return;
       window.speechSynthesis.cancel();
-
-      // Format spell: "A 0 1 2" -> "A, nol, satu, dua"
-      const chars = noAntrean.split('').map(c => {
-        if (c === '0') return 'nol';
-        return c;
-      }).join(' ');
-
-      const text = `Nomor antrean, ${chars}, silakan menuju, ${poli}`;
-      const utterance = new SpeechSynthesisUtterance(text);
+      const chars = String(noAntrean || '').split('').map(c => c === '0' ? 'nol' : c).join(' ');
+      const utterance = new SpeechSynthesisUtterance(`Nomor antrean, ${chars}. Silakan menuju ${poli || 'Poli Umum'}.`);
       utterance.lang = 'id-ID';
-      utterance.rate = 0.88;
-      utterance.pitch = 1.0;
-
+      utterance.rate = 0.94;
+      utterance.pitch = 0.88;
+      utterance.volume = 0.9;
       const voices = window.speechSynthesis.getVoices();
-      const idVoice = voices.find(v => v.lang.startsWith('id') || v.lang.includes('Indonesian'));
-      if (idVoice) utterance.voice = idVoice;
-
-      setTimeout(() => {
-        window.speechSynthesis.speak(utterance);
-      }, 700);
+      const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
+      const naturalVoice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
+      if (naturalVoice) utterance.voice = naturalVoice;
+      window.speechSynthesis.speak(utterance);
     }
 
     // Digital Clock
@@ -1030,19 +1032,11 @@
     queueChannel.onmessage = event => {
       const { type, patient, poli } = event.data || {};
       if (type === 'CALL_PATIENT') {
-        const hero = document.getElementById('hero-card');
         document.getElementById('active-no').textContent = patient.no;
         document.getElementById('active-name').textContent = patient.nama;
         document.getElementById('active-poli').textContent = poli || patient.layanan || 'Poli Umum';
 
-        hero.classList.remove('flash');
-        void hero.offsetWidth;
-        hero.classList.add('flash');
-
-        if (audioEnabled) {
-          playChime();
-          speakCall(patient.no, poli || patient.layanan || 'Poli Umum');
-        }
+        notifyPatientCall(patient, poli || patient.layanan || 'Poli Umum');
 
         loadDisplayData();
       } else if (type === 'QUEUE_UPDATE') {
@@ -1111,20 +1105,10 @@
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
         if (called) {
-          const hero = document.getElementById('hero-card');
-          const prevNo = document.getElementById('active-no').textContent;
           document.getElementById('active-no').textContent = called.no;
           document.getElementById('active-name').textContent = called.nama;
           document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
-          if (prevNo !== called.no) {
-            hero.classList.remove('flash');
-            void hero.offsetWidth;
-            hero.classList.add('flash');
-            if (audioEnabled) {
-              playChime();
-              speakCall(called.no, called.layanan || 'Poli Umum');
-            }
-          }
+          notifyPatientCall(called, called.layanan || 'Poli Umum');
         } else {
           // Pertahankan nomor pasien terakhir yang selesai dilayani saat tidak ada panggilan aktif.
           const lastServed = docs
