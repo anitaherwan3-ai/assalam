@@ -738,8 +738,9 @@ class FirebaseBackend {
     const trxId = String(initialRetur.trxId || '');
     if (!trxId) throw new Error('Referensi nota pada retur tidak valid.');
     const trxRef = this.db.collection('k_trx').doc(trxId);
-    const relatedReturns = await this.db.collection('k_returJual').where('trxId', '==', trxId).get();
-    const priorRefs = relatedReturns.docs
+    const hasStoredPriorQty = Number.isFinite(Number(initialRetur.priorQty));
+    const priorRefs = hasStoredPriorQty ? [] : (await this.db.collection('k_returJual')
+      .where('trxId', '==', trxId).get()).docs
       .filter(doc => doc.id !== String(returId) &&
         Number(doc.data().itemIndex) === Number(initialRetur.itemIndex) &&
         doc.data().status !== 'ditolak')
