@@ -176,6 +176,7 @@ service cloud.firestore {
           resource.data.trxId == request.resource.data.trxId &&
           resource.data.itemIndex == request.resource.data.itemIndex &&
           request.resource.data.lastReturId is string &&
+          request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
@@ -206,6 +207,7 @@ service cloud.firestore {
         getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.trxId == request.resource.data.trxId &&
         getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.itemIndex == request.resource.data.itemIndex &&
         getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastQty == request.resource.data.qty &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastPriorQty == request.resource.data.priorQty &&
         (!exists(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)) ||
           get(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)).data.status == 'ditolak') &&
         (!('status' in get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data) ||
