@@ -189,6 +189,12 @@ service cloud.firestore {
           request.resource.data.pengembalian.nominal == resource.data.total &&
           request.resource.data.pengembalian.dibayarOleh == ownerDocId() &&
           request.resource.data.pengembalian.metode in ['Tunai', 'Transfer'] &&
+          request.resource.data.pengembalian.nominal is number &&
+          request.resource.data.pengembalian.nominal > 0 &&
+          request.resource.data.pengembalian.dibayarPada is number &&
+          (request.resource.data.pengembalian.metode == 'Tunai' ||
+            (request.resource.data.pengembalian.referensi is string &&
+             request.resource.data.pengembalian.referensi.size() > 0)) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t'])) ||
         // Cache Kasir tidak boleh menghidupkan kembali retur yang sudah diputuskan.
         (kasirOrPimpinan() &&
