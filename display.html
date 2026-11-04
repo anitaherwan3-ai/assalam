@@ -664,47 +664,45 @@
       playChime();
     }
 
-    // Digital futuristic notification: soft layered synth chime.
+    // Station-style two-note announcement chime: warm, clear and restrained.
     function playChime() {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const now = audioCtx.currentTime;
-        const notes = [
-          { freq: 740, delay: 0, duration: 0.42, volume: 0.10, type: 'triangle' },
-          { freq: 988, delay: 0.12, duration: 0.52, volume: 0.075, type: 'sine' },
-          { freq: 1480, delay: 0.22, duration: 0.36, volume: 0.035, type: 'sine' }
-        ];
-        notes.forEach(note => {
+        [
+          { freq: 659.25, delay: 0, duration: 0.62, volume: 0.13 },
+          { freq: 523.25, delay: 0.34, duration: 0.78, volume: 0.12 }
+        ].forEach(note => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
-          const start = now + note.delay;
-          osc.type = note.type;
-          osc.frequency.setValueAtTime(note.freq * 0.94, start);
-          osc.frequency.exponentialRampToValueAtTime(note.freq, start + 0.09);
-          gain.gain.setValueAtTime(0.001, start);
-          gain.gain.exponentialRampToValueAtTime(note.volume, start + 0.025);
-          gain.gain.exponentialRampToValueAtTime(0.001, start + note.duration);
+          const startAt = now + note.delay;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(note.freq, startAt);
+          gain.gain.setValueAtTime(0.001, startAt);
+          gain.gain.linearRampToValueAtTime(note.volume, startAt + 0.035);
+          gain.gain.setValueAtTime(note.volume * 0.82, startAt + 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, startAt + note.duration);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
-          osc.start(start);
-          osc.stop(start + note.duration + 0.03);
+          osc.start(startAt);
+          osc.stop(startAt + note.duration + 0.04);
         });
       } catch (e) {
         console.warn('Audio chime error:', e);
       }
     }
 
-    // Pengumuman suara manusia melalui voice bahasa Indonesia yang tersedia di perangkat.
+    // Pengumuman antrean dengan gaya petugas stasiun: formal, tenang, dan jelas.
     function speakCall(noAntrean, poli) {
       if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return;
       window.speechSynthesis.cancel();
       const chars = String(noAntrean || '').split('').map(c => c === '0' ? 'nol' : c).join(' ');
-      const utterance = new SpeechSynthesisUtterance(`Nomor antrean, ${chars}. Silakan menuju ${poli || 'Poli Umum'}.`);
+      const utterance = new SpeechSynthesisUtterance(`Perhatian. Nomor antrean, ${chars}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
       utterance.lang = 'id-ID';
-      utterance.rate = 0.94;
-      utterance.pitch = 0.88;
-      utterance.volume = 0.9;
+      utterance.rate = 0.88;
+      utterance.pitch = 0.92;
+      utterance.volume = 1;
       const voices = window.speechSynthesis.getVoices();
       const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
       const naturalVoice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
