@@ -182,7 +182,7 @@ service cloud.firestore {
           resource.data.pengembalian.status == 'menunggu' &&
           request.resource.data.pengembalian.status == 'dibayar' &&
           request.resource.data.pengembalian.nominal == resource.data.total &&
-          request.resource.data.pengembalian.dibayarOleh == staffProfile().u &&
+          request.resource.data.pengembalian.dibayarOleh == ownerDocId() &&
           request.resource.data.pengembalian.metode in ['Tunai', 'Transfer'] &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t'])) ||
         // Cache Kasir tidak boleh menghidupkan kembali retur yang sudah diputuskan.
