@@ -3538,9 +3538,10 @@ function viewPengawasanRetur() {
         ' / ' + esc(refund.dibayarOleh || '-') +
         (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID') : '')
       : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') : (refund ? '-' : 'Periksa arsip lama'));
-    const action = status === 'disetujui' && refund && refund.status === 'menunggu'
+    const payAction = status === 'disetujui' && refund && refund.status === 'menunggu'
       ? '<button class="p" onclick="actionPayReturJual(\'' + esc(r.id) + '\')">Catat Uang Kembali</button>'
       : '';
+    const action = '<button class="s" onclick="printReturJual(\'' + esc(r.id) + '\')">Nota Retur</button> ' + payAction;
     return [esc(r.tgl || '-'), esc(r.noNota || '-'), esc(r.namaPasien || '-'),
       esc(r.namaItem || '-'), Number(r.qty || 0), rp(r.total), esc(r.kasir || '-'),
       statusRetur, statusUang, detail, action];
