@@ -161,9 +161,46 @@ service cloud.firestore {
     match /k_beli/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_biaya/{document} { allow read, write: if adminOrPimpinan(); }
     match /k_loss/{document} { allow read, write: if adminOrPimpinan(); }
+    match /k_returKuota/{document} {
+      allow read: if signedIn();
+      // Pimpinan menyiapkan kuota historis; Kasir hanya membuat kuota nol
+      // bersamaan dengan pembuatan nota baru.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.qtyTerpakai == 0 &&
+          request.resource.data.originTrx == true &&
+          !exists(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)) &&
+          getAfter(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.id == request.resource.data.trxId);
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.trxId == request.resource.data.trxId &&
+          resource.data.itemIndex == request.resource.data.itemIndex &&
+          request.resource.data.lastReturId is string &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&
+          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty) ||
+        (adminOrPimpinan() &&
+          request.resource.data.trxId == resource.data.trxId &&
+          request.resource.data.itemIndex == resource.data.itemIndex &&
+          request.resource.data.lastReturId is string &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'ditolak' &&
+          get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
+          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai - request.resource.data.lastQty);
+      allow delete: if pimpinan();
+    }
+
     match /k_returJual/{document} {
       allow read: if signedIn();
       allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu' &&
+        request.resource.data.quotaId is string &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastReturId == document &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.trxId == request.resource.data.trxId &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.itemIndex == request.resource.data.itemIndex &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastQty == request.resource.data.qty &&
         (!exists(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)) ||
           get(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)).data.status == 'ditolak') &&
         (!('status' in get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data) ||
