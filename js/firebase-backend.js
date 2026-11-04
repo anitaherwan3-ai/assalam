@@ -1,34 +1,46 @@
 // Firebase Firestore Free Backend Adapter
 // Firebase Web SDK v10 Compat - Dioptimalkan untuk Sinkronisasi Pendapatan & Anti Tumpang Tindih
 // Hitung nilai bersih baris retur dari nota asli; jangan percaya nominal kiriman Kasir.
+// Hitung nilai bersih baris retur dari nota asli; jangan percaya nominal kiriman Kasir.
+// Diskon pelayanan dialokasikan hanya ke jasa/konsultasi/lab; nota lama tanpa scope tetap kompatibel.
 function calculateVerifiedReturnAmount(trx, itemIndex, qtyReturn, priorQty = 0) {
   const items = Array.isArray(trx && trx.items) ? trx.items : [];
   const target = items[Number(itemIndex)];
   if (!target) throw new Error('Item nota asli tidak ditemukan.');
-  const rows = [];
-  let grossTotal = 0, discountTotal = 0;
+  const rows = [], discounts = [];
   items.forEach((item, index) => {
     const kind = String(item.t || item.jenis || '');
     const qty = Number(item.qty || 0), price = Number(item.harga || 0);
     if (['Diskon', 'Potongan Diskon'].includes(kind) || price < 0) {
-      discountTotal += Math.round(Math.abs(price * (Number.isFinite(qty) ? qty : 1)));
+      const amount = Math.round(Math.abs(price * (Number.isFinite(qty) ? qty : 1)));
+      if (amount > 0) discounts.push({ amount, scope: String(item.scope || 'all') });
       return;
     }
     const gross = Math.round(Math.max(0, qty * price));
-    if (gross > 0) { rows.push({ index, gross, allocated: 0, remainder: 0 }); grossTotal += gross; }
+    if (gross > 0) rows.push({ index, gross, allocated: 0 });
   });
-  discountTotal = Math.round(discountTotal);
-  if (discountTotal > grossTotal || grossTotal <= 0) throw new Error('Nilai diskon/nota asli tidak valid.');
-  let allocated = 0;
-  rows.forEach(row => {
-    const exact = discountTotal * row.gross / grossTotal;
-    row.allocated = Math.floor(exact);
-    row.remainder = exact - row.allocated;
-    allocated += row.allocated;
-  });
-  const left = discountTotal - allocated;
-  rows.slice().sort((a, b) => b.remainder - a.remainder || a.index - b.index)
-    .slice(0, left).forEach(row => { row.allocated += 1; });
+  for (const discount of discounts) {
+    const eligible = rows.filter(row => {
+      const kind = String(items[row.index].t || items[row.index].jenis || '');
+      if (discount.scope === 'pelayanan') return !['Obat', 'Paket'].includes(kind);
+      if (discount.scope === 'obat') return kind === 'Obat';
+      return true;
+    });
+    const basis = eligible.reduce((sum, row) => sum + row.gross - row.allocated, 0);
+    if (discount.amount > basis) throw new Error('Diskon melebihi nilai komponen yang memenuhi syarat.');
+    if (discount.amount <= 0 || basis <= 0) continue;
+    let allocatedNow = 0;
+    const shares = eligible.map(row => {
+      const remaining = row.gross - row.allocated;
+      const exact = discount.amount * remaining / basis;
+      const floor = Math.floor(exact);
+      allocatedNow += floor;
+      return { row, floor, remainder: exact - floor };
+    });
+    shares.slice().sort((a, b) => b.remainder - a.remainder || a.row.index - b.row.index)
+      .slice(0, discount.amount - allocatedNow).forEach(share => { share.row.allocated += 1; });
+    shares.forEach(share => { share.row.allocated += share.floor; });
+  }
   const row = rows.find(entry => entry.index === Number(itemIndex));
   if (!row) throw new Error('Item nota tidak dapat diretur.');
   const lineQty = Number(target.qty || 0), before = Number(priorQty || 0), requested = Number(qtyReturn || 0);
