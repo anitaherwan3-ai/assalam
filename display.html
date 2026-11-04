@@ -818,6 +818,15 @@
     let displayCloudSettings = null;
     let displayCloudPatients = null;
 
+    // Tanggal operasional klinik mengikuti WIB (Palembang), bukan UTC perangkat.
+    function getDisplayTodayWIB() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date());
+      const part = type => (parts.find(item => item.type === type) || {}).value || '';
+      return `${part('year')}-${part('month')}-${part('day')}`;
+    }
+
     // State & Sync Loader
     function loadDisplayData() {
       try {
@@ -826,7 +835,7 @@
         const data = JSON.parse(raw);
         const set = Object.assign({}, data.set || {}, displayCloudSettings || {});
         const patientData = Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []);
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getDisplayTodayWIB();
 
         // Update clinic branding
         document.getElementById('display-clinic-name').textContent = set.nama || 'Klinik Sehat Pratama';
@@ -838,8 +847,8 @@
         }
 
         // Update running text
-        if (set.runningTextDisplay) {
-          document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+        if (Object.prototype.hasOwnProperty.call(set, 'runningTextDisplay')) {
+          document.getElementById('marquee-text').textContent = String(set.runningTextDisplay || '');
         }
 
         // Atur Video YouTube atau Fallback
@@ -851,11 +860,17 @@
         const patients = patientData.filter(p => p.tgl === today && !p.done);
         
         // Active called patient
-        const called = patientData.filter(p => p.tgl === today && p.calling).pop();
+        const called = patientData
+          .filter(p => p.tgl === today && p.calling && !p.done)
+          .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
         if (called) {
-          document.getElementById('active-no').textContent = called.no;
-          document.getElementById('active-name').textContent = called.nama;
+          document.getElementById('active-no').textContent = called.no || '-';
+          document.getElementById('active-name').textContent = called.nama || '';
           document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
+        } else {
+          document.getElementById('active-no').textContent = '-';
+          document.getElementById('active-name').textContent = 'Menunggu panggilan';
+          document.getElementById('active-poli').textContent = 'Poli Umum';
         }
 
         // Waiting list
@@ -946,22 +961,29 @@
           } else if (set.logo) {
             document.getElementById('display-logo').textContent = set.logo;
           }
-          if (set.runningTextDisplay) {
-            document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+          if (Object.prototype.hasOwnProperty.call(set, 'runningTextDisplay')) {
+            document.getElementById('marquee-text').textContent = String(set.runningTextDisplay || '');
           }
           const enableVideo = set.enableYoutubeDisplay !== false;
           const videoId = parseYoutubeId(set.youtubeVideoId || '');
           showVideoOrFallback(videoId, enableVideo);
         }
-      }, err => console.log('FB Display settings listener error:', err));
+      }, err => {
+        displayCloudStarted = false;
+        console.warn('FB Display settings listener error:', err);
+      });
 
       // 2. Listen Realtime Patient Queue. Access requires a valid staff Firebase session.
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
-        const today = new Date().toISOString().slice(0, 10);
-        const docs = snapshot.docs.map(d => d.data());
+        const today = getDisplayTodayWIB();
+        // Sertakan ID dokumen; diperlukan agar pasien yang sedang dipanggil
+        // tidak muncul kembali di daftar antrean.
+        const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
         const patients = docs.filter(p => p.tgl === today && !p.done);
-        const called = docs.filter(p => p.tgl === today && p.calling).pop();
+        const called = docs
+          .filter(p => p.tgl === today && p.calling && !p.done)
+          .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
         if (called) {
           const hero = document.getElementById('hero-card');
@@ -978,6 +1000,10 @@
               speakCall(called.no, called.layanan || 'Poli Umum');
             }
           }
+        } else {
+          document.getElementById('active-no').textContent = '-';
+          document.getElementById('active-name').textContent = 'Menunggu panggilan';
+          document.getElementById('active-poli').textContent = 'Poli Umum';
         }
 
         const nextList = patients.filter(p => !called || p.id !== called.id);
@@ -999,7 +1025,10 @@
             </div>
           `).join('');
         }
-      }, err => console.log('FB Display queue listener error:', err));
+      }, err => {
+        displayCloudStarted = false;
+        console.warn('FB Display queue listener error:', err);
+      });
     }
 
     try {
@@ -1007,42 +1036,16 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseDisplayConfig);
         fbDisplayDb = firebase.firestore();
         fbDisplayAuth = firebase.auth();
-        // Display TV uses the authenticated session already opened in the same browser.
-        // A separate TV device must first sign in through the main app.
-        fbDisplayAuth.onAuthStateChanged(async user => {
+        // Gunakan sesi Firebase yang sama dengan aplikasi utama.
+        // Firestore Security Rules menjadi pemeriksa hak akses untuk tiap listener,
+        // sehingga validasi profil di halaman TV tidak menduplikasi aturan backend.
+        fbDisplayAuth.onAuthStateChanged(user => {
           if (!user) {
+            displayCloudStarted = false;
             console.info('Display TV menunggu sesi login Firebase dari aplikasi utama.');
             return;
           }
-          try {
-            // Validasi role melalui profil Firestore, sama seperti aplikasi utama.
-            // Tidak bergantung pada custom claims yang memerlukan Admin SDK.
-            const email = String(user.email || '').toLowerCase();
-            const ownerIds = {
-              'praktekrose@gmail.com': 'praktekrose',
-              'nursalim42@gmail.com': 'pimpinan2'
-            };
-            if (!email) {
-              console.warn('Email sesi Firebase tidak tersedia untuk Display TV.');
-              return;
-            }
-            const profileId = ownerIds[email] || email;
-            const profileSnap = await fbDisplayDb.collection('k_users').doc(profileId).get();
-            if (!profileSnap.exists) {
-              console.warn('Profil akun belum tersedia untuk Display TV.');
-              return;
-            }
-            const profile = profileSnap.data() || {};
-            const role = ownerIds[email] ? 'pimpinan' : profile.role;
-            if (profile.active !== true || !['pimpinan', 'admin', 'kasir'].includes(role) ||
-                (profile.email && String(profile.email).toLowerCase() !== email)) {
-              console.warn('Akun tidak memiliki akses Display TV.');
-              return;
-            }
-            startDisplayCloudListeners();
-          } catch (err) {
-            console.warn('Validasi sesi Display TV gagal:', err);
-          }
+          startDisplayCloudListeners();
         });
       }
     } catch (e) {
