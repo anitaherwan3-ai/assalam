@@ -2705,10 +2705,15 @@ function viewRiwayat() {
       : (status === 'disetujui' && refund && refund.status === 'menunggu' && currentRole === 'pimpinan'
         ? `<button class="p" onclick="actionPayReturJual('${r.id}')">Catat Uang Kembali</button>` : '');
     const refundDetail = legacyRefund ? 'Periksa catatan lama' : (refund && refund.status === 'dibayar'
-      ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') + ' / ' + esc(refund.dibayarOleh || '-')
+      ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') + ' / ' + esc(refund.dibayarOleh || '-') +
+        (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : '')
       : '-');
+    const decisionDetail = status === 'menunggu' ? '-' :
+      esc(r.diverifikasiOleh || '-') + (r.diverifikasiPada
+        ? ' / ' + new Date(r.diverifikasiPada).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+        : ' / waktu tidak tersedia');
     return [esc(r.tgl), esc(r.noNota), esc(r.namaPasien), esc(r.namaItem), Number(r.qty || 0), rp(r.total),
-      esc(r.alasan), esc(r.kasir || '-'), badge, refundBadge, refundDetail, actions];
+      esc(r.alasan), esc(r.kasir || '-'), badge, decisionDetail, refundBadge, refundDetail, actions];
   });
   return renderFilterBar() + `
     <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
@@ -2718,7 +2723,7 @@ function viewRiwayat() {
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
     <div class="card"><h2>Riwayat Retur Penjualan Pasien</h2>
       <p style="color:var(--mu);font-size:13px;">Retur disetujui Admin untuk mengembalikan stok. Pengembalian uang dicatat terpisah dan hanya dapat dilakukan Pimpinan.</p>
-      ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Petugas','Status Retur','Status Uang','Bukti/Metode','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
+      ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Kasir','Status Retur','Diputuskan Oleh / Waktu','Status Uang','Bukti / Metode / Waktu Bayar','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
   `;
 }
 
