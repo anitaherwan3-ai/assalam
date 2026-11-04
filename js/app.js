@@ -2758,13 +2758,38 @@ function openModalReturJual(trxId) {
     return;
   }
 
-  const itemOptions = trx.items.map((it, idx) => ({
-    value: String(idx),
-    label: `${it.nama} (Qty: ${it.qty} @ ${rp(it.harga)})`
-  }));
+  // Item yang sudah diretur penuh (menunggu atau disetujui) tidak ditampilkan lagi.
+  // Retur yang ditolak tidak mengurangi kuota sehingga item dapat diajukan kembali.
+  const itemOptions = trx.items.reduce((options, it, idx) => {
+    const jenis = it.t || it.jenis || '';
+    const directOid = it.oid || (jenis === 'Obat' ? it.id : '');
+    const isPackage = jenis === 'Paket' && Array.isArray(it.items);
+    const isService = !directOid && !isPackage &&
+      !['Diskon', 'Potongan Diskon'].includes(jenis) &&
+      Number(it.harga || 0) >= 0;
+    if (!directOid && !isPackage && !isService) return options;
+
+    const priorQty = (store.state.returJual || [])
+      .filter(r => r && r.trxId === trx.id &&
+        Number(r.itemIndex) === idx && r.status !== 'ditolak')
+      .reduce((sum, r) => sum + Number(r.qty || 0), 0);
+    const remainingQty = Math.max(0, Number(it.qty || 0) - priorQty);
+    if (remainingQty <= 0) return options;
+
+    options.push({
+      value: String(idx),
+      label: `${it.nama} (Sisa dapat diretur: ${remainingQty} dari ${it.qty})`
+    });
+    return options;
+  }, []);
+
+  if (!itemOptions.length) {
+    showAlert('Semua item pada nota ini sudah diretur penuh atau tidak memenuhi syarat retur.', 'Tidak Ada Item Retur');
+    return;
+  }
 
   showFormModal(`Retur Penjualan - Nota ${trx.no}`, [
-    ['itemIdx', 'Pilih Item yang Ingin Diretur', 'select', '0', itemOptions],
+    ['itemIdx', 'Pilih Item yang Ingin Diretur', 'select', itemOptions[0].value, itemOptions],
     ['qty', 'Jumlah Qty Retur', 'number', 1],
     ['alasan', 'Alasan Retur Pasien', 'text', 'Salah beli / obat tidak terpakai']
   ], res => {
