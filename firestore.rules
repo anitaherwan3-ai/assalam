@@ -100,7 +100,12 @@ service cloud.firestore {
     match /k_trx/{document} {
       allow read: if signedIn();
       allow create: if kasirOrPimpinan();
-      allow update: if (kasirOrPimpinan() && (!('status' in request.resource.data) || request.resource.data.status != 'dibatalkan')) ||
+      // Nota yang sudah dibuat bersifat historis: Kasir/Pimpinan hanya boleh
+      // memperbarui metadata sinkronisasi, bukan item, qty, harga, diskon, atau total.
+      allow update: if
+        (kasirOrPimpinan() &&
+          (!('status' in resource.data) || resource.data.status != 'dibatalkan') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t'])) ||
         (adminOrPimpinan() && (!('status' in resource.data) || resource.data.status != 'dibatalkan') &&
           request.resource.data.status == 'dibatalkan' &&
           request.resource.data.diff(resource.data).affectedKeys()
