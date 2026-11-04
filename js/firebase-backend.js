@@ -1028,6 +1028,34 @@ class FirebaseBackend {
     }, 600);
   }
 
+  async saveDisplaySettings(settings) {
+    if (!this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Firebase belum terhubung. Pengaturan tidak disimpan.');
+    }
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) {
+      throw new Error('Hanya Admin atau Pimpinan yang dapat mengubah pengaturan Display TV.');
+    }
+
+    this.updateBadge('syncing');
+    try {
+      // Simpan hanya tiga field Display TV agar konfigurasi lain tidak tertimpa.
+      await this.db.doc('klinik_config/settings').set({
+        set: {
+          youtubeVideoId: String(settings.youtubeVideoId || ''),
+          enableYoutubeDisplay: settings.enableYoutubeDisplay !== false,
+          runningTextDisplay: String(settings.runningTextDisplay || '')
+        }
+      }, { merge: true });
+      this.updateBadge('online');
+      return true;
+    } catch (err) {
+      console.error('Simpan pengaturan Display TV ke Firebase gagal:', err);
+      this.updateBadge('error', err.code || err.message);
+      throw err;
+    }
+  }
+
   async performPush(state) {
     if (!this.db || !this.auth || !this.auth.currentUser) return;
     this.updateBadge('syncing');
