@@ -541,6 +541,148 @@ class FirebaseBackend {
     return true;
   }
 
+  // Pengajuan retur dan reservasi kuota dilakukan atomik di Cloud.
+  returQuotaId(trxId, itemIndex) {
+    return String(trxId) + '__' + String(Number(itemIndex));
+  }
+
+  async submitReturJual(returInput) {
+    const profile = this.currentProfile;
+    if (!profile || !['kasir', 'pimpinan'].includes(profile.role) ||
+        !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Akun Kasir/Pimpinan belum terhubung ke Firebase.');
+    }
+    const input = Object.assign({}, returInput || {});
+    const trxId = String(input.trxId || '');
+    const itemIndex = Number(input.itemIndex);
+    const qty = Number(input.qty);
+    if (!trxId || !Number.isInteger(itemIndex) || itemIndex < 0 ||
+        !Number.isFinite(qty) || qty <= 0 || !input.id) {
+      throw new Error('Data pengajuan retur tidak lengkap atau tidak valid.');
+    }
+    if (profile.role === 'kasir' && input.kasir !== profile.u) {
+      throw new Error('Kasir hanya dapat mengajukan retur atas identitasnya sendiri.');
+    }
+    const trxRef = this.db.collection('k_trx').doc(trxId);
+    const returRef = this.db.collection('k_returJual').doc(String(input.id));
+    const quotaRef = this.db.collection('k_returKuota').doc(this.returQuotaId(trxId, itemIndex));
+    const cancelRef = this.db.collection('k_batalTrx').doc(trxId);
+    const now = Date.now();
+    let saved = null;
+    await this.db.runTransaction(async transaction => {
+      const trxSnap = await transaction.get(trxRef);
+      const quotaSnap = await transaction.get(quotaRef);
+      const returSnap = await transaction.get(returRef);
+      const cancelSnap = await transaction.get(cancelRef);
+      if (!trxSnap.exists) throw new Error('Nota asli tidak ditemukan di Cloud.');
+      if (returSnap.exists) throw new Error('ID pengajuan retur sudah pernah digunakan.');
+      const trx = trxSnap.data() || {};
+      if (trx.status === 'dibatalkan') throw new Error('Nota asli sudah dibatalkan.');
+      if (cancelSnap.exists && (cancelSnap.data() || {}).status !== 'ditolak') {
+        throw new Error('Nota memiliki pengajuan pembatalan yang belum ditolak.');
+      }
+      if (!quotaSnap.exists) {
+        throw new Error('Kuota retur nota ini belum disiapkan. Minta Pimpinan menjalankan sinkronisasi kuota retur terlebih dahulu.');
+      }
+      const quota = quotaSnap.data() || {};
+      if (String(quota.trxId) !== trxId || Number(quota.itemIndex) !== itemIndex) {
+        throw new Error('Data kuota retur tidak cocok dengan nota.');
+      }
+      const originalItem = Array.isArray(trx.items) ? trx.items[itemIndex] : null;
+      if (!originalItem) throw new Error('Item pada nota asli tidak ditemukan.');
+      const priorQty = Number(quota.qtyTerpakai || 0);
+      const invoiceQty = Number(originalItem.qty || 0);
+      if (!Number.isFinite(priorQty) || priorQty < 0 || priorQty + qty > invoiceQty) {
+        throw new Error('Jumlah retur melebihi sisa kuota pada nota asli. Muat ulang data retur.');
+      }
+      const jenis = String(originalItem.t || originalItem.jenis || '');
+      if (String(input.namaItem || '') !== String(originalItem.nama || '') ||
+          Number(input.harga) !== Number(originalItem.harga) ||
+          String(input.jenis || '') !== jenis) {
+        throw new Error('Rincian item retur tidak cocok dengan nota asli.');
+      }
+      const expectedTotal = calculateVerifiedReturnAmount(trx, itemIndex, qty, priorQty);
+      if (!Number.isFinite(expectedTotal) || expectedTotal < 0) {
+        throw new Error('Nominal retur dari nota asli tidak valid.');
+      }
+      if (!Array.isArray(input.batchRestores)) throw new Error('Rincian batch retur tidak valid.');
+      const isStockReturn = jenis === 'Obat' ||
+        (jenis === 'Paket' && input.batchRestores.length > 0);
+      if (isStockReturn && input.batchRestores.length === 0) {
+        throw new Error('Rincian batch obat asal tidak tersedia. Retur tidak dikirim.');
+      }
+      const returnData = Object.assign({}, input, {
+        id: String(input.id), trxId, itemIndex, qty, priorQty,
+        quotaId: quotaRef.id, status: 'menunggu',
+        total: expectedTotal, harga: Number(originalItem.harga),
+        namaItem: String(originalItem.nama || ''),
+        jenis, kasir: profile.role === 'kasir' ? profile.u : (input.kasir || profile.u),
+        tgl: input.tgl || new Date(now).toISOString().slice(0, 10),
+        _t: now
+      });
+      transaction.update(quotaRef, {
+        qtyTerpakai: priorQty + qty,
+        lastReturId: String(input.id),
+        lastQty: qty,
+        _t: now
+      });
+      transaction.set(returRef, returnData);
+      saved = returnData;
+    });
+    return saved;
+  }
+
+  // Inisialisasi kuota untuk nota lama. Dokumen yang sudah ada tidak pernah ditimpa.
+  async migrateReturKuota() {
+    const profile = this.currentProfile;
+    if (!profile || profile.role !== 'pimpinan' ||
+        !this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Hanya Pimpinan yang dapat menyiapkan kuota retur nota lama.');
+    }
+    const [trxSnapshot, returSnapshot] = await Promise.all([
+      this.db.collection('k_trx').get(),
+      this.db.collection('k_returJual').get()
+    ]);
+    const byTrx = new Map();
+    returSnapshot.docs.forEach(doc => {
+      const r = doc.data() || {};
+      if (!r.trxId || r.status === 'ditolak') return;
+      const key = String(r.trxId) + '__' + String(Number(r.itemIndex));
+      if (!byTrx.has(key)) byTrx.set(key, []);
+      byTrx.get(key).push(doc.ref);
+    });
+    let created = 0, existed = 0;
+    for (const trxDoc of trxSnapshot.docs) {
+      const trx = trxDoc.data() || {};
+      if (trx.status === 'dibatalkan' || !Array.isArray(trx.items)) continue;
+      for (let itemIndex = 0; itemIndex < trx.items.length; itemIndex++) {
+        const quotaRef = this.db.collection('k_returKuota').doc(this.returQuotaId(trxDoc.id, itemIndex));
+        const priorRefs = byTrx.get(this.returQuotaId(trxDoc.id, itemIndex)) || [];
+        const didCreate = await this.db.runTransaction(async transaction => {
+          const currentQuota = await transaction.get(quotaRef);
+          const currentTrx = await transaction.get(trxDoc.ref);
+          const priorSnaps = [];
+          for (const ref of priorRefs) priorSnaps.push(await transaction.get(ref));
+          if (currentQuota.exists) return false;
+          if (!currentTrx.exists || (currentTrx.data() || {}).status === 'dibatalkan') return false;
+          const qtyUsed = priorSnaps.reduce((sum, snap) => {
+            if (!snap.exists) return sum;
+            const r = snap.data() || {};
+            return r.status !== 'ditolak' ? sum + Number(r.qty || 0) : sum;
+          }, 0);
+          transaction.set(quotaRef, {
+            trxId: trxDoc.id, itemIndex,
+            qtyTerpakai: qtyUsed, _t: Date.now(),
+            migratedBy: profile.u || profile.email || '-'
+          });
+          return true;
+        });
+        if (didCreate) created++; else existed++;
+      }
+    }
+    return { created, existed, invoices: trxSnapshot.size };
+  }
+
   // Persetujuan retur memverifikasi ulang nominal terhadap nota asli di Cloud.
   async approveReturJual(returId) {
     const profile = this.currentProfile;
@@ -578,11 +720,13 @@ class FirebaseBackend {
       }
       const priorSnaps = [];
       for (const ref of priorRefs) priorSnaps.push(await transaction.get(ref));
-      const priorQty = priorSnaps.reduce((sum, snap) => {
-        if (!snap.exists) return sum;
-        const prior = snap.data() || {};
-        return prior.status !== 'ditolak' ? sum + Number(prior.qty || 0) : sum;
-      }, 0);
+      const priorQty = Number.isFinite(Number(retur.priorQty))
+        ? Number(retur.priorQty)
+        : priorSnaps.reduce((sum, snap) => {
+            if (!snap.exists) return sum;
+            const prior = snap.data() || {};
+            return prior.status !== 'ditolak' ? sum + Number(prior.qty || 0) : sum;
+          }, 0);
       const itemIndex = Number(retur.itemIndex), qty = Number(retur.qty);
       const originalItem = Array.isArray(trx.items) ? trx.items[itemIndex] : null;
       if (!originalItem || !Number.isInteger(itemIndex) || qty <= 0 ||
@@ -666,6 +810,20 @@ class FirebaseBackend {
       const snap = await transaction.get(ref);
       if (!snap.exists || (snap.data() || {}).status !== 'menunggu') {
         throw new Error('Retur tidak ditemukan atau sudah pernah diproses.');
+      }
+      const retur = snap.data() || {};
+      const quotaRef = retur.quotaId
+        ? this.db.collection('k_returKuota').doc(String(retur.quotaId))
+        : null;
+      const quotaSnap = quotaRef ? await transaction.get(quotaRef) : null;
+      if (quotaSnap && quotaSnap.exists) {
+        const quota = quotaSnap.data() || {};
+        const nextQty = Number(quota.qtyTerpakai || 0) - Number(retur.qty || 0);
+        if (nextQty < 0) throw new Error('Kuota retur tidak konsisten. Minta Pimpinan memeriksa data.');
+        transaction.update(quotaRef, {
+          qtyTerpakai: nextQty, lastReturId: String(returId),
+          lastQty: -Number(retur.qty || 0), _t: now
+        });
       }
       transaction.update(ref, {
         status: 'ditolak',
@@ -774,6 +932,13 @@ class FirebaseBackend {
       });
       if (patientSnap.exists) transaction.update(patientRef, { done: true, _t: now });
       transaction.set(trxRef, trx);
+      (Array.isArray(trx.items) ? trx.items : []).forEach((item, itemIndex) => {
+        const quotaRef = this.db.collection('k_returKuota').doc(this.returQuotaId(trx.id, itemIndex));
+        transaction.set(quotaRef, {
+          trxId: String(trx.id), itemIndex, qtyTerpakai: 0,
+          originTrx: true, _t: now
+        });
+      });
     });
     return true;
   }
@@ -824,7 +989,8 @@ class FirebaseBackend {
           writableCollections = writableCollections.filter(name => !['pasien', 'trx', 'petty'].includes(name));
         }
 
-        // Retur hanya ditulis Kasir saat mengajukan; keputusan dan pembayaran memakai transaksi Cloud khusus.\n        writableCollections = writableCollections.filter(name => name !== 'batalTrx' && (profile.role === 'kasir' || name !== 'returJual'));
+        // Retur hanya ditulis Kasir saat mengajukan; keputusan dan pembayaran memakai transaksi Cloud khusus.\n        // Semua retur harus melalui submit/approve/reject/pay transaction khusus.
+        writableCollections = writableCollections.filter(name => name !== 'batalTrx' && name !== 'returJual');
 
         for (const col of writableCollections) {
           const items = state[col] || [];
