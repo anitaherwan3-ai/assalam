@@ -827,6 +827,19 @@
       return `${part('year')}-${part('month')}-${part('day')}`;
     }
 
+    // Kompatibilitas data lama: sebelum tanggal operasional diseragamkan ke WIB,
+    // pasien yang didaftarkan dini hari dapat memiliki tgl UTC kemarin.
+    // Timestamp pendaftaran memastikan hanya data yang benar-benar dibuat hari ini yang ikut tampil.
+    function isDisplayTodayPatient(patient) {
+      if (!patient) return false;
+      const today = getDisplayTodayWIB();
+      if (patient.tgl === today) return true;
+      const start = new Date(`${today}T00:00:00+07:00`).getTime();
+      const end = start + 24 * 60 * 60 * 1000;
+      const createdAt = Number(patient._t || 0);
+      return createdAt >= start && createdAt < end;
+    }
+
     // State & Sync Loader
     function loadDisplayData() {
       try {
@@ -857,11 +870,11 @@
         showVideoOrFallback(videoId, enableVideo);
 
         // Patients waiting today
-        const patients = patientData.filter(p => p.tgl === today && !p.done);
+        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done);
         
         // Active called patient
         const called = patientData
-          .filter(p => p.tgl === today && p.calling && !p.done)
+          .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
         if (called) {
           document.getElementById('active-no').textContent = called.no || '-';
@@ -871,7 +884,7 @@
           // Jika tidak ada pasien yang sedang dipanggil, tampilkan pasien
           // terakhir yang sudah dilayani agar nomor terakhir tetap terlihat.
           const lastServed = patientData
-            .filter(p => p.tgl === today && p.done === true)
+            .filter(p => isDisplayTodayPatient(p) && p.done === true)
             .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
           if (lastServed) {
@@ -991,9 +1004,9 @@
         // tidak muncul kembali di daftar antrean.
         const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
-        const patients = docs.filter(p => p.tgl === today && !p.done);
+        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done);
         const called = docs
-          .filter(p => p.tgl === today && p.calling && !p.done)
+          .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
         if (called) {
@@ -1014,7 +1027,7 @@
         } else {
           // Pertahankan nomor pasien terakhir yang selesai dilayani saat tidak ada panggilan aktif.
           const lastServed = docs
-            .filter(p => p.tgl === today && p.done === true)
+            .filter(p => isDisplayTodayPatient(p) && p.done === true)
             .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
           if (lastServed) {
