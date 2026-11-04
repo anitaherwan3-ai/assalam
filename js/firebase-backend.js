@@ -812,8 +812,10 @@ class FirebaseBackend {
         throw new Error('Retur tidak ditemukan atau sudah pernah diproses.');
       }
       const retur = snap.data() || {};
-      const quotaRef = retur.quotaId
-        ? this.db.collection('k_returKuota').doc(String(retur.quotaId))
+      const quotaId = retur.quotaId || (retur.trxId != null && retur.itemIndex != null
+        ? this.returQuotaId(retur.trxId, retur.itemIndex) : '');
+      const quotaRef = quotaId
+        ? this.db.collection('k_returKuota').doc(String(quotaId))
         : null;
       const quotaSnap = quotaRef ? await transaction.get(quotaRef) : null;
       if (quotaSnap && quotaSnap.exists) {
