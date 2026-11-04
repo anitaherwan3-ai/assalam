@@ -2825,7 +2825,7 @@ function openModalReturJual(trxId) {
     ['itemIdx', 'Pilih Item yang Ingin Diretur', 'select', itemOptions[0].value, itemOptions],
     ['qty', 'Jumlah Qty Retur', 'number', 1],
     ['alasan', 'Alasan Retur Pasien', 'text', 'Salah beli / obat tidak terpakai']
-  ], res => {
+  ], async res => {
     const idx = parseInt(res.itemIdx, 10);
     const success = store.processReturJual({
       trxId: trx.id,
@@ -2833,13 +2833,23 @@ function openModalReturJual(trxId) {
       qtyRetur: Number(res.qty),
       alasan: res.alasan
     });
-
-    if (success) {
-      showAlert('Pengajuan retur berhasil dikirim dan menunggu verifikasi Admin. Stok belum berubah.', 'Retur Menunggu Verifikasi');
-      renderApp();
-    } else {
+    if (!success) {
       showAlert('Gagal memproses retur. Periksa kembali jumlah qty retur.');
+      return;
     }
+    const localRetur = (store.state.returJual || [])[0];
+    try {
+      if (!localRetur) throw new Error('Data pengajuan retur lokal tidak ditemukan.');
+      const saved = await window.firebaseBackend.submitReturJual(localRetur);
+      Object.assign(localRetur, saved);
+      store.saveLocal(false);
+      showAlert('Pengajuan retur berhasil dikirim dan kuotanya terkunci di Cloud. Stok belum berubah.', 'Retur Menunggu Verifikasi');
+    } catch (err) {
+      store.state.returJual = (store.state.returJual || []).filter(r => r.id !== (localRetur && localRetur.id));
+      store.saveLocal(false);
+      showAlert(err.message || 'Pengajuan retur gagal dikirim. Stok tidak berubah.', 'Gagal');
+    }
+    renderApp();
   });
 }
 
@@ -3419,6 +3429,19 @@ function viewUtang() {
 // -------------------------------------------------------------
 // MODULE: PENGAWASAN RETUR (PIMPINAN)
 // -------------------------------------------------------------
+async function actionMigrateReturKuota() {
+  if (currentRole !== 'pimpinan') return;
+  showConfirm('Siapkan kuota retur untuk seluruh nota lama? Proses ini hanya membuat dokumen pengaman terpisah dan tidak mengubah nota, stok, atau riwayat retur.', async () => {
+    try {
+      const result = await window.firebaseBackend.migrateReturKuota();
+      showAlert('Penyiapan kuota selesai. Dokumen baru: ' + result.created + ', sudah tersedia: ' + result.existed + ', nota diperiksa: ' + result.invoices + '. Tidak ada nota atau stok yang diubah.', 'Kuota Retur Siap');
+    } catch (err) {
+      showAlert(err.message || 'Penyiapan kuota retur gagal.', 'Gagal');
+    }
+    renderApp();
+  });
+}
+
 function viewPengawasanRetur() {
   if (currentRole !== 'pimpinan') return '<div class="card">Akses hanya untuk Pimpinan.</div>';
   const list = (store.state.returJual || []).slice().sort((a, b) =>
@@ -3452,6 +3475,10 @@ function viewPengawasanRetur() {
     <div class="card">
       <h2>Pengawasan Pengembalian Uang Retur</h2>
       <p style="color:var(--mu);font-size:13px;">Pimpinan hanya perlu mencatat pengembalian uang setelah retur disetujui Admin. Persetujuan stok tetap ditangani Admin; setiap pembayaran tercatat satu kali beserta metode, referensi, petugas, dan waktunya.</p>
+      <div style="margin:10px 0 14px;">
+        <button class="s p" onclick="actionMigrateReturKuota()">Siapkan / Periksa Kuota Retur Nota Lama</button>
+        <p style="color:var(--mu);font-size:12px;">Jalankan sekali setelah pembaruan. Dokumen kuota terpisah; nota, stok, dan riwayat lama tidak ditimpa.</p>
+      </div>
       <div class="grid">
         <div class="kpi"><span>Menunggu Pengembalian</span><b>${pendingPayment}</b></div>
         <div class="kpi"><span>Sudah Dikembalikan</span><b>${paid}</b></div>
