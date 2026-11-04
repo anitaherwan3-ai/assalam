@@ -75,17 +75,41 @@ function getActiveFilteredTrx() {
 function calculateFinancials() {
   const trxList = getActiveFilteredTrx();
   const allItems = trxList.flatMap(t => t.items || []);
-  const approvedReturns = inFilterRange(store.state.returJual || []).filter(r => r.status === 'disetujui' || !r.status);
+  const allActiveTrx = (store.state.trx || []).filter(t => !isTrxCancelled(t));
+  const trxById = new Map(allActiveTrx.map(t => [t.id, t]));
+  // Retur dibukukan pada tanggal persetujuan/retur, bukan mengubah tanggal nota asli.
+  // Filter metode dan kasir mengikuti transaksi asal agar laporan tidak mencampur kelompok.
+  const approvedReturns = inFilterRange(store.state.returJual || []).filter(r => {
+    if (!(r.status === 'disetujui' || !r.status)) return false;
+    const original = trxById.get(r.trxId);
+    if (original && isTrxCancelled(original)) return false;
+    const method = original ? original.metode : r.metode;
+    const cashier = original ? original.kasir : r.kasir;
+    if (dateFilter.metode && method !== dateFilter.metode) return false;
+    if (dateFilter.kasir && cashier !== dateFilter.kasir) return false;
+    return true;
+  });
+  const grossRevenue = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
   const returnValue = approvedReturns.reduce((sum, r) => sum + Number(r.total || 0), 0);
-  const returnHpp = approvedReturns.reduce((sum, r) => sum + Number(r.hpp || 0) * Number(r.qty || 0), 0);
+  const returnGoods = approvedReturns.filter(r => ['Obat', 'Paket'].includes(r.jenis || ''))
+    .reduce((sum, r) => sum + Number(r.total || 0), 0);
+  const returnServices = returnValue - returnGoods;
+  const returnHpp = approvedReturns.filter(r => ['Obat', 'Paket'].includes(r.jenis || ''))
+    .reduce((sum, r) => sum + Number(r.hpp || 0) * Number(r.qty || 0), 0);
+  const refundPaid = approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'dibayar')
+    .reduce((sum, r) => sum + Number(r.pengembalian.nominal || r.total || 0), 0);
+  const refundPending = approvedReturns.filter(r => r.pengembalian && r.pengembalian.status === 'menunggu')
+    .reduce((sum, r) => sum + Number(r.pengembalian.nominal || r.total || 0), 0);
+  const legacyReturnValue = approvedReturns.filter(r => !r.pengembalian)
+    .reduce((sum, r) => sum + Number(r.total || 0), 0);
   const sumByJenis = j => allItems.filter(i => (i.t || i.jenis) === j)
     .reduce((s, x) => s + Number(x.harga || 0) * Number(x.qty || 0), 0) -
     approvedReturns.filter(r => (r.jenis || '') === j).reduce((s, r) => s + Number(r.total || 0), 0);
-  // Omset dan HPP bersih setelah retur disetujui Admin.
-  const rev = trxList.reduce((s, t) => s + Number(t.total || 0), 0) - returnValue;
+  // Pendapatan bersih = transaksi bruto dikurangi retur yang sudah disetujui.
+  const rev = grossRevenue - returnValue;
   const hpp = allItems.filter(i => (i.t || i.jenis) === 'Obat' || (i.t || i.jenis) === 'Paket')
     .reduce((s, x) => s + Number(x.hpp || 0) * Number(x.qty || 0), 0) - returnHpp;
-  
+
   const loss = inFilterRange(store.state.loss).reduce((s, l) => s + Number(l.nilai || 0), 0);
   const op = inFilterRange(store.state.biaya)
     .filter(b => b.status === 'approved')
@@ -96,25 +120,21 @@ function calculateFinancials() {
   const tind = sumByJenis('Tindakan');
   const obat = sumByJenis('Obat');
   const paket = sumByJenis('Paket');
-  const disk = Math.abs(sumByJenis('Diskon')); // Diskon absolut
+  const disk = Math.abs(sumByJenis('Diskon'));
 
-  // Total Modal Awal Shift dalam Rentang Filter (jika ada)
   const totalModalAwalShift = inFilterRange(store.state.shift || []).reduce((s, sh) => s + Number(sh.modal || 0), 0);
-
-  // Laba bersih = Total Omset - HPP - Kerugian Obat - Biaya Operasional - Kas Kecil
   const laba = rev - hpp - loss - op - pc;
 
-  return { 
-    trxList, rev, hpp, loss, op, pc, kons, tind, obat, paket, disk, laba,
-    totalModalAwalShift,
+  return {
+    trxList, approvedReturns, grossRevenue, returnValue, returnGoods, returnServices,
+    refundPaid, refundPending, legacyReturnValue, rev, hpp, loss, op, pc,
+    kons, tind, obat, paket, disk, laba, totalModalAwalShift,
     totalKasDiTangan: totalModalAwalShift +
       trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0) -
       approvedReturns.filter(r =>
-        // Pertahankan perlakuan kas historis untuk retur lama yang belum memiliki data pembayaran.
         (r.metode === 'Tunai' && !r.pengembalian) ||
         (r.pengembalian && r.pengembalian.status === 'dibayar' && r.pengembalian.metode === 'Tunai'))
         .reduce((s, r) => s + Number(r.pengembalian ? (r.pengembalian.nominal || r.total || 0) : (r.total || 0)), 0) - pc
-    // Kas laci = modal awal + transaksi tunai - kas kecil; QRIS/transfer tidak masuk laci.
   };
 }
 
@@ -3084,10 +3104,23 @@ function viewDashboard() {
 
   return renderFilterBar() + `
     <div class="grid">
-      <div class="kpi"><span>Total Omset (Pendapatan Murni)</span><b>${rp(fin.rev)}</b></div>
-      <div class="kpi"><span>Jumlah Kunjungan Pasien</span><b>${k} Pasien</b></div>
-      <div class="kpi"><span>Rata-Rata per Pasien</span><b>${rp(avg)}</b></div>
+      <div class="kpi"><span>Transaksi Bruto</span><b>${rp(fin.grossRevenue)}</b></div>
+      <div class="kpi"><span>Retur Disetujui</span><b>(-) ${rp(fin.returnValue)}</b></div>
+      <div class="kpi"><span>Omzet Bersih</span><b>${rp(fin.rev)}</b></div>
+      <div class="kpi"><span>Jumlah Nota Pasien</span><b>${k}</b></div>
+      <div class="kpi"><span>Rata-Rata Bersih per Nota</span><b>${rp(avg)}</b></div>
       <div class="kpi"><span>Laba Bersih Operasional</span><b class="${fin.laba < 0 ? 'badge-bad' : 'badge-ok'}">${rp(fin.laba)}</b></div>
+    </div>
+    <div class="card">
+      <h2>Rincian Retur pada Periode Terpilih</h2>
+      ${renderTable(['Komponen', 'Nilai'], [
+        ['Retur obat/barang', rp(fin.returnGoods)],
+        ['Retur jasa/pelayanan', rp(fin.returnServices)],
+        ['Total retur disetujui', '<b>' + rp(fin.returnValue) + '</b>'],
+        ['Refund sudah dibayarkan', rp(fin.refundPaid)],
+        ['Refund menunggu pembayaran', rp(fin.refundPending)],
+        ['Retur lama perlu rekonsiliasi', rp(fin.legacyReturnValue)]
+      ], { key: 'dashboard_return_summary' })}
     </div>
 
     <div class="card" style="border-left:4px solid var(--am);">
@@ -3154,6 +3187,11 @@ function initDashboardCharts(fin) {
   trxList.forEach(t => {
     dailyOmset[t.tgl] = (dailyOmset[t.tgl] || 0) + Number(t.total || 0);
   });
+  // Kurangi retur pada tanggal retur agar tren harian menunjukkan pendapatan bersih periode berjalan.
+  (fin.approvedReturns || []).forEach(r => {
+    if (!r.tgl) return;
+    dailyOmset[r.tgl] = (dailyOmset[r.tgl] || 0) - Number(r.total || 0);
+  });
   const daysSorted = Object.keys(dailyOmset).sort();
   const omsetValues = daysSorted.map(d => dailyOmset[d]);
 
@@ -3164,7 +3202,7 @@ function initDashboardCharts(fin) {
       data: {
         labels: daysSorted.length ? daysSorted : ['Hari Ini'],
         datasets: [{
-          label: 'Omset (Rp)',
+          label: 'Omzet Bersih (Rp)',
           data: omsetValues.length ? omsetValues : [0],
           borderColor: '#0f766e',
           backgroundColor: 'rgba(15, 118, 110, 0.15)',
@@ -3259,9 +3297,13 @@ function viewLabaRugi() {
   });
 
   const pnlRows = [
-    ['Pendapatan Jasa Konsultasi Dokter', rp(fin.kons)],
-    ['Pendapatan Tindakan Medis', rp(fin.tind)],
-    ['Pendapatan Penjualan Obat & Alkes', rp(fin.obat)],
+    ['Total Transaksi Bruto', rp(fin.grossRevenue)],
+    ['(-) Retur Obat / Barang Disetujui', `(-) ${rp(fin.returnGoods)}`],
+    ['(-) Retur Jasa / Pelayanan Disetujui', `(-) ${rp(fin.returnServices)}`],
+    ['<b>PENDAPATAN SETELAH RETUR</b>', `<b>${rp(fin.grossRevenue - fin.returnValue)}</b>`],
+    ['Pendapatan Jasa Konsultasi Dokter (rincian nota)', rp(fin.kons)],
+    ['Pendapatan Tindakan Medis (rincian nota)', rp(fin.tind)],
+    ['Pendapatan Penjualan Obat & Alkes (rincian nota)', rp(fin.obat)],
     ['<b>(-) Potongan Diskon</b>', `<b>(-) ${rp(fin.disk)}</b>`],
     ['<b>TOTAL PENDAPATAN BERSIH</b>', `<b>${rp(fin.rev)}</b>`],
     ['(-) HPP Obat Terjual', `(-) ${rp(fin.hpp)}`],
@@ -3283,7 +3325,8 @@ function viewLabaRugi() {
 // MODULE: ARUS KAS (PIMPINAN)
 // -------------------------------------------------------------
 function viewArusKas() {
-  const trxList = getActiveFilteredTrx();
+  const fin = calculateFinancials();
+  const trxList = fin.trxList;
   const totalMasuk = trxList.reduce((s, t) => s + Number(t.total || 0), 0);
   const masukTunai = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const masukNonTunai = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
@@ -3291,7 +3334,8 @@ function viewArusKas() {
   const beliLunas = inFilterRange(store.state.beli).filter(b => b.lunas).reduce((s, b) => s + Number(b.total || 0), 0);
   const biayaOp = inFilterRange(store.state.biaya).filter(b => b.status === 'approved').reduce((s, b) => s + Number(b.jml || 0), 0);
   const pettyOut = inFilterRange(store.state.petty).reduce((s, p) => s + Number(p.jml || 0), 0);
-  const totalKeluar = beliLunas + biayaOp + pettyOut;
+  const refundOut = fin.refundPaid;
+  const totalKeluar = beliLunas + biayaOp + pettyOut + refundOut;
   const arusKasBersih = totalMasuk - totalKeluar;
 
   return renderFilterBar() + `
@@ -3316,6 +3360,9 @@ function viewArusKas() {
           ['Pembayaran Faktur Supplier Obat', rp(beliLunas)],
           ['Biaya Operasional & Honor Dokter', rp(biayaOp)],
           ['Kas Kecil', rp(pettyOut)],
+          ['Pengembalian uang retur yang sudah dibayar', rp(refundOut)],
+          ['Refund disetujui, belum dibayar (belum menjadi kas keluar)', rp(fin.refundPending)],
+          ['Retur lama tanpa bukti pembayaran (perlu rekonsiliasi)', rp(fin.legacyReturnValue)],
           ['<b>Total Arus Kas Keluar</b>', `<b>${rp(totalKeluar)}</b>`]
         ],
         { key: 'cf_out' }
