@@ -429,7 +429,8 @@ class ClinicStore {
     const now = Date.now();
     this.state.returJual.unshift({
       id: uid(), status: 'menunggu', tgl: new Date().toISOString().slice(0, 10),
-      trxId: trx.id, itemIndex: Number(itemIndex), noNota: trx.no, namaPasien: trx.nama,
+      trxId: trx.id, itemIndex: Number(itemIndex), quotaId: String(trx.id) + '__' + String(Number(itemIndex)), priorQty,
+      noNota: trx.no, namaPasien: trx.nama,
       namaItem: item.nama, oid: directOid || '', jenis, hpp: Number(item.hpp || 0),
       metode: trx.metode || '', qty, harga: Number(item.harga || 0), total: nilaiRetur,
       batchRestores, alasan: alasan || 'Retur Pasien',
