@@ -784,13 +784,50 @@ class FirebaseBackend {
       if (returJenis !== originalJenis) {
         throw new Error('Jenis item retur tidak sesuai nota asli.');
       }
+      // Jangan percaya batchRestores yang dikirim perangkat. Hitung ulang dari nota
+      // asli dan kuota Cloud agar tidak ada stok/batch fiktif yang dapat dipulihkan.
+      const verifiedBatchRestores = [];
+      const allocateOriginalBatches = (oid, deductions, amount, offset) => {
+        if (!oid || !Array.isArray(deductions)) return amount <= 0;
+        let skip = offset, left = amount;
+        for (const deduction of deductions) {
+          const available = Number(deduction.qty || 0);
+          if (skip >= available) { skip -= available; continue; }
+          const take = Math.min(left, available - skip);
+          if (take > 0) {
+            verifiedBatchRestores.push({
+              oid, bid: String(deduction.bid || ''), qty: take,
+              batchNo: deduction.batchNo || '', ed: deduction.ed || ''
+            });
+            left -= take;
+          }
+          skip = 0;
+          if (left <= 0) break;
+        }
+        return left <= 0;
+      };
+      const directOid = originalItem.oid || (returJenis === 'Obat' ? originalItem.id : '');
+      const isPackage = returJenis === 'Paket' && Array.isArray(originalItem.items);
+      if (directOid && !allocateOriginalBatches(directOid, originalItem.batchDeductions, qty, priorQty)) {
+        throw new Error('Batch asal pada nota tidak cukup. Stok tidak diubah.');
+      }
+      if (isPackage) {
+        for (const part of originalItem.items) {
+          const partOid = part.type === 'obat' ? (part.oid || part.id) : '';
+          const partQty = (Number(part.qty) || 1) * qty;
+          const partOffset = (Number(part.qty) || 1) * priorQty;
+          if (partOid && !allocateOriginalBatches(partOid, part.batchDeductions, partQty, partOffset)) {
+            throw new Error('Batch obat dalam paket tidak cukup. Stok tidak diubah.');
+          }
+        }
+      }
       const isStockReturn = returJenis === 'Obat' ||
-        (returJenis === 'Paket' && retur.batchRestores.length > 0);
-      if (isStockReturn && !retur.batchRestores.length) {
+        (returJenis === 'Paket' && verifiedBatchRestores.length > 0);
+      if (isStockReturn && !verifiedBatchRestores.length) {
         throw new Error('Data batch asal retur obat tidak lengkap. Stok tidak diubah.');
       }
       const obatQty = new Map(), batchQty = new Map(), refs = new Map();
-      retur.batchRestores.forEach(item => {
+      verifiedBatchRestores.forEach(item => {
         const amount = Number(item.qty);
         if (!item.oid || !item.bid || !Number.isFinite(amount) || amount <= 0) {
           throw new Error('Rincian batch retur tidak valid. Stok tidak diubah.');
