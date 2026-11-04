@@ -969,7 +969,6 @@
           showVideoOrFallback(videoId, enableVideo);
         }
       }, err => {
-        displayCloudStarted = false;
         console.warn('FB Display settings listener error:', err);
       });
 
@@ -1026,7 +1025,6 @@
           `).join('');
         }
       }, err => {
-        displayCloudStarted = false;
         console.warn('FB Display queue listener error:', err);
       });
     }
