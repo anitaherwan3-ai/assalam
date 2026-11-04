@@ -27,7 +27,7 @@ let dateFilter = {
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
-  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
@@ -36,7 +36,7 @@ const TAB_ICONS = {
   'Stok Opname': '📋', 'Kartu Stok': '📒', 'Riwayat Transaksi': '🗂️', 'Verifikasi': '✅', 'Ekspor': '📤',
   'Display TV': '📺',
   'Dashboard': '📊', 'Data Pasien': '👥', 'Stok Obat': '💊', 'Kartu Stok': '📒', 'Laba Rugi': '📈', 'Arus Kas': '💱', 'Utang': '🧮',
-  'Approval': '✍️', 'Log Aktivitas': '🕘', 'Pengguna': '👤', 'Pengaturan': '⚙️'
+  'Approval': '✍️', 'Pengawasan Retur': '↩️', 'Log Aktivitas': '🕘', 'Pengguna': '👤', 'Pengaturan': '⚙️'
 };
 
 // Helper: Cari data dalam filter range
@@ -3337,6 +3337,52 @@ function viewUtang() {
 }
 
 // -------------------------------------------------------------
+// MODULE: PENGAWASAN RETUR (PIMPINAN)
+// -------------------------------------------------------------
+function viewPengawasanRetur() {
+  if (currentRole !== 'pimpinan') return '<div class="card">Akses hanya untuk Pimpinan.</div>';
+  const list = (store.state.returJual || []).slice().sort((a, b) =>
+    Number(b.diverifikasiPada || b._t || 0) - Number(a.diverifikasiPada || a._t || 0)
+  );
+  const pendingPayment = list.filter(r => r.status === 'disetujui' && r.pengembalian && r.pengembalian.status === 'menunggu').length;
+  const paid = list.filter(r => r.status === 'disetujui' && r.pengembalian && r.pengembalian.status === 'dibayar').length;
+  const legacy = list.filter(r => r.status === 'disetujui' && !r.pengembalian).length;
+  const rows = list.map(r => {
+    const status = r.status || 'disetujui';
+    const refund = r.pengembalian || null;
+    const statusRetur = status === 'menunggu' ? '<span class="badge-warn">Menunggu Admin</span>' :
+      status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
+    const statusUang = status !== 'disetujui' ? '-' : (!refund
+      ? '<span class="badge-warn">Retur Lama - Perlu Rekonsiliasi</span>'
+      : (refund.status === 'dibayar' ? '<span class="badge-ok">Sudah Dikembalikan</span>' :
+        '<span class="badge-warn">Menunggu Pimpinan</span>'));
+    const detail = refund && refund.status === 'dibayar'
+      ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') +
+        ' / ' + esc(refund.dibayarOleh || '-') +
+        (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID') : '')
+      : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') : (refund ? '-' : 'Periksa arsip lama'));
+    const action = status === 'disetujui' && refund && refund.status === 'menunggu'
+      ? '<button class="p" onclick="actionPayReturJual(\'' + esc(r.id) + '\')">Catat Uang Kembali</button>'
+      : '';
+    return [esc(r.tgl || '-'), esc(r.noNota || '-'), esc(r.namaPasien || '-'),
+      esc(r.namaItem || '-'), Number(r.qty || 0), rp(r.total), esc(r.kasir || '-'),
+      statusRetur, statusUang, detail, action];
+  });
+  return `
+    <div class="card">
+      <h2>Pengawasan Pengembalian Uang Retur</h2>
+      <p style="color:var(--mu);font-size:13px;">Pimpinan hanya perlu mencatat pengembalian uang setelah retur disetujui Admin. Persetujuan stok tetap ditangani Admin; setiap pembayaran tercatat satu kali beserta metode, referensi, petugas, dan waktunya.</p>
+      <div class="grid">
+        <div class="kpi"><span>Menunggu Pengembalian</span><b>${pendingPayment}</b></div>
+        <div class="kpi"><span>Sudah Dikembalikan</span><b>${paid}</b></div>
+        <div class="kpi"><span>Retur Lama Perlu Rekonsiliasi</span><b>${legacy}</b></div>
+      </div>
+      ${renderTable(['Tanggal','No. Nota','Pasien','Item','Qty','Nilai Retur','Kasir','Status Retur','Status Uang','Bukti/Metode/Petugas','Tindakan'], rows, { key: 'pimpinan_pengawasan_retur' })}
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // MODULE: APPROVAL PENGELUARAN BESAR (PIMPINAN)
 // -------------------------------------------------------------
 function viewApproval() {
@@ -4256,6 +4302,7 @@ function renderApp() {
     case 'Arus Kas': content = viewArusKas(); break;
     case 'Utang': content = viewUtang(); break;
     case 'Approval': content = viewApproval(); break;
+    case 'Pengawasan Retur': content = viewPengawasanRetur(); break;
     case 'Log Aktivitas': content = viewLog(); break;
     case 'Pengguna': content = viewPengguna(); break;
     case 'Pengaturan': content = viewPengaturan(); break;
