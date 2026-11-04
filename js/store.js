@@ -334,7 +334,12 @@ class ClinicStore {
     const jenis = item.t || item.jenis || '';
     const directOid = item.oid || (jenis === 'Obat' ? item.id : '');
     const isPackage = jenis === 'Paket' && Array.isArray(item.items);
-    if (!directOid && !isPackage) return false;
+    // Jasa (konsultasi, tindakan, laboratorium, dan tarif non-obat lain)
+    // tidak memiliki stok/batch, tetapi tetap dapat diretur berdasarkan nota.
+    const isService = !directOid && !isPackage &&
+      !['Diskon', 'Potongan Diskon'].includes(jenis) &&
+      Number(item.harga || 0) >= 0;
+    if (!directOid && !isPackage && !isService) return false;
     const priorQty = (this.state.returJual || []).filter(r => r.trxId === trx.id &&
       Number(r.itemIndex) === Number(itemIndex) && r.status !== 'ditolak')
       .reduce((sum, r) => sum + Number(r.qty || 0), 0);
@@ -359,13 +364,13 @@ class ClinicStore {
     };
     if (directOid) {
       if (!allocate(directOid, item.batchDeductions, qty, priorQty)) return false;
-    } else {
+    } else if (isPackage) {
       for (const part of item.items) {
         const oid = part.type === 'obat' ? (part.oid || part.id) : '';
         if (oid && !allocate(oid, part.batchDeductions, (Number(part.qty) || 1) * qty,
           (Number(part.qty) || 1) * priorQty)) return false;
       }
-      if (!batchRestores.length) return false;
+      // Paket layanan tanpa komponen obat tidak mengubah stok.
     }
     const nilaiRetur = qty * Number(item.harga || 0), now = Date.now();
     this.state.returJual.unshift({
@@ -385,7 +390,11 @@ class ClinicStore {
     const user = window.currentUser || {};
     if (!['admin', 'pimpinan'].includes(user.role)) return false;
     const retur = this.get('returJual', returId);
-    if (!retur || retur.status !== 'menunggu' || !Array.isArray(retur.batchRestores) || !retur.batchRestores.length) return false;
+    if (!retur || retur.status !== 'menunggu' || !Array.isArray(retur.batchRestores)) return false;
+    const returJenis = retur.jenis || '';
+    const returIsStock = ['Obat', 'Paket'].includes(returJenis) &&
+      (returJenis === 'Obat' || (retur.batchRestores || []).length > 0);
+    if (returIsStock && !retur.batchRestores.length) return false;
     for (const item of retur.batchRestores) {
       if (!this.getObat(item.oid) || !this.get('batch', item.bid) || Number(item.qty) <= 0) return false;
     }
