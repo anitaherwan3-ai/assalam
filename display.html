@@ -870,7 +870,7 @@
         } else {
           // Jika tidak ada pasien yang sedang dipanggil, tampilkan pasien
           // terakhir yang sudah dilayani agar nomor terakhir tetap terlihat.
-          const lastServed = docs
+          const lastServed = patientData
             .filter(p => p.tgl === today && p.done === true)
             .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
