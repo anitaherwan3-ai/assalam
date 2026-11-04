@@ -3163,19 +3163,11 @@ function viewDashboard() {
     </div>
 
     <div class="card">
-      <h2>Komposisi Pendapatan Pasien</h2>
-      ${renderTable(
-        ['Komponen', 'Nominal', 'Persentase terhadap Omset'],
-        [
-          ['Jasa Konsultasi Dokter', rp(fin.kons), pct(fin.kons, fin.rev)],
-          ['Tindakan Medis & Rawat', rp(fin.tind), pct(fin.tind, fin.rev)],
-          ['Penjualan Obat & Alkes', rp(fin.obat), pct(fin.obat, fin.rev)],
-          ['Potongan Diskon Pasien', `(-) ${rp(fin.disk)}`, pct(fin.disk, fin.rev)]
-        ],
-        { key: 'komposisi_pendapatan' }
-      )}
-      <p style="margin-top:10px;font-size:13px;">Margin Kotor Penjualan Obat (Jual - HPP): <b>${rp(fin.obat - fin.hpp)}</b></p>
+      <h2>Dasar Perhitungan Pendapatan</h2>
+      <p style="font-size:13px;">Omzet bersih dihitung dari total nota yang sudah termasuk diskon, dikurangi retur yang disetujui pada periode laporan. Rincian per kategori tidak ditampilkan agar diskon dan retur tidak terhitung ganda.</p>
+      <p style="font-size:13px;">HPP obat dikurangi kembali sesuai nilai pokok obat yang diretur dan disetujui pada periode laporan.</p>
     </div>
+
   `;
 }
 
@@ -3339,7 +3331,10 @@ function viewArusKas() {
   const masukTunai = trxList.filter(t => t.metode === 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
   const masukNonTunai = trxList.filter(t => t.metode !== 'Tunai').reduce((s, t) => s + Number(t.total || 0), 0);
 
-  const beliLunas = inFilterRange(store.state.beli).filter(b => b.lunas).reduce((s, b) => s + Number(b.total || 0), 0);
+  const beliLunas = (store.state.beli || []).filter(b => b.lunas).filter(b => {
+    const paidDate = b.tglBayar || b.tgl || '';
+    return paidDate >= dateFilter.from && paidDate <= dateFilter.to;
+  }).reduce((s, b) => s + Number(b.total || 0), 0);
   const biayaOp = inFilterRange(store.state.biaya).filter(b => b.status === 'approved').reduce((s, b) => s + Number(b.jml || 0), 0);
   const pettyOut = inFilterRange(store.state.petty).reduce((s, p) => s + Number(p.jml || 0), 0);
   const refundOut = fin.refundPaid;
