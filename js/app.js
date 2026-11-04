@@ -4069,7 +4069,7 @@ function viewDisplayTV() {
       <h2>📢 Teks Berjalan (Running Text)</h2>
       <label style="display:block;margin-bottom:10px;">
         Isi Teks Berjalan di Bagian Bawah Layar TV
-        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Sehat... mohon perhatikan nomor antrean Anda.">
+        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Sehat... mohon perhatikan nomor antrean Anda." style="display:block;width:100%;box-sizing:border-box;min-height:56px;padding:14px 16px;font-size:16px;line-height:1.5;border-radius:10px;">
       </label>
       <div style="background:var(--bg);padding:10px 20px;border-radius:8px;overflow:hidden;font-size:13px;color:#06b6d4;font-weight:600;">
         <span id="dtv-text-preview" style="white-space:nowrap;">${esc(currentText) || 'Pratinjau teks berjalan...'}</span>
