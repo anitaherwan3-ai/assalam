@@ -962,7 +962,7 @@ class FirebaseBackend {
         !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
       throw new Error('Firebase belum terhubung. Pendaftaran antrean membutuhkan koneksi aktif.');
     }
-    if (!patient || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(patient.tgl || ''))) {
+    if (!patient || !/^\d{4}-\d{2}-\d{2}$/.test(String(patient.tgl || ''))) {
       throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
     }
 
