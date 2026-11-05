@@ -23,7 +23,7 @@ function getClinicTodayStr() {
   const part = type => (parts.find(item => item.type === type) || {}).value || '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
-const todayStr = getClinicTodayStr();
+let todayStr = getClinicTodayStr();
 let dateFilter = {
   from: todayStr.slice(0, 7) + '-01',
   to: todayStr,
@@ -688,6 +688,14 @@ async function actionAddPasien() {
   if (!window.firebaseBackend || !window.firebaseBackend.isOnline) {
     showAlert('Firebase belum terhubung. Pendaftaran antrean tidak dapat dilakukan secara offline agar nomor tidak ganda.', 'Koneksi Diperlukan');
     return;
+  }
+
+  // Segarkan tanggal setiap pendaftaran, termasuk jika halaman tetap terbuka melewati tengah malam WIB.
+  const previousTodayStr = todayStr;
+  todayStr = getClinicTodayStr();
+  if (dateFilter.to === previousTodayStr) dateFilter.to = todayStr;
+  if (dateFilter.from === previousTodayStr.slice(0, 7) + '-01') {
+    dateFilter.from = todayStr.slice(0, 7) + '-01';
   }
 
   if (submitButton) {
