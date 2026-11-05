@@ -38,13 +38,26 @@ service cloud.firestore {
 
     match /klinik_config/{document} {
       allow read: if signedIn();
-      allow create: if pimpinan();
+      allow create: if pimpinan() ||
+        (adminOrPimpinan() &&
+          document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])') &&
+          request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+          request.resource.data.type == 'queue_audio_clip' &&
+          request.resource.data.audioData is string && request.resource.data.audioData.size() <= 820500 &&
+          request.resource.data.sizeBytes is number && request.resource.data.sizeBytes > 0 && request.resource.data.sizeBytes <= 614400);
       allow update: if pimpinan() ||
+        (adminOrPimpinan() &&
+          document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])') &&
+          request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+          request.resource.data.type == 'queue_audio_clip' &&
+          request.resource.data.audioData is string && request.resource.data.audioData.size() <= 820500 &&
+          request.resource.data.sizeBytes is number && request.resource.data.sizeBytes > 0 && request.resource.data.sizeBytes <= 614400) ||
         (adminOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
-      allow delete: if pimpinan();
+      allow delete: if pimpinan() ||
+        (adminOrPimpinan() && document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])'));
     }
 
     match /k_users/{document} {
