@@ -649,7 +649,7 @@
       hero.classList.add('flash');
       if (audioEnabled) {
         playChime();
-        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 420);
+        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 1250);
       }
     }
 
@@ -726,7 +726,7 @@
       await playQueueClip('prefix','Nomor antrean');
       await playQueueClip('letter_' + letter,letter);
       for (const digit of digits) await playQueueClip('digit_' + digit,names[digit]);
-      await playQueueClip('suffix','Dip persilakan');
+      await playQueueClip('suffix','Dipersilakan');
       await speakFallback('menuju ' + (poli || 'Poli Umum'));
     }
 
