@@ -9,10 +9,10 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
   <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2">
   
-  <!-- Google Font: Inter -->
+  <!-- Google Font: Manrope modern untuk seluruh layar TV -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
     :root {
@@ -30,7 +30,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-family: 'Manrope', system-ui, -apple-system, sans-serif;
       background: radial-gradient(circle at 50% 10%, #0e2a47 0%, var(--bg) 100%);
       color: var(--tx);
       height: 100vh;
@@ -413,6 +413,107 @@
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* Ornamen abstrak untuk layar TV — dekoratif saja, tidak mengubah alur antrean/video */
+    body {
+      background:
+        radial-gradient(ellipse at 12% 18%, rgba(6, 182, 212, .20), transparent 34%),
+        radial-gradient(ellipse at 88% 78%, rgba(16, 185, 129, .14), transparent 32%),
+        radial-gradient(ellipse at 78% 8%, rgba(99, 102, 241, .16), transparent 28%),
+        linear-gradient(135deg, #061321 0%, #0a1d31 48%, #071725 100%);
+      position: relative;
+      isolation: isolate;
+    }
+    body::before, body::after {
+      content: "";
+      position: fixed;
+      pointer-events: none;
+      z-index: -1;
+      border-radius: 50%;
+      filter: blur(2px);
+    }
+    body::before {
+      width: 42vw; height: 42vw; min-width: 280px; min-height: 280px;
+      top: -18vw; right: -12vw;
+      border: 1px solid rgba(103, 232, 249, .18);
+      box-shadow: 0 0 0 34px rgba(6, 182, 212, .035), 0 0 0 72px rgba(6, 182, 212, .025);
+      background: radial-gradient(circle at 35% 65%, rgba(6, 182, 212, .10), transparent 65%);
+    }
+    body::after {
+      width: 34vw; height: 34vw; min-width: 230px; min-height: 230px;
+      bottom: -19vw; left: -10vw;
+      border: 1px solid rgba(52, 211, 153, .16);
+      box-shadow: 0 0 0 28px rgba(16, 185, 129, .035), 0 0 0 60px rgba(16, 185, 129, .025);
+      background: radial-gradient(circle at 65% 30%, rgba(16, 185, 129, .09), transparent 66%);
+    }
+    header {
+      background: linear-gradient(100deg, rgba(10, 30, 49, .94), rgba(17, 45, 68, .86), rgba(10, 30, 49, .94));
+      border-bottom: 1px solid rgba(103, 232, 249, .22);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, .20);
+    }
+    .brand-logo img { box-shadow: 0 0 22px rgba(6, 182, 212, .22); }
+    .hero-card {
+      background:
+        radial-gradient(circle at 12% 10%, rgba(6, 182, 212, .18), transparent 34%),
+        radial-gradient(circle at 90% 92%, rgba(16, 185, 129, .13), transparent 32%),
+        linear-gradient(145deg, rgba(19, 43, 69, .98), rgba(8, 26, 43, .98));
+      border-color: rgba(103, 232, 249, .75);
+      box-shadow: 0 12px 42px rgba(0, 0, 0, .24), 0 0 32px rgba(6, 182, 212, .16);
+    }
+    .hero-card::before, .hero-card::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      border: 1px solid rgba(103, 232, 249, .12);
+    }
+    .hero-card::before {
+      width: 230px; height: 230px; right: -105px; top: -125px;
+      box-shadow: 0 0 0 22px rgba(6, 182, 212, .035), 0 0 0 48px rgba(6, 182, 212, .025);
+    }
+    .hero-card::after {
+      width: 170px; height: 170px; left: -95px; bottom: -110px;
+      border-color: rgba(52, 211, 153, .13);
+      box-shadow: 0 0 0 20px rgba(16, 185, 129, .03);
+    }
+    .hero-card > * { position: relative; z-index: 1; }
+    .queue-card, .video-card {
+      background: linear-gradient(150deg, rgba(18, 39, 60, .96), rgba(9, 27, 44, .96));
+      border-color: rgba(103, 232, 249, .15);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+    }
+    .queue-header, .video-header {
+      background: linear-gradient(90deg, rgba(6, 182, 212, .08), rgba(255, 255, 255, .025));
+    }
+    .queue-item {
+      background: linear-gradient(100deg, rgba(6, 182, 212, .075), rgba(255, 255, 255, .025));
+      border-color: rgba(103, 232, 249, .10);
+    }
+    .queue-item:nth-child(even) {
+      background: linear-gradient(100deg, rgba(16, 185, 129, .075), rgba(255, 255, 255, .025));
+    }
+    footer {
+      background: linear-gradient(90deg, #06111c, #0b2636, #06111c);
+      border-top: 1px solid rgba(103, 232, 249, .22);
+    }
+    .marquee-badge { box-shadow: 0 0 18px rgba(6, 182, 212, .22); }
+
+
+    /* Penyempurnaan tipografi layar TV */
+    .marquee-content {
+      font-family: 'Manrope', system-ui, sans-serif;
+      font-size: 18px;
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: .015em;
+      color: #f1f7fb;
+    }
+    .marquee-badge {
+      font-family: 'Manrope', system-ui, sans-serif;
+      font-size: 12px;
+      letter-spacing: .07em;
+    }
+
   </style>
   <!-- Firebase Compat Web SDK (CDN) for Realtime TV Display Sync -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -532,6 +633,25 @@
     let audioCtx = null;
     let audioEnabled = false;
     let currentYtVideoId = '';
+    let lastNotifiedCallKey = '';
+    function notifyPatientCall(patient, poli) {
+      if (!patient) return;
+      // ID pasien saja tidak cukup: pasien yang sama bisa dipanggil ulang.
+      // _t berubah setiap panggilan, dan sama pada jalur BroadcastChannel + Firestore,
+      // sehingga panggilan baru berbunyi lagi tetapi snapshot duplikat tidak menggandakan bunyi.
+      const key = [patient.id || patient.no || '', patient._t || ''].join('|');
+      if (!key || key === lastNotifiedCallKey) return;
+      lastNotifiedCallKey = key;
+      const hero = document.getElementById('hero-card');
+      hero.classList.remove('flash');
+      void hero.offsetWidth;
+      hero.classList.add('flash');
+      if (audioEnabled) {
+        playChime();
+        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 420);
+      }
+    }
+
 
     function enableAudio() {
       if (!audioCtx) {
@@ -547,66 +667,50 @@
       playChime();
     }
 
-    // Pleasant 2-Tone Ding Dong Chime
+    // Station-style two-note announcement chime: warm, clear and restrained.
     function playChime() {
       try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         const now = audioCtx.currentTime;
-
-        // Tone 1 (High: 554.37 Hz - C#5)
-        const osc1 = audioCtx.createOscillator();
-        const gain1 = audioCtx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(554.37, now);
-        gain1.gain.setValueAtTime(0.35, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-        osc1.connect(gain1);
-        gain1.connect(audioCtx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.55);
-
-        // Tone 2 (Lower: 440 Hz - A4)
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(440, now + 0.28);
-        gain2.gain.setValueAtTime(0.35, now + 0.28);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.start(now + 0.28);
-        osc2.stop(now + 0.95);
+        [
+          { freq: 659.25, delay: 0, duration: 0.62, volume: 0.13 },
+          { freq: 523.25, delay: 0.34, duration: 0.78, volume: 0.12 }
+        ].forEach(note => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const startAt = now + note.delay;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(note.freq, startAt);
+          gain.gain.setValueAtTime(0.001, startAt);
+          gain.gain.linearRampToValueAtTime(note.volume, startAt + 0.035);
+          gain.gain.setValueAtTime(note.volume * 0.82, startAt + 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.001, startAt + note.duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(startAt);
+          osc.stop(startAt + note.duration + 0.04);
+        });
       } catch (e) {
         console.warn('Audio chime error:', e);
       }
     }
 
-    // Voice Announcement in Indonesian
+    // Pengumuman antrean dengan gaya petugas stasiun: formal, tenang, dan jelas.
     function speakCall(noAntrean, poli) {
-      if (!('speechSynthesis' in window)) return;
+      if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return;
       window.speechSynthesis.cancel();
-
-      // Format spell: "A 0 1 2" -> "A, nol, satu, dua"
-      const chars = noAntrean.split('').map(c => {
-        if (c === '0') return 'nol';
-        return c;
-      }).join(' ');
-
-      const text = `Nomor antrean, ${chars}, silakan menuju, ${poli}`;
-      const utterance = new SpeechSynthesisUtterance(text);
+      const chars = String(noAntrean || '').split('').map(c => c === '0' ? 'nol' : c).join(' ');
+      const utterance = new SpeechSynthesisUtterance(`Perhatian. Nomor antrean, ${chars}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
       utterance.lang = 'id-ID';
       utterance.rate = 0.88;
-      utterance.pitch = 1.0;
-
+      utterance.pitch = 0.92;
+      utterance.volume = 1;
       const voices = window.speechSynthesis.getVoices();
-      const idVoice = voices.find(v => v.lang.startsWith('id') || v.lang.includes('Indonesian'));
-      if (idVoice) utterance.voice = idVoice;
-
-      setTimeout(() => {
-        window.speechSynthesis.speak(utterance);
-      }, 700);
+      const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
+      const naturalVoice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
+      if (naturalVoice) utterance.voice = naturalVoice;
+      window.speechSynthesis.speak(utterance);
     }
 
     // Digital Clock
@@ -818,6 +922,26 @@
     let displayCloudSettings = null;
     let displayCloudPatients = null;
 
+    // Tanggal operasional klinik mengikuti WIB (Palembang), bukan UTC perangkat.
+    function getDisplayTodayWIB() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date());
+      const part = type => (parts.find(item => item.type === type) || {}).value || '';
+      return `${part('year')}-${part('month')}-${part('day')}`;
+    }
+
+    // Tanggal antrean memakai waktu pendaftaran tetap, bukan _t yang berubah saat pasien dipanggil/diedit.
+    function isDisplayTodayPatient(patient) {
+      if (!patient) return false;
+      const today = getDisplayTodayWIB();
+      if (patient.tgl === today) return true;
+      const start = new Date(`${today}T00:00:00+07:00`).getTime();
+      const end = start + 24 * 60 * 60 * 1000;
+      const registeredAt = Number(patient.registeredAt || 0);
+      return registeredAt >= start && registeredAt < end;
+    }
+
     // State & Sync Loader
     function loadDisplayData() {
       try {
@@ -826,7 +950,7 @@
         const data = JSON.parse(raw);
         const set = Object.assign({}, data.set || {}, displayCloudSettings || {});
         const patientData = Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []);
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getDisplayTodayWIB();
 
         // Update clinic branding
         document.getElementById('display-clinic-name').textContent = set.nama || 'Klinik Sehat Pratama';
@@ -838,8 +962,8 @@
         }
 
         // Update running text
-        if (set.runningTextDisplay) {
-          document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+        if (Object.prototype.hasOwnProperty.call(set, 'runningTextDisplay')) {
+          document.getElementById('marquee-text').textContent = String(set.runningTextDisplay || '');
         }
 
         // Atur Video YouTube atau Fallback
@@ -848,14 +972,32 @@
         showVideoOrFallback(videoId, enableVideo);
 
         // Patients waiting today
-        const patients = patientData.filter(p => p.tgl === today && !p.done);
+        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done);
         
         // Active called patient
-        const called = patientData.filter(p => p.tgl === today && p.calling).pop();
+        const called = patientData
+          .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
+          .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
         if (called) {
-          document.getElementById('active-no').textContent = called.no;
-          document.getElementById('active-name').textContent = called.nama;
+          document.getElementById('active-no').textContent = called.no || '-';
+          document.getElementById('active-name').textContent = called.nama || '';
           document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
+        } else {
+          // Jika tidak ada pasien yang sedang dipanggil, tampilkan pasien
+          // terakhir yang sudah dilayani agar nomor terakhir tetap terlihat.
+          const lastServed = patientData
+            .filter(p => isDisplayTodayPatient(p) && p.done === true)
+            .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
+
+          if (lastServed) {
+            document.getElementById('active-no').textContent = lastServed.no || '-';
+            document.getElementById('active-name').textContent = 'Terakhir dilayani: ' + (lastServed.nama || '-');
+            document.getElementById('active-poli').textContent = lastServed.layanan || 'Poli Umum';
+          } else {
+            document.getElementById('active-no').textContent = '-';
+            document.getElementById('active-name').textContent = 'Belum ada pasien dilayani';
+            document.getElementById('active-poli').textContent = 'Poli Umum';
+          }
         }
 
         // Waiting list
@@ -889,19 +1031,11 @@
     queueChannel.onmessage = event => {
       const { type, patient, poli } = event.data || {};
       if (type === 'CALL_PATIENT') {
-        const hero = document.getElementById('hero-card');
         document.getElementById('active-no').textContent = patient.no;
         document.getElementById('active-name').textContent = patient.nama;
         document.getElementById('active-poli').textContent = poli || patient.layanan || 'Poli Umum';
 
-        hero.classList.remove('flash');
-        void hero.offsetWidth;
-        hero.classList.add('flash');
-
-        if (audioEnabled) {
-          playChime();
-          speakCall(patient.no, poli || patient.layanan || 'Poli Umum');
-        }
+        notifyPatientCall(patient, poli || patient.layanan || 'Poli Umum');
 
         loadDisplayData();
       } else if (type === 'QUEUE_UPDATE') {
@@ -946,37 +1080,48 @@
           } else if (set.logo) {
             document.getElementById('display-logo').textContent = set.logo;
           }
-          if (set.runningTextDisplay) {
-            document.getElementById('marquee-text').textContent = set.runningTextDisplay;
+          if (Object.prototype.hasOwnProperty.call(set, 'runningTextDisplay')) {
+            document.getElementById('marquee-text').textContent = String(set.runningTextDisplay || '');
           }
           const enableVideo = set.enableYoutubeDisplay !== false;
           const videoId = parseYoutubeId(set.youtubeVideoId || '');
           showVideoOrFallback(videoId, enableVideo);
         }
-      }, err => console.log('FB Display settings listener error:', err));
+      }, err => {
+        console.warn('FB Display settings listener error:', err);
+      });
 
       // 2. Listen Realtime Patient Queue. Access requires a valid staff Firebase session.
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
-        const today = new Date().toISOString().slice(0, 10);
-        const docs = snapshot.docs.map(d => d.data());
+        const today = getDisplayTodayWIB();
+        // Sertakan ID dokumen; diperlukan agar pasien yang sedang dipanggil
+        // tidak muncul kembali di daftar antrean.
+        const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
-        const patients = docs.filter(p => p.tgl === today && !p.done);
-        const called = docs.filter(p => p.tgl === today && p.calling).pop();
+        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done);
+        const called = docs
+          .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
+          .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
         if (called) {
-          const hero = document.getElementById('hero-card');
-          const prevNo = document.getElementById('active-no').textContent;
           document.getElementById('active-no').textContent = called.no;
           document.getElementById('active-name').textContent = called.nama;
           document.getElementById('active-poli').textContent = called.layanan || 'Poli Umum';
-          if (prevNo !== called.no) {
-            hero.classList.remove('flash');
-            void hero.offsetWidth;
-            hero.classList.add('flash');
-            if (audioEnabled) {
-              playChime();
-              speakCall(called.no, called.layanan || 'Poli Umum');
-            }
+          notifyPatientCall(called, called.layanan || 'Poli Umum');
+        } else {
+          // Pertahankan nomor pasien terakhir yang selesai dilayani saat tidak ada panggilan aktif.
+          const lastServed = docs
+            .filter(p => isDisplayTodayPatient(p) && p.done === true)
+            .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
+
+          if (lastServed) {
+            document.getElementById('active-no').textContent = lastServed.no || '-';
+            document.getElementById('active-name').textContent = 'Terakhir dilayani: ' + (lastServed.nama || '-');
+            document.getElementById('active-poli').textContent = lastServed.layanan || 'Poli Umum';
+          } else {
+            document.getElementById('active-no').textContent = '-';
+            document.getElementById('active-name').textContent = 'Belum ada pasien dilayani';
+            document.getElementById('active-poli').textContent = 'Poli Umum';
           }
         }
 
@@ -999,7 +1144,9 @@
             </div>
           `).join('');
         }
-      }, err => console.log('FB Display queue listener error:', err));
+      }, err => {
+        console.warn('FB Display queue listener error:', err);
+      });
     }
 
     try {
@@ -1007,42 +1154,16 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseDisplayConfig);
         fbDisplayDb = firebase.firestore();
         fbDisplayAuth = firebase.auth();
-        // Display TV uses the authenticated session already opened in the same browser.
-        // A separate TV device must first sign in through the main app.
-        fbDisplayAuth.onAuthStateChanged(async user => {
+        // Gunakan sesi Firebase yang sama dengan aplikasi utama.
+        // Firestore Security Rules menjadi pemeriksa hak akses untuk tiap listener,
+        // sehingga validasi profil di halaman TV tidak menduplikasi aturan backend.
+        fbDisplayAuth.onAuthStateChanged(user => {
           if (!user) {
+            displayCloudStarted = false;
             console.info('Display TV menunggu sesi login Firebase dari aplikasi utama.');
             return;
           }
-          try {
-            // Validasi role melalui profil Firestore, sama seperti aplikasi utama.
-            // Tidak bergantung pada custom claims yang memerlukan Admin SDK.
-            const email = String(user.email || '').toLowerCase();
-            const ownerIds = {
-              'praktekrose@gmail.com': 'praktekrose',
-              'nursalim42@gmail.com': 'pimpinan2'
-            };
-            if (!email) {
-              console.warn('Email sesi Firebase tidak tersedia untuk Display TV.');
-              return;
-            }
-            const profileId = ownerIds[email] || email;
-            const profileSnap = await fbDisplayDb.collection('k_users').doc(profileId).get();
-            if (!profileSnap.exists) {
-              console.warn('Profil akun belum tersedia untuk Display TV.');
-              return;
-            }
-            const profile = profileSnap.data() || {};
-            const role = ownerIds[email] ? 'pimpinan' : profile.role;
-            if (profile.active !== true || !['pimpinan', 'admin', 'kasir'].includes(role) ||
-                (profile.email && String(profile.email).toLowerCase() !== email)) {
-              console.warn('Akun tidak memiliki akses Display TV.');
-              return;
-            }
-            startDisplayCloudListeners();
-          } catch (err) {
-            console.warn('Validasi sesi Display TV gagal:', err);
-          }
+          startDisplayCloudListeners();
         });
       }
     } catch (e) {

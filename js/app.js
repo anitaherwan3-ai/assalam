@@ -16,7 +16,14 @@ let selectedKartuStokOid = '';
 let kartuStokSearch = '';
 
 // Filter rentang tanggal
-const todayStr = new Date().toISOString().slice(0, 10);
+function getClinicTodayStr() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const part = type => (parts.find(item => item.type === type) || {}).value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+const todayStr = getClinicTodayStr();
 let dateFilter = {
   from: todayStr.slice(0, 7) + '-01',
   to: todayStr,
@@ -218,16 +225,6 @@ async function doLogin() {
       ? 'Email atau password tidak sesuai.'
       : (err.code === 'auth/user-not-found' ? 'Akun belum terdaftar di Firebase Authentication.' : (err.message || 'Login gagal.'));
   }
-}
-
-async function activatePimpinanAccount() {
-  const email = val('login-email').trim().toLowerCase();
-  const password = val('login-password');
-  if (!email || !password) {
-    $('login-error').textContent = 'Isi email dan password akun Pimpinan, lalu tekan tombol Aktivasi.';
-    return;
-  }
-  await doLogin();
 }
 
 async function resetLoginPassword() {
@@ -687,6 +684,7 @@ function actionAddPasien() {
     return;
   }
   const shift = getCurrentShift();
+  const registeredAt = Date.now();
   store.state.seq[todayStr] = (store.state.seq[todayStr] || 0) + 1;
   const noAntrean = 'A' + String(store.state.seq[todayStr]).padStart(3, '0');
   
@@ -701,7 +699,8 @@ function actionAddPasien() {
     done: false,
     kasir: currentUser ? currentUser.u : '-',
     sh: shift ? shift.id : null,
-    _t: Date.now()
+    registeredAt: registeredAt,
+    _t: registeredAt
   });
 
   store.logActivity('Tambah', 'Pasien', `${noAntrean} - ${nama}`);
@@ -4059,18 +4058,6 @@ function viewDisplayTV() {
         </label>
       </div>
 
-      <div style="background:var(--bg);border-left:4px solid var(--warn);padding:14px 16px;border-radius:10px;font-size:12px;color:var(--tx);line-height:1.8;margin-bottom:14px;">
-        <b style="color:var(--warn);font-size:13px;">💡 Mengapa YouTube Muncul Error 153 (Meskipun dari Akun Resmi Kemenkes)?</b><br>
-        Error 153 terjadi <b>bukan karena videonya rusak</b>, melainkan karena sistem YouTube <b>memblokir pemutaran video jika file HTML dibuka langsung dari harddisk komputer (protokol <code>file:///</code>)</b>.<br>
-        <br>
-        <b>Pilihan Solusi Terbaik untuk Klinik Anda:</b>
-        <ol style="margin:6px 0 6px 18px;padding:0;">
-          <li><b>Paling Direkomendasikan (Bebas Error 153 & Bebas Iklan):</b> Gunakan tombol <b>🎬 Video File Lokal</b> di pojok kanan atas Layar TV (<code>display.html</code>) untuk memilih video MP4 langsung dari komputer. Video diputar otomatis terus-menerus secara <b>offline 100% tanpa internet & tanpa iklan</b>!</li>
-          <li><b>Jika Ingin Tetap Memutar YouTube:</b> Jalankan aplikasi via file <b><code>Jalankan_Klinik.bat</code></b> di folder aplikasi (klik 2x). Browser akan membuka <code>http://localhost:8080</code> dan semua video YouTube akan berputar lancar tanpa Error 153.</li>
-          <li><b>Slide Tips Kesehatan Otomatis:</b> Jika kolom ini dikosongkan atau video gagal dibuka, layar TV akan otomatis menampilkan animasi <b>Slide Edukasi Kesehatan Pasien</b> yang elegan dan bermanfaat.</li>
-        </ol>
-      </div>
-
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;cursor:pointer;">
           <input id="dtv-enableYt" type="checkbox" ${enableVideo ? 'checked' : ''} style="width:18px;height:18px;">
@@ -4091,7 +4078,7 @@ function viewDisplayTV() {
       <h2>📢 Teks Berjalan (Running Text)</h2>
       <label style="display:block;margin-bottom:10px;">
         Isi Teks Berjalan di Bagian Bawah Layar TV
-        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Sehat... mohon perhatikan nomor antrean Anda.">
+        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Sehat... mohon perhatikan nomor antrean Anda." style="display:block;width:100%;box-sizing:border-box;min-height:56px;padding:14px 16px;font-size:16px;line-height:1.5;border-radius:10px;">
       </label>
       <div style="background:var(--bg);padding:10px 20px;border-radius:8px;overflow:hidden;font-size:13px;color:#06b6d4;font-weight:600;">
         <span id="dtv-text-preview" style="white-space:nowrap;">${esc(currentText) || 'Pratinjau teks berjalan...'}</span>
@@ -4134,21 +4121,35 @@ function previewRunningTextAdmin() {
   preview.textContent = input.value || 'Pratinjau teks berjalan...';
 }
 
-function actionSaveDisplayTV() {
-  const set      = store.state.set;
+async function actionSaveDisplayTV() {
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';
-
   const vid = parseYouTubeIdAdmin(rawYt);
-  set.youtubeVideoId      = vid || rawYt;
-  set.enableYoutubeDisplay = enableYt;
-  set.runningTextDisplay  = rtxt;
+  const settings = {
+    youtubeVideoId: vid || rawYt,
+    enableYoutubeDisplay: enableYt,
+    runningTextDisplay: rtxt
+  };
 
-  store.logActivity('Ubah', 'Display TV', `YouTube: ${set.youtubeVideoId}, Enable: ${enableYt}`);
-  store.saveLocal();
-  if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
-  showAlert('Pengaturan Layar TV berhasil disimpan dan disinkronkan!', '📺 Display TV');
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.isOnline || !backend.currentProfile ||
+      !['admin', 'pimpinan'].includes(backend.currentProfile.role)) {
+    showAlert('Pengaturan belum disimpan. Pastikan akun Admin/Pimpinan terhubung ke Firebase, lalu coba lagi.', 'Koneksi Cloud');
+    return;
+  }
+
+  try {
+    await backend.saveDisplaySettings(settings);
+    Object.assign(store.state.set, settings);
+    store.logActivity('Ubah', 'Display TV', `YouTube: ${settings.youtubeVideoId}, Enable: ${enableYt}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+    showAlert('Pengaturan Display TV berhasil disimpan ke Cloud dan akan digunakan oleh perangkat lain.', '📺 Display TV');
+  } catch (err) {
+    console.error('Simpan pengaturan Display TV gagal:', err);
+    showAlert(err.message || 'Pengaturan gagal disimpan ke Cloud. Periksa koneksi lalu coba lagi.', 'Gagal Menyimpan');
+  }
 }
 
 // -------------------------------------------------------------

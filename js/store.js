@@ -350,16 +350,25 @@ class ClinicStore {
 
   // Panggil Pasien ke Layar Display TV
   callPatient(patientId) {
-    const today = new Date().toISOString().slice(0, 10);
+    const dateParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date());
+    const part = type => (dateParts.find(item => item.type === type) || {}).value || '';
+    const today = `${part('year')}-${part('month')}-${part('day')}`;
+    const now = Date.now();
     const patient = (this.state.pasien || []).find(p => p.id === patientId);
     if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
-    // Reset status calling pasien lain hari ini
+    // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
     (this.state.pasien || []).forEach(p => {
-      if (p.tgl === today) p.calling = false;
+      if (p.tgl === today && p.calling) {
+        p.calling = false;
+        p._t = now;
+      }
     });
 
     patient.calling = true;
+    patient._t = now;
     this.logActivity('Panggil', 'Antrean', `${patient.no} - ${patient.nama} (${patient.layanan})`);
     this.saveLocal();
 
