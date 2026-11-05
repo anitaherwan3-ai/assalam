@@ -931,17 +931,15 @@
       return `${part('year')}-${part('month')}-${part('day')}`;
     }
 
-    // Kompatibilitas data lama: sebelum tanggal operasional diseragamkan ke WIB,
-    // pasien yang didaftarkan dini hari dapat memiliki tgl UTC kemarin.
-    // Timestamp pendaftaran memastikan hanya data yang benar-benar dibuat hari ini yang ikut tampil.
+    // Tanggal antrean memakai waktu pendaftaran tetap, bukan _t yang berubah saat pasien dipanggil/diedit.
     function isDisplayTodayPatient(patient) {
       if (!patient) return false;
       const today = getDisplayTodayWIB();
       if (patient.tgl === today) return true;
       const start = new Date(`${today}T00:00:00+07:00`).getTime();
       const end = start + 24 * 60 * 60 * 1000;
-      const createdAt = Number(patient._t || 0);
-      return createdAt >= start && createdAt < end;
+      const registeredAt = Number(patient.registeredAt || 0);
+      return registeredAt >= start && registeredAt < end;
     }
 
     // State & Sync Loader
