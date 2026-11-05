@@ -633,6 +633,7 @@
     let audioCtx = null;
     let audioEnabled = false;
     let customChimeUrl = '';
+    let customChimeData = '';
     let customChimeVolume = 0.75;
     let currentYtVideoId = '';
     let lastNotifiedCallKey = '';
@@ -675,10 +676,15 @@
       customChimeVolume = Math.max(0, Math.min(1, Number(settings.queueChimeVolume ?? 75) / 100));
     }
 
-    // MP3 publik menggantikan bunyi pembuka; jika gagal, gunakan chime digital bawaan.
+    function configureQueueAudioAsset(audioDoc) {
+      customChimeData = audioDoc && typeof audioDoc.audioData === 'string' ? audioDoc.audioData : '';
+    }
+
+    // MP3 tersimpan di Firestore menggantikan bunyi pembuka; fallback tetap tersedia.
     function playChime() {
-      if (customChimeUrl) {
-        const audio = new Audio(customChimeUrl);
+      const source = customChimeData || customChimeUrl;
+      if (source) {
+        const audio = new Audio(source);
         audio.volume = customChimeVolume;
         audio.play().catch(err => {
           console.warn('MP3 antrean gagal diputar; memakai chime bawaan:', err);
@@ -1114,6 +1120,11 @@
       }, err => {
         console.warn('FB Display settings listener error:', err);
       });
+
+      // 1b. Dengarkan file MP3 antrean yang tersimpan terpusat.
+      fbDisplayDb.doc('klinik_config/queueAudio').onSnapshot(doc => {
+        configureQueueAudioAsset(doc.exists ? (doc.data() || null) : null);
+      }, err => console.warn('FB Display queue audio listener error:', err));
 
       // 2. Listen Realtime Patient Queue. Access requires a valid staff Firebase session.
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
