@@ -23,7 +23,7 @@ function getClinicTodayStr() {
   const part = type => (parts.find(item => item.type === type) || {}).value || '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
-const todayStr = getClinicTodayStr();
+let todayStr = getClinicTodayStr();
 let dateFilter = {
   from: todayStr.slice(0, 7) + '-01',
   to: todayStr,
@@ -617,8 +617,25 @@ function printShiftSlip(shiftId) {
 // -------------------------------------------------------------
 function viewPasien() {
   const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus');
+  // Pasien yang belum dilayani tampil lebih dahulu, diurutkan dari waktu kedatangan.
+  // Pasien yang sudah dilayani otomatis pindah ke bagian paling bawah.
+  const sortedTodayPatients = todayPatients.slice().sort((a, b) => {
+    const aDone = a.done ? 1 : 0;
+    const bDone = b.done ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    const aTime = Number(a.registeredAt) || 0;
+    const bTime = Number(b.registeredAt) || 0;
+    if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+    const aJam = String(a.jam || '');
+    const bJam = String(b.jam || '');
+    const byJam = aJam.localeCompare(bJam);
+    if (byJam) return byJam;
+    const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+    const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+    return aNo - bNo;
+  });
 
-  const rows = todayPatients.map(p => [
+  const rows = sortedTodayPatients.map(p => [
     esc(p.no),
     esc(p.jam),
     esc(p.nama),
@@ -633,6 +650,15 @@ function viewPasien() {
       <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
     `
   ]);
+
+  const availableShifts = (store.state.shift || []).slice().sort((a, b) =>
+    String(b.tgl || '').localeCompare(String(a.tgl || '')) ||
+    String(b.jam || '').localeCompare(String(a.jam || '')) ||
+    Number(b._t || 0) - Number(a._t || 0)
+  );
+  const shiftOptions = availableShifts.map(s =>
+    `<option value="${esc(s.id)}">${esc(s.tgl || '-')} | ${esc(s.jam || '-')} | ${esc(s.nama || s.kasir || 'Kasir')} | ${s.status === 'tutup' ? 'Tutup' : 'Berjalan'}</option>`
+  ).join('');
 
   return `
     <div class="card">
@@ -667,47 +693,172 @@ function viewPasien() {
             <option>Laboratorium / Cek Darah</option>
           </select>
         </label>
-        <button class="p" onclick="actionAddPasien()">+ Daftarkan Antrean</button>
+        <button class="p" id="btn-daftar-antrean" onclick="actionAddPasien()">+ Daftarkan Antrean</button>
       </div>
     </div>
     <div class="card">
-      <h2>Antrean Pasien Hari Ini (${todayStr})</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <h2 style="margin:0;">Antrean Pasien Hari Ini (${todayStr})</h2>
+      </div>
       ${renderTable(['No. Antrean', 'Jam', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Aksi'], rows, { key: 'pasien_hari_ini' })}
+    </div>
+    <div class="card">
+      <h2>Ekspor Data Pasien per Shift</h2>
+      <p style="color:var(--mu);font-size:13px;margin:0 0 10px;">Pilih shift dari seluruh kasir, termasuk shift yang sudah ditutup, untuk mengunduh daftar pasien dalam PDF.</p>
+      <div class="row" style="align-items:end;">
+        <label style="min-width:260px;flex:1;">Pilih Shift
+          <select id="pasien-export-shift">
+            <option value="">-- Pilih Shift --</option>
+            ${shiftOptions}
+          </select>
+        </label>
+        <button class="p" onclick="exportPasienShiftPDF()">📄 Ekspor PDF Pasien</button>
+      </div>
     </div>
   `;
 }
 
-function actionAddPasien() {
+function exportPasienShiftPDF() {
+  const shiftId = val('pasien-export-shift');
+  if (!shiftId) {
+    showAlert('Pilih shift terlebih dahulu.');
+    return;
+  }
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showAlert('Pustaka PDF belum siap. Periksa koneksi internet lalu coba lagi.');
+    return;
+  }
+  const shift = store.get('shift', shiftId);
+  if (!shift) {
+    showAlert('Data shift tidak ditemukan. Muat ulang halaman lalu coba kembali.');
+    return;
+  }
+  const patients = (store.state.pasien || []).filter(p =>
+    p.sh === shift.id && !p.deletedAt && p.status !== 'dihapus'
+  ).slice().sort((a, b) => {
+    const aTime = Number(a.registeredAt) || 0;
+    const bTime = Number(b.registeredAt) || 0;
+    if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+    const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+    if (byJam) return byJam;
+    return (Number(String(a.no || '').replace(/\D/g, '')) || 0) -
+      (Number(String(b.no || '').replace(/\D/g, '')) || 0);
+  });
+  if (!patients.length) {
+    showAlert('Belum ada data pasien pada shift yang dipilih.');
+    return;
+  }
+
+  const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const settings = store.state.set || {};
+  const cashier = shift.nama || shift.kasir || '-';
+  const shiftStatus = shift.status === 'tutup' ? 'Tutup' : 'Berjalan';
+  doc.setFontSize(16);
+  doc.setTextColor(15, 118, 110);
+  doc.text(settings.nama || 'Klinik Assalaam Palembang', 14, 15);
+  doc.setFontSize(12);
+  doc.setTextColor(51, 65, 85);
+  doc.text('Laporan Data Pasien per Shift', 14, 22);
+  doc.setFontSize(9);
+  doc.setTextColor(80, 90, 100);
+  doc.text(`Tanggal: ${shift.tgl || '-'} | Shift: ${shift.jam || '-'} | Kasir: ${cashier} | Status: ${shiftStatus}`, 14, 29);
+  doc.text(`Jumlah pasien: ${patients.length} | Dicetak: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`, 14, 35);
+
+  const rows = patients.map((p, index) => [
+    index + 1,
+    p.no || '-',
+    p.jam || '-',
+    p.nama || '-',
+    p.hp || '-',
+    p.layanan || '-',
+    p.status === 'batal_berobat' ? 'Batal Berobat' :
+      p.done ? 'Selesai' : p.calling ? 'Sedang Dipanggil' : 'Menunggu'
+  ]);
+  if (typeof doc.autoTable !== 'function') {
+    showAlert('Komponen tabel PDF belum siap. Muat ulang halaman lalu coba lagi.');
+    return;
+  }
+  doc.autoTable({
+    head: [['No.', 'No. Antrean', 'Jam Datang', 'Nama Pasien', 'No. HP', 'Layanan', 'Status']],
+    body: rows,
+    startY: 41,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [15, 118, 110], textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 250, 252] }
+  });
+  const safeDate = String(shift.tgl || 'shift').replace(/[^0-9-]/g, '');
+  const safeCashier = String(cashier).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  doc.save(`pasien-shift-${safeDate}-${safeCashier || 'kasir'}.pdf`);
+}
+
+async function actionAddPasien() {
   const nama = val('p-nama').trim();
   if (!nama) {
     showAlert('Nama pasien wajib diisi');
     return;
   }
-  const shift = getCurrentShift();
-  const registeredAt = Date.now();
-  store.state.seq[todayStr] = (store.state.seq[todayStr] || 0) + 1;
-  const noAntrean = 'A' + String(store.state.seq[todayStr]).padStart(3, '0');
-  
-  store.state.pasien.push({
-    id: uid(),
-    no: noAntrean,
-    tgl: todayStr,
-    jam: new Date().toTimeString().slice(0, 5),
-    nama: nama,
-    hp: val('p-hp').trim(),
-    layanan: val('p-layanan'),
-    done: false,
-    kasir: currentUser ? currentUser.u : '-',
-    sh: shift ? shift.id : null,
-    registeredAt: registeredAt,
-    _t: registeredAt
-  });
+  const submitButton = $('btn-daftar-antrean');
+  if (submitButton && submitButton.disabled) return;
+  if (!window.firebaseBackend || !window.firebaseBackend.isOnline) {
+    showAlert('Firebase belum terhubung. Pendaftaran antrean tidak dapat dilakukan secara offline agar nomor tidak ganda.', 'Koneksi Diperlukan');
+    return;
+  }
 
-  store.logActivity('Tambah', 'Pasien', `${noAntrean} - ${nama}`);
-  store.saveLocal();
-  if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
-  $('p-nama').value = '';
-  $('p-hp').value = '';
+  // Segarkan tanggal setiap pendaftaran, termasuk jika halaman tetap terbuka melewati tengah malam WIB.
+  const previousTodayStr = todayStr;
+  todayStr = getClinicTodayStr();
+  if (dateFilter.to === previousTodayStr) dateFilter.to = todayStr;
+  if (dateFilter.from === previousTodayStr.slice(0, 7) + '-01') {
+    dateFilter.from = todayStr.slice(0, 7) + '-01';
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Menyimpan antrean...';
+  }
+  try {
+    const shift = getCurrentShift();
+    const registeredAt = Date.now();
+    const patient = {
+      id: '',
+      no: '',
+      tgl: todayStr,
+      jam: new Date().toTimeString().slice(0, 5),
+      nama: nama,
+      hp: val('p-hp').trim(),
+      layanan: val('p-layanan'),
+      done: false,
+      kasir: currentUser ? currentUser.u : '-',
+      sh: shift ? shift.id : null,
+      registeredAt: registeredAt,
+      _t: registeredAt
+    };
+
+    const allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
+    patient.id = allocation.id;
+    patient.no = allocation.no;
+    patient._t = Date.now();
+    // Listener Firestore mungkin sudah memasukkan dokumen ini sebelum
+    // promise transaksi selesai. Cegah pasien yang sama tampil dua kali.
+    if (!store.get('pasien', patient.id)) {
+      store.state.pasien.push(patient);
+    }
+    store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
+    store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+    $('p-nama').value = '';
+    $('p-hp').value = '';
+    showAlert('Antrean berhasil didaftarkan dengan nomor ' + patient.no + '.', 'Pendaftaran Berhasil');
+  } catch (err) {
+    console.error('Pendaftaran antrean gagal:', err);
+    showAlert(err && err.message ? err.message : 'Pendaftaran gagal disimpan ke server. Silakan coba kembali.', 'Gagal Mendaftarkan Antrean');
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = '+ Daftarkan Antrean';
+    }
+  }
 }
 
 function editPasien(id) {
@@ -787,7 +938,19 @@ function delPasien(id) {
 // MODULE: TRANSAKSI & KASIR (POS)
 // -------------------------------------------------------------
 function viewTrx() {
-  const waitingPatients = (store.state.pasien || []).filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat');
+  const waitingPatients = (store.state.pasien || [])
+    .filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat')
+    .slice()
+    .sort((a, b) => {
+      const aTime = Number(a.registeredAt) || 0;
+      const bTime = Number(b.registeredAt) || 0;
+      if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+      const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+      if (byJam) return byJam;
+      const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+      const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+      return aNo - bNo;
+    });
   const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   const cartRows = cartItems.map((item, idx) => [
@@ -819,7 +982,7 @@ function viewTrx() {
             <div style="font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;">PILIH PASIEN</div>
             <select id="trx-pasien" style="margin-top:4px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--bg);color:var(--tx);font-size:13px;font-weight:600;">
               ${waitingPatients.length === 0 ? '<option value="">-- Belum ada pasien antrean --</option>' : ''}
-              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
+              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.jam || "--:--")} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
             </select>
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0;">
