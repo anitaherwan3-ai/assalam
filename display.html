@@ -634,6 +634,7 @@
     let audioEnabled = false;
     let currentYtVideoId = '';
     let lastNotifiedCallKey = '';
+    let queueAudioClips = {};
     function notifyPatientCall(patient, poli) {
       if (!patient) return;
       // ID pasien saja tidak cukup: pasien yang sama bisa dipanggil ulang.
@@ -696,21 +697,37 @@
       }
     }
 
-    // Pengumuman antrean dengan gaya petugas stasiun: formal, tenang, dan jelas.
-    function speakCall(noAntrean, poli) {
-      if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return;
-      window.speechSynthesis.cancel();
-      const chars = String(noAntrean || '').split('').map(c => c === '0' ? 'nol' : c).join(' ');
-      const utterance = new SpeechSynthesisUtterance(`Perhatian. Nomor antrean, ${chars}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
-      utterance.lang = 'id-ID';
-      utterance.rate = 0.88;
-      utterance.pitch = 0.92;
-      utterance.volume = 1;
-      const voices = window.speechSynthesis.getVoices();
-      const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
-      const naturalVoice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
-      if (naturalVoice) utterance.voice = naturalVoice;
-      window.speechSynthesis.speak(utterance);
+    function speakFallback(text) {
+      return new Promise(resolve => {
+        if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return resolve();
+        const u = new SpeechSynthesisUtterance(text); u.lang = 'id-ID'; u.rate = 0.88; u.pitch = 0.92; u.volume = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
+        const voice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
+        if (voice) u.voice = voice;
+        u.onend = resolve; u.onerror = resolve; window.speechSynthesis.speak(u);
+      });
+    }
+    function playQueueClip(id, fallback) {
+      return new Promise(resolve => {
+        const src = queueAudioClips[id];
+        if (!src) return speakFallback(fallback).then(resolve);
+        const audio = new Audio(src); audio.onended = resolve;
+        audio.onerror = () => speakFallback(fallback).then(resolve);
+        const result = audio.play(); if (result && result.catch) result.catch(() => speakFallback(fallback).then(resolve));
+      });
+    }
+    async function speakCall(noAntrean, poli) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      const match = String(noAntrean || '').trim().match(/^([A-Z])[- ]?(\d+)$/i);
+      if (!match) return speakFallback(`Nomor antrean ${String(noAntrean || '').split('').join(' ')}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
+      const letter = match[1].toUpperCase(), digits = match[2].split('');
+      const names = {'0':'nol','1':'satu','2':'dua','3':'tiga','4':'empat','5':'lima','6':'enam','7':'tujuh','8':'delapan','9':'sembilan'};
+      await playQueueClip('prefix','Nomor antrean');
+      await playQueueClip('letter_' + letter,letter);
+      for (const digit of digits) await playQueueClip('digit_' + digit,names[digit]);
+      await playQueueClip('suffix','Dip persilakan');
+      await speakFallback('menuju ' + (poli || 'Poli Umum'));
     }
 
     // Digital Clock
@@ -1090,6 +1107,13 @@
       }, err => {
         console.warn('FB Display settings listener error:', err);
       });
+
+      // 1b. Sinkronkan potongan MP3 panggilan antrean ke semua layar TV.
+      fbDisplayDb.collection('klinik_config').where('type', '==', 'queue_audio_clip').onSnapshot(snapshot => {
+        const clips = {};
+        snapshot.forEach(doc => { const data = doc.data() || {}; if (data.audioData) clips[doc.id.replace(/^queueAudioClip_/, '')] = data.audioData; });
+        queueAudioClips = clips;
+      }, err => console.warn('FB Display queue audio listener error:', err));
 
       // 2. Listen Realtime Patient Queue. Access requires a valid staff Firebase session.
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
