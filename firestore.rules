@@ -37,7 +37,256 @@ service cloud.firestore {
     }
 
     function isQueueAudioClipDoc(document) {
-      return document.matches('queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)');
+      return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi);
+    }
+    function validQueueAudioClipData(document) {
+      return request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.keys().hasAll(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.type == 'queue_audio_clip' &&
+        request.resource.data.clipId is string &&
+        document == 'queueAudioClip_' + request.resource.data.clipId &&
+        request.resource.data.audioData is string &&
+        request.resource.data.audioData.size() <= 820500 &&
+        request.resource.data.sizeBytes is number &&
+        request.resource.data.sizeBytes > 0 &&
+        request.resource.data.sizeBytes <= 614400 &&
+        request.resource.data.fileName is string &&
+        request.resource.data.fileName.size() <= 120 &&
+        request.resource.data.mimeType == 'audio/mpeg' &&
+        request.resource.data.updatedAt is number &&
+        request.resource.data.updatedBy is string;
+    }
+
+    match /klinik_config/{document} {
+      allow read: if signedIn();
+
+      // Konfigurasi umum selain klip suara tetap mengikuti hak Pimpinan lama.
+      allow create: if
+        (pimpinan() && !isQueueAudioClipDoc(document)) ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document));
+
+      // Izin Display TV lama dipertahankan; klip suara harus lolos validasi untuk Admin/Pimpinan.
+      allow update: if
+        (pimpinan() && !isQueueAudioClipDoc(document)) ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document)) ||
+        (adminOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
+          request.resource.data.set.diff(resource.data.set).affectedKeys()
+            .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
+
+      // Pimpinan tetap memiliki hak hapus konfigurasi umum; Admin hanya klip suara.
+      allow delete: if pimpinan() ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document));
+    }
+
+    match /k_users/{document} {
+      // Pimpinan dapat melihat semua profil; staf hanya dapat membaca profil sendiri.
+      allow read: if initialOwner() ||
+        (request.auth != null && document == request.auth.token.email);
+      // Bootstrap profil Pimpinan dan provisioning staf hanya oleh Pimpinan.
+      allow update: if initialOwner() && (
+        (document == ownerDocId() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == 'pimpinan' &&
+          request.resource.data.active == true &&
+          (!('uid' in resource.data) || resource.data.uid == null || resource.data.uid == request.auth.uid))
+        ||
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+          request.resource.data.email == document &&
+          request.resource.data.role in ['admin', 'kasir'] &&
+          request.resource.data.active is bool)
+      );
+      allow create: if initialOwner() && (
+        (document == ownerDocId() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == 'pimpinan' &&
+          request.resource.data.active == true)
+        ||
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+          request.resource.data.email == document &&
+          request.resource.data.role in ['admin', 'kasir'] &&
+          request.resource.data.active == true)
+      );
+      allow delete: if initialOwner() &&
+        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+    }
+
+    match /k_log/{document} {
+      allow read: if adminOrPimpinan();
+      allow create: if signedIn() && (initialOwner() ||
+        request.resource.data.u == staffProfile().u);
+      allow update: if pimpinan() ||
+        (signedIn() && resource.data.u == staffProfile().u &&
+          request.resource.data.u == staffProfile().u);
+      allow delete: if pimpinan();
+    }
+    match /k_pasien/{document} {
+      allow read: if signedIn();
+      allow write: if kasirOrPimpinan();
+      allow update: if adminOrPimpinan() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+        request.resource.data.done == false;
+    }
+    match /k_trx/{document} {
+      allow read: if signedIn();
+      allow create: if kasirOrPimpinan();
+      // Nota yang sudah dibuat bersifat historis: Kasir/Pimpinan hanya boleh
+      // memperbarui metadata sinkronisasi, bukan item, qty, harga, diskon, atau total.
+      allow update: if
+        (kasirOrPimpinan() &&
+          (!('status' in resource.data) || resource.data.status != 'dibatalkan') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t'])) ||
+        (adminOrPimpinan() && (!('status' in resource.data) || resource.data.status != 'dibatalkan') &&
+          request.resource.data.status == 'dibatalkan' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'dibatalkanPada', 'dibatalkanOleh', '_t']) &&
+          exists(/databases/$(database)/documents/k_batalTrx/$(document)) &&
+          get(/databases/$(database)/documents/k_batalTrx/$(document)).data.status == 'menunggu');
+      allow delete: if pimpinan();
+    }
+    match /k_batalTrx/{document} {
+      allow read: if signedIn();
+      allow create: if staffActive() && staffProfile().role == 'kasir' &&
+        request.resource.data.id == document &&
+        request.resource.data.trxId == document &&
+        request.resource.data.status == 'menunggu' &&
+        request.resource.data.kasir == staffProfile().u;
+      allow update: if (adminOrPimpinan() &&
+        resource.data.status == 'menunggu' &&
+        request.resource.data.status in ['disetujui', 'ditolak'] &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', '_t'])) ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          resource.data.status == 'ditolak' &&
+          request.resource.data.status == 'menunggu' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'alasan', 'tgl', '_t', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada']));
+      allow delete: if pimpinan();
+    }
+    match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
+    match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_obat/{document} {
+      allow read: if signedIn();
+      allow create, delete: if adminOrPimpinan();
+      allow update: if adminOrPimpinan() ||
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stok', '_t']) &&
+          request.resource.data.stok is number &&
+          request.resource.data.stok >= 0 &&
+          request.resource.data.stok <= resource.data.stok);
+    }
+    match /k_tarif/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
+    match /k_paket/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan(); }
+    match /k_batch/{document} {
+      allow read: if signedIn();
+      allow create, delete: if adminOrPimpinan();
+      allow update: if adminOrPimpinan() ||
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sisa', '_t']) &&
+          request.resource.data.sisa is number &&
+          request.resource.data.sisa >= 0 &&
+          request.resource.data.sisa <= resource.data.sisa);
+    }
+    match /k_beli/{document} { allow read, write: if adminOrPimpinan(); }
+    match /k_biaya/{document} { allow read, write: if adminOrPimpinan(); }
+    match /k_loss/{document} { allow read, write: if adminOrPimpinan(); }
+    match /k_returKuota/{document} {
+      allow read: if signedIn();
+      // Pimpinan menyiapkan kuota historis; Kasir hanya membuat kuota nol
+      // bersamaan dengan pembuatan nota baru.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.qtyTerpakai == 0 &&
+          request.resource.data.originTrx == true &&
+          document == request.resource.data.trxId + '__' + string(request.resource.data.itemIndex) &&
+          !exists(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)) &&
+          getAfter(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.id == request.resource.data.trxId);
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.trxId == request.resource.data.trxId &&
+          resource.data.itemIndex == request.resource.data.itemIndex &&
+          request.resource.data.lastReturId is string &&
+          request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.kasir == staffProfile().u &&
+          request.resource.data.lastQty is number && request.resource.data.lastQty > 0 &&
+          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty &&
+          request.resource.data.qtyTerpakai <= get(/databases/$(database)/documents/k_trx/$(resource.data.trxId)).data.items[resource.data.itemIndex].qty) ||
+        (adminOrPimpinan() &&
+          request.resource.data.trxId == resource.data.trxId &&
+          request.resource.data.itemIndex == resource.data.itemIndex &&
+          request.resource.data.lastReturId is string &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'ditolak' &&
+          get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
+          request.resource.data.lastQty is number &&
+          request.resource.data.lastQty == -getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty &&
+          request.resource.data.qtyTerpakai >= 0 &&
+          request.resource.data.qtyTerpakai == resource.data.qtyTerpakai + request.resource.data.lastQty);
+      allow delete: if pimpinan();
+    }
+
+    match /k_returJual/{document} {
+      allow read: if signedIn();
+      allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu' &&
+        request.resource.data.quotaId is string &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastReturId == document &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.trxId == request.resource.data.trxId &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.itemIndex == request.resource.data.itemIndex &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastQty == request.resource.data.qty &&
+        getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastPriorQty == request.resource.data.priorQty &&
+        (!exists(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)) ||
+          get(/databases/$(database)/documents/k_batalTrx/$(request.resource.data.trxId)).data.status == 'ditolak') &&
+        (!('status' in get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data) ||
+          get(/databases/$(database)/documents/k_trx/$(request.resource.data.trxId)).data.status != 'dibatalkan');
+      // Admin/Pimpinan hanya memproses keputusan retur yang masih menunggu.
+      allow update: if
+        (adminOrPimpinan() &&
+          resource.data.status == 'menunggu' &&
+          request.resource.data.status in ['disetujui', 'ditolak'] &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada', 'pengembalian', '_t']) &&
+          ((request.resource.data.status == 'disetujui' &&
+            request.resource.data.pengembalian.status == 'menunggu' &&
+            request.resource.data.pengembalian.nominal == resource.data.total) ||
+           (request.resource.data.status == 'ditolak' &&
+            !('pengembalian' in request.resource.data)))) ||
+        // Pencatatan uang kembali hanya Pimpinan; nominal tidak boleh melebihi/mengubah nilai retur.
+        (pimpinan() &&
+          resource.data.status == 'disetujui' &&
+          ('pengembalian' in resource.data) &&
+          resource.data.pengembalian.status == 'menunggu' &&
+          request.resource.data.pengembalian.status == 'dibayar' &&
+          request.resource.data.pengembalian.nominal == resource.data.total &&
+          request.resource.data.pengembalian.dibayarOleh == ownerDocId() &&
+          request.resource.data.pengembalian.metode in ['Tunai', 'Transfer'] &&
+          request.resource.data.pengembalian.nominal is number &&
+          request.resource.data.pengembalian.nominal > 0 &&
+          request.resource.data.pengembalian.dibayarPada is number &&
+          (request.resource.data.pengembalian.metode == 'Tunai' ||
+            (request.resource.data.pengembalian.referensi is string &&
+             request.resource.data.pengembalian.referensi.size() > 0)) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pengembalian', '_t'])) ||
+        // Cache Kasir tidak boleh menghidupkan kembali retur yang sudah diputuskan.
+        (kasirOrPimpinan() &&
+          staffProfile().role == 'kasir' &&
+          resource.data.status == 'menunggu' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.status == 'menunggu' &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t']));
+      allow delete: if pimpinan();
+    }
+    match /k_returBeli/{document} { allow read, write: if adminOrPimpinan(); }
+  }
+});
     }
     function validQueueAudioClipData(document) {
       return request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
