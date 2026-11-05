@@ -68,7 +68,7 @@ service cloud.firestore {
       // Izin Display TV lama dipertahankan; klip suara harus lolos validasi untuk Admin/Pimpinan.
       allow update: if
         (pimpinan() && !isQueueAudioClipDoc(document)) ||
-        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData()) ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document)) ||
         (adminOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
