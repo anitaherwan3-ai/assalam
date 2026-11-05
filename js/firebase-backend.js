@@ -962,7 +962,7 @@ class FirebaseBackend {
         !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
       throw new Error('Firebase belum terhubung. Pendaftaran antrean membutuhkan koneksi aktif.');
     }
-    if (!patient || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(patient.tgl || ''))) {
+    if (!patient || !/^\d{4}-\d{2}-\d{2}$/.test(String(patient.tgl || ''))) {
       throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
     }
 
@@ -974,12 +974,12 @@ class FirebaseBackend {
       .where('tgl', '==', date).get({ source: 'server' });
     let existingMax = 0;
     dayPatients.forEach(doc => {
-      const value = String((doc.data() || {}).no || '').match(/^A-?(\\d+)$/i);
+      const value = String((doc.data() || {}).no || '').match(/^A-?(\d+)$/i);
       if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
     });
     (this.store.state.pasien || []).forEach(item => {
       if (!item || item.tgl !== date) return;
-      const value = String(item.no || '').match(/^A-?(\\d+)$/i);
+      const value = String(item.no || '').match(/^A-?(\d+)$/i);
       if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
     });
     existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
