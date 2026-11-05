@@ -8,7 +8,7 @@ let currentUser = null;
 let currentRole = null;
 let queueAudioClipMeta = {};
 let pendingQueueAudioClip = null;
-window.onQueueAudioClipMeta = function(meta) { queueAudioClipMeta = meta || {}; };
+window.onQueueAudioClipMeta = function(meta) { queueAudioClipMeta = meta || {}; if (typeof window.renderCurrentTab === 'function') window.renderCurrentTab(); };
 let activeTab = '';
 let cartItems = [];
 let cashierSearchQuery = '';
