@@ -698,7 +698,7 @@ async function actionAddPasien() {
     const shift = getCurrentShift();
     const registeredAt = Date.now();
     const patient = {
-      id: uid(),
+      id: '',
       no: '',
       tgl: todayStr,
       jam: new Date().toTimeString().slice(0, 5),
@@ -713,6 +713,7 @@ async function actionAddPasien() {
     };
 
     const allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
+    patient.id = allocation.id;
     patient.no = allocation.no;
     patient._t = Date.now();
     store.state.pasien.push(patient);
