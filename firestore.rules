@@ -65,7 +65,7 @@ service cloud.firestore {
       allow update: if
         (pimpinan() && !isQueueAudioClipDoc(document)) ||
         (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document)) ||
-        (adminOrPimpinan() &&
+        (adminOrPimpinan() && !isQueueAudioClipDoc(document) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
