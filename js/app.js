@@ -850,8 +850,8 @@ function viewTrx() {
       if (aTime && bTime && aTime !== bTime) return aTime - bTime;
       const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
       if (byJam) return byJam;
-      const aNo = Number(String(a.no || '').replace(/\\D/g, '')) || 0;
-      const bNo = Number(String(b.no || '').replace(/\\D/g, '')) || 0;
+      const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+      const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
       return aNo - bNo;
     });
   const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
