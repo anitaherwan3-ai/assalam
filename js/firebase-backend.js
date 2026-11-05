@@ -313,6 +313,19 @@ class FirebaseBackend {
     });
     this.listeners.push(unsubSet);
 
+    // Metadata suara antrean; file audio tidak dimasukkan ke cache data operasional.
+    const unsubQueueAudio = this.db.doc('klinik_config/queueAudio').onSnapshot(doc => {
+      const data = doc.exists ? (doc.data() || {}) : null;
+      if (typeof window.onQueueAudioMeta === 'function') {
+        window.onQueueAudioMeta(data ? {
+          fileName: data.fileName || 'Suara antrean',
+          sizeBytes: Number(data.sizeBytes || 0),
+          updatedAt: Number(data.updatedAt || 0)
+        } : null);
+      }
+    }, err => console.warn('Listener metadata MP3 antrean gagal:', err));
+    this.listeners.push(unsubQueueAudio);
+
     // ==========================================
     // 2. LISTENER SELURUH COLLECTION (DENGAN MERGE TIMESTAMP ANTI TUMPANG TINDIH)
     // ==========================================
@@ -1026,6 +1039,46 @@ class FirebaseBackend {
     this.debounceTimer = setTimeout(() => {
       this.performPush(state);
     }, 600);
+  }
+
+  async getQueueAudio() {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const doc = await this.db.doc('klinik_config/queueAudio').get();
+    return doc.exists ? (doc.data() || null) : null;
+  }
+
+  async saveQueueAudio(audio) {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengunggah suara antrean.');
+    const data = audio && audio.audioData;
+    const size = Number(audio && audio.sizeBytes || 0);
+    if (typeof data !== 'string' || !/^data:audio\/(mpeg|mp3);base64,/i.test(data)) throw new Error('Format file tidak dikenali sebagai MP3.');
+    if (!Number.isFinite(size) || size <= 0 || size > 600 * 1024 || data.length > 820500) throw new Error('Ukuran MP3 maksimal 600 KB.');
+    this.updateBadge('syncing');
+    try {
+      await this.db.doc('klinik_config/queueAudio').set({
+        audioData: data,
+        fileName: String(audio.fileName || 'suara-antrean.mp3').slice(0, 120),
+        sizeBytes: size,
+        mimeType: 'audio/mpeg',
+        updatedAt: Date.now(),
+        updatedBy: String(profile.u || profile.email || '')
+      });
+      this.updateBadge('online');
+      return true;
+    } catch (err) {
+      this.updateBadge('error', err.code || err.message);
+      throw err;
+    }
+  }
+
+  async deleteQueueAudio() {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat menghapus suara antrean.');
+    await this.db.doc('klinik_config/queueAudio').delete();
+    return true;
   }
 
   async saveDisplaySettings(settings) {
