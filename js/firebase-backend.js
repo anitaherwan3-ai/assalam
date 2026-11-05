@@ -313,6 +313,18 @@ class FirebaseBackend {
     });
     this.listeners.push(unsubSet);
 
+    // Metadata suara antrean; audio tetap terpisah dari cache data operasional.
+    const unsubQueueAudioClips = this.db.collection('klinik_config').where('type', '==', 'queue_audio_clip')
+      .onSnapshot(snapshot => {
+        const clips = {};
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          clips[doc.id.replace(/^queueAudioClip_/, '')] = { fileName: data.fileName || '', sizeBytes: Number(data.sizeBytes || 0) };
+        });
+        if (typeof window.onQueueAudioClipMeta === 'function') window.onQueueAudioClipMeta(clips);
+      }, err => console.warn('Listener metadata suara antrean gagal:', err));
+    this.listeners.push(unsubQueueAudioClips);
+
     // ==========================================
     // 2. LISTENER SELURUH COLLECTION (DENGAN MERGE TIMESTAMP ANTI TUMPANG TINDIH)
     // ==========================================
@@ -1093,6 +1105,38 @@ class FirebaseBackend {
     this.debounceTimer = setTimeout(() => {
       this.performPush(state);
     }, 600);
+  }
+
+  async getQueueAudioClips() {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const snap = await this.db.collection('klinik_config').where('type', '==', 'queue_audio_clip').get();
+    const clips = {};
+    snap.forEach(doc => { const d = doc.data() || {}; if (d.audioData) clips[doc.id.replace(/^queueAudioClip_/, '')] = d.audioData; });
+    return clips;
+  }
+
+  async saveQueueAudioClip(audio) {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const profile = this.currentProfile;
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengelola suara antrean.');
+    const id = String(audio && audio.clipId || ''), data = audio && audio.audioData, size = Number(audio && audio.sizeBytes || 0);
+    if (!/^(prefix|suffix|letter_[A-Z]|digit_[0-9])$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
+    if (typeof data !== 'string' || !/^data:audio\/(mpeg|mp3);base64,/i.test(data) || !Number.isFinite(size) || size <= 0 || size > 600 * 1024 || data.length > 820500) throw new Error('File harus MP3 dan berukuran maksimal 600 KB.');
+    await this.db.doc('klinik_config/queueAudioClip_' + id).set({
+      type:'queue_audio_clip', clipId:id, audioData:data, sizeBytes:size,
+      fileName:String(audio.fileName || 'suara-antrean.mp3').slice(0,120), mimeType:'audio/mpeg',
+      updatedAt:Date.now(), updatedBy:String(profile.u || profile.email || '')
+    });
+    return true;
+  }
+
+  async deleteQueueAudioClip(clipId) {
+    if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
+    const profile = this.currentProfile, id = String(clipId || '');
+    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengelola suara antrean.');
+    if (!/^(prefix|suffix|letter_[A-Z]|digit_[0-9])$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
+    await this.db.doc('klinik_config/queueAudioClip_' + id).delete();
+    return true;
   }
 
   async saveDisplaySettings(settings) {
