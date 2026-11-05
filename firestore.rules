@@ -47,34 +47,6 @@ service cloud.firestore {
       allow delete: if pimpinan();
     }
 
-    // Penghitung antrean bersama; Kasir hanya dapat menaikkan satu angka setiap transaksi.
-    match /k_queueCounters/{document} {
-      allow read: if signedIn();
-      allow create: if (initialOwner() ||
-          (staffActive() && staffProfile().role == 'kasir' &&
-            request.resource.data.updatedBy == staffProfile().u)) &&
-        document.size() == 10 &&
-        request.resource.data.keys().hasOnly(['tgl', 'lastNumber', 'updatedAt', 'updatedBy']) &&
-        request.resource.data.tgl == document &&
-        request.resource.data.lastNumber is int &&
-        request.resource.data.lastNumber > 0 &&
-        request.resource.data.lastNumber <= 999999 &&
-        request.resource.data.updatedAt is number &&
-        request.resource.data.updatedBy is string;
-      allow update: if (initialOwner() ||
-          (staffActive() && staffProfile().role == 'kasir' &&
-            request.resource.data.updatedBy == staffProfile().u)) &&
-        resource.data.tgl == document &&
-        request.resource.data.tgl == document &&
-        request.resource.data.lastNumber is int &&
-        request.resource.data.lastNumber == resource.data.lastNumber + 1 &&
-        request.resource.data.updatedAt is number &&
-        request.resource.data.updatedBy is string &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['lastNumber', 'updatedAt', 'updatedBy']);
-      allow delete: if pimpinan();
-    }
-
     match /k_users/{document} {
       // Pimpinan dapat melihat semua profil; staf hanya dapat membaca profil sendiri.
       allow read: if initialOwner() ||
