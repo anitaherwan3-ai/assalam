@@ -39,7 +39,7 @@ service cloud.firestore {
     function isQueueAudioClipDoc(document) {
       return document.matches('queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)');
     }
-    function validQueueAudioClipData() {
+    function validQueueAudioClipData(document) {
       return request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
         request.resource.data.keys().hasAll(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
         request.resource.data.type == 'queue_audio_clip' &&
@@ -63,7 +63,7 @@ service cloud.firestore {
       // Konfigurasi umum selain klip suara tetap mengikuti hak Pimpinan lama.
       allow create: if
         (pimpinan() && !isQueueAudioClipDoc(document)) ||
-        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData());
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document));
 
       // Izin Display TV lama dipertahankan; klip suara harus lolos validasi untuk Admin/Pimpinan.
       allow update: if
