@@ -723,11 +723,15 @@
       if (!match) return speakFallback(`Nomor antrean ${String(noAntrean || '').split('').join(' ')}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
       const letter = match[1].toUpperCase(), digits = match[2].split('');
       const names = {'0':'nol','1':'satu','2':'dua','3':'tiga','4':'empat','5':'lima','6':'enam','7':'tujuh','8':'delapan','9':'sembilan'};
+      await playQueueClip('notification','Notifikasi');
       await playQueueClip('prefix','Nomor antrean');
       await playQueueClip('letter_' + letter,letter);
       for (const digit of digits) await playQueueClip('digit_' + digit,names[digit]);
       await playQueueClip('suffix','Dipersilakan');
-      await speakFallback('menuju ' + (poli || 'Poli Umum'));
+      const tujuan = String(poli || 'Poli Umum').toLowerCase();
+      if (tujuan.includes('gigi')) await playQueueClip('counter_gigi','menuju Konter Dokter Gigi');
+      else if (tujuan.includes('umum')) await playQueueClip('counter_umum','menuju Konter Dokter Umum');
+      else await speakFallback('menuju ' + (poli || 'Poli Umum'));
     }
 
     // Digital Clock
