@@ -684,6 +684,7 @@ function actionAddPasien() {
     return;
   }
   const shift = getCurrentShift();
+  const registeredAt = Date.now();
   store.state.seq[todayStr] = (store.state.seq[todayStr] || 0) + 1;
   const noAntrean = 'A' + String(store.state.seq[todayStr]).padStart(3, '0');
   
@@ -698,7 +699,8 @@ function actionAddPasien() {
     done: false,
     kasir: currentUser ? currentUser.u : '-',
     sh: shift ? shift.id : null,
-    _t: Date.now()
+    registeredAt: registeredAt,
+    _t: registeredAt
   });
 
   store.logActivity('Tambah', 'Pasien', `${noAntrean} - ${nama}`);
