@@ -841,7 +841,19 @@ function delPasien(id) {
 // MODULE: TRANSAKSI & KASIR (POS)
 // -------------------------------------------------------------
 function viewTrx() {
-  const waitingPatients = (store.state.pasien || []).filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat');
+  const waitingPatients = (store.state.pasien || [])
+    .filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat')
+    .slice()
+    .sort((a, b) => {
+      const aTime = Number(a.registeredAt) || 0;
+      const bTime = Number(b.registeredAt) || 0;
+      if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+      const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+      if (byJam) return byJam;
+      const aNo = Number(String(a.no || '').replace(/\\D/g, '')) || 0;
+      const bNo = Number(String(b.no || '').replace(/\\D/g, '')) || 0;
+      return aNo - bNo;
+    });
   const totalCart = cartItems.reduce((s, i) => s + (Number(i.harga || 0) * Number(i.qty || 0)), 0);
 
   const cartRows = cartItems.map((item, idx) => [
@@ -873,7 +885,7 @@ function viewTrx() {
             <div style="font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;">PILIH PASIEN</div>
             <select id="trx-pasien" style="margin-top:4px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--bg);color:var(--tx);font-size:13px;font-weight:600;">
               ${waitingPatients.length === 0 ? '<option value="">-- Belum ada pasien antrean --</option>' : ''}
-              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
+              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.jam || "--:--")} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
             </select>
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0;">
