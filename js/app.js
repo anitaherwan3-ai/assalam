@@ -45,7 +45,7 @@ let dateFilter = {
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
-  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
