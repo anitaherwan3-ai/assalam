@@ -956,6 +956,73 @@ class FirebaseBackend {
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
+  // Alokasikan nomor antrean lintas perangkat secara atomik di Firestore.
+  async registerPatientWithQueueNumber(patient) {
+    if (!this.db || !this.auth || !this.auth.currentUser ||
+        !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
+      throw new Error('Firebase belum terhubung. Pendaftaran antrean membutuhkan koneksi aktif.');
+    }
+    if (!patient || !/^\d{4}-\d{2}-\d{2}$/.test(String(patient.tgl || ''))) {
+      throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
+    }
+
+    const date = String(patient.tgl);
+    // Baca antrean hari ini untuk melanjutkan nomor lama. ID pasien baru
+    // menggunakan pola deterministik agar dokumen pasien sendiri menjadi
+    // pengunci unik lintas perangkat, tanpa koleksi counter atau aturan baru.
+    const dayPatients = await this.db.collection('k_pasien')
+      .where('tgl', '==', date).get({ source: 'server' });
+    let existingMax = 0;
+    dayPatients.forEach(doc => {
+      const value = String((doc.data() || {}).no || '').match(/^A-?(\d+)$/i);
+      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
+    });
+    (this.store.state.pasien || []).forEach(item => {
+      if (!item || item.tgl !== date) return;
+      const value = String(item.no || '').match(/^A-?(\d+)$/i);
+      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
+    });
+    existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
+
+    let assignedNumber = 0;
+    let assignedId = '';
+    await this.db.runTransaction(async transaction => {
+      // Jangan menulis apa pun sampai seluruh dokumen kandidat selesai dibaca.
+      // Bila dua perangkat memilih kandidat sama, transaksi yang kalah akan
+      // diulang Firestore dan melihat ID tersebut sudah terpakai.
+      let candidate = existingMax + 1;
+      assignedNumber = 0;
+      assignedId = '';
+      for (let attempt = 0; attempt < 100; attempt++, candidate++) {
+        if (!Number.isSafeInteger(candidate) || candidate > 999999) break;
+        const candidateId = 'q_' + date.replace(/-/g, '') + '_' +
+          String(candidate).padStart(6, '0');
+        const candidateRef = this.db.collection('k_pasien').doc(candidateId);
+        const candidateSnap = await transaction.get(candidateRef);
+        if (!candidateSnap.exists) {
+          assignedNumber = candidate;
+          assignedId = candidateId;
+          transaction.set(candidateRef, Object.assign({}, patient, {
+            id: candidateId,
+            no: 'A' + String(candidate).padStart(3, '0'),
+            _t: Date.now()
+          }));
+          return;
+        }
+      }
+      throw new Error('Tidak dapat memperoleh nomor antrean unik. Silakan coba kembali.');
+    });
+
+    if (!assignedId || !assignedNumber) {
+      throw new Error('Nomor antrean belum berhasil dialokasikan. Silakan coba kembali.');
+    }
+    return {
+      id: assignedId,
+      no: 'A' + String(assignedNumber).padStart(3, '0'),
+      number: assignedNumber
+    };
+  }
+
   // Simpan transaksi Kasir dan pengurangan stok/batch dalam satu transaksi Firestore.
   async commitCashierTransaction(trx, patientId, stockChanges) {
     if (!this.db || !this.auth || !this.auth.currentUser ||
