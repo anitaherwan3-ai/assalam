@@ -962,17 +962,16 @@ class FirebaseBackend {
         !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
       throw new Error('Firebase belum terhubung. Pendaftaran antrean membutuhkan koneksi aktif.');
     }
-    if (!patient || !/^\d{4}-\d{2}-\d{2}$/.test(String(patient.tgl || ''))) {
+    if (!patient || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(patient.tgl || ''))) {
       throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
     }
 
     const date = String(patient.tgl);
-    const counterRef = this.db.collection('k_queueCounters').doc(date);
-    const patientRef = this.db.collection('k_pasien').doc(String(patient.id));
-
-    // Ambil nomor tertinggi yang sudah tersimpan pada hari ini untuk migrasi aman
-    // dari penghitung lama (settings.seq) ke koleksi penghitung atomik.
-    const dayPatients = await this.db.collection('k_pasien').where('tgl', '==', date).get({ source: 'server' });
+    // Baca antrean hari ini untuk melanjutkan nomor lama. ID pasien baru
+    // menggunakan pola deterministik agar dokumen pasien sendiri menjadi
+    // pengunci unik lintas perangkat, tanpa koleksi counter atau aturan baru.
+    const dayPatients = await this.db.collection('k_pasien')
+      .where('tgl', '==', date).get({ source: 'server' });
     let existingMax = 0;
     dayPatients.forEach(doc => {
       const value = String((doc.data() || {}).no || '').match(/^A-?(\\d+)$/i);
@@ -986,36 +985,42 @@ class FirebaseBackend {
     existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
 
     let assignedNumber = 0;
-    const now = Date.now();
+    let assignedId = '';
     await this.db.runTransaction(async transaction => {
-      const counterSnap = await transaction.get(counterRef);
-      const patientSnap = await transaction.get(patientRef);
-      if (patientSnap.exists) throw new Error('ID pendaftaran sudah digunakan. Silakan coba lagi.');
-
-      const currentNumber = counterSnap.exists
-        ? Number((counterSnap.data() || {}).lastNumber)
-        : existingMax;
-      if (!Number.isSafeInteger(currentNumber) || currentNumber < 0 || currentNumber >= 999999) {
-        throw new Error('Penghitung nomor antrean tidak valid atau telah mencapai batas. Hubungi Pimpinan.');
+      // Jangan menulis apa pun sampai seluruh dokumen kandidat selesai dibaca.
+      // Bila dua perangkat memilih kandidat sama, transaksi yang kalah akan
+      // diulang Firestore dan melihat ID tersebut sudah terpakai.
+      let candidate = existingMax + 1;
+      assignedNumber = 0;
+      assignedId = '';
+      for (let attempt = 0; attempt < 100; attempt++, candidate++) {
+        if (!Number.isSafeInteger(candidate) || candidate > 999999) break;
+        const candidateId = 'q_' + date.replace(/-/g, '') + '_' +
+          String(candidate).padStart(6, '0');
+        const candidateRef = this.db.collection('k_pasien').doc(candidateId);
+        const candidateSnap = await transaction.get(candidateRef);
+        if (!candidateSnap.exists) {
+          assignedNumber = candidate;
+          assignedId = candidateId;
+          transaction.set(candidateRef, Object.assign({}, patient, {
+            id: candidateId,
+            no: 'A' + String(candidate).padStart(3, '0'),
+            _t: Date.now()
+          }));
+          return;
+        }
       }
-      assignedNumber = currentNumber + 1;
-      const counterData = {
-        tgl: date,
-        lastNumber: assignedNumber,
-        updatedAt: now,
-        updatedBy: this.currentProfile.u || this.currentProfile.email || '-'
-      };
-      if (counterSnap.exists) transaction.update(counterRef, counterData);
-      else transaction.set(counterRef, counterData);
-
-      const savedPatient = Object.assign({}, patient, {
-        no: 'A' + String(assignedNumber).padStart(3, '0'),
-        _t: now
-      });
-      transaction.set(patientRef, savedPatient);
+      throw new Error('Tidak dapat memperoleh nomor antrean unik. Silakan coba kembali.');
     });
 
-    return { no: 'A' + String(assignedNumber).padStart(3, '0'), number: assignedNumber };
+    if (!assignedId || !assignedNumber) {
+      throw new Error('Nomor antrean belum berhasil dialokasikan. Silakan coba kembali.');
+    }
+    return {
+      id: assignedId,
+      no: 'A' + String(assignedNumber).padStart(3, '0'),
+      number: assignedNumber
+    };
   }
 
   // Simpan transaksi Kasir dan pengurangan stok/batch dalam satu transaksi Firestore.
