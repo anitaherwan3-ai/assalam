@@ -667,7 +667,7 @@ function viewPasien() {
             <option>Laboratorium / Cek Darah</option>
           </select>
         </label>
-        <button class="p" onclick="actionAddPasien()">+ Daftarkan Antrean</button>
+        <button class="p" id="btn-daftar-antrean" onclick="actionAddPasien()">+ Daftarkan Antrean</button>
       </div>
     </div>
     <div class="card">
@@ -677,37 +677,61 @@ function viewPasien() {
   `;
 }
 
-function actionAddPasien() {
+async function actionAddPasien() {
   const nama = val('p-nama').trim();
   if (!nama) {
     showAlert('Nama pasien wajib diisi');
     return;
   }
-  const shift = getCurrentShift();
-  const registeredAt = Date.now();
-  store.state.seq[todayStr] = (store.state.seq[todayStr] || 0) + 1;
-  const noAntrean = 'A' + String(store.state.seq[todayStr]).padStart(3, '0');
-  
-  store.state.pasien.push({
-    id: uid(),
-    no: noAntrean,
-    tgl: todayStr,
-    jam: new Date().toTimeString().slice(0, 5),
-    nama: nama,
-    hp: val('p-hp').trim(),
-    layanan: val('p-layanan'),
-    done: false,
-    kasir: currentUser ? currentUser.u : '-',
-    sh: shift ? shift.id : null,
-    registeredAt: registeredAt,
-    _t: registeredAt
-  });
+  const submitButton = $('btn-daftar-antrean');
+  if (submitButton && submitButton.disabled) return;
+  if (!window.firebaseBackend || !window.firebaseBackend.isOnline) {
+    showAlert('Firebase belum terhubung. Pendaftaran antrean tidak dapat dilakukan secara offline agar nomor tidak ganda.', 'Koneksi Diperlukan');
+    return;
+  }
 
-  store.logActivity('Tambah', 'Pasien', `${noAntrean} - ${nama}`);
-  store.saveLocal();
-  if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
-  $('p-nama').value = '';
-  $('p-hp').value = '';
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Menyimpan antrean...';
+  }
+  try {
+    const shift = getCurrentShift();
+    const registeredAt = Date.now();
+    const patient = {
+      id: uid(),
+      no: '',
+      tgl: todayStr,
+      jam: new Date().toTimeString().slice(0, 5),
+      nama: nama,
+      hp: val('p-hp').trim(),
+      layanan: val('p-layanan'),
+      done: false,
+      kasir: currentUser ? currentUser.u : '-',
+      sh: shift ? shift.id : null,
+      registeredAt: registeredAt,
+      _t: registeredAt
+    };
+
+    const allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
+    patient.no = allocation.no;
+    patient._t = Date.now();
+    store.state.pasien.push(patient);
+    store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
+    store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+    $('p-nama').value = '';
+    $('p-hp').value = '';
+    showAlert('Antrean berhasil didaftarkan dengan nomor ' + patient.no + '.', 'Pendaftaran Berhasil');
+  } catch (err) {
+    console.error('Pendaftaran antrean gagal:', err);
+    showAlert(err && err.message ? err.message : 'Pendaftaran gagal disimpan ke server. Silakan coba kembali.', 'Gagal Mendaftarkan Antrean');
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = '+ Daftarkan Antrean';
+    }
+  }
 }
 
 function editPasien(id) {
