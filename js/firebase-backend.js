@@ -314,7 +314,7 @@ class FirebaseBackend {
     this.listeners.push(unsubSet);
 
     // Metadata suara antrean; file audio tidak dimasukkan ke cache data operasional.
-    const unsubQueueAudio = this.db.doc('klinik_config/queueAudio').onSnapshot(doc => {
+    const unsubQueueAudio = this.db.doc('klinik_config/queueAudioMeta').onSnapshot(doc => {
       const data = doc.exists ? (doc.data() || {}) : null;
       if (typeof window.onQueueAudioMeta === 'function') {
         window.onQueueAudioMeta(data ? {
@@ -1057,14 +1057,18 @@ class FirebaseBackend {
     if (!Number.isFinite(size) || size <= 0 || size > 600 * 1024 || data.length > 820500) throw new Error('Ukuran MP3 maksimal 600 KB.');
     this.updateBadge('syncing');
     try {
-      await this.db.doc('klinik_config/queueAudio').set({
-        audioData: data,
-        fileName: String(audio.fileName || 'suara-antrean.mp3').slice(0, 120),
-        sizeBytes: size,
-        mimeType: 'audio/mpeg',
-        updatedAt: Date.now(),
-        updatedBy: String(profile.u || profile.email || '')
+      const now = Date.now();
+      const fileName = String(audio.fileName || 'suara-antrean.mp3').slice(0, 120);
+      const updatedBy = String(profile.u || profile.email || '');
+      const batch = this.db.batch();
+      batch.set(this.db.doc('klinik_config/queueAudio'), {
+        audioData: data, sizeBytes: size, mimeType: 'audio/mpeg',
+        updatedAt: now, updatedBy
       });
+      batch.set(this.db.doc('klinik_config/queueAudioMeta'), {
+        fileName, sizeBytes: size, updatedAt: now, updatedBy
+      });
+      await batch.commit();
       this.updateBadge('online');
       return true;
     } catch (err) {
@@ -1077,7 +1081,10 @@ class FirebaseBackend {
     if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
     const profile = this.currentProfile;
     if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat menghapus suara antrean.');
-    await this.db.doc('klinik_config/queueAudio').delete();
+    const batch = this.db.batch();
+    batch.delete(this.db.doc('klinik_config/queueAudio'));
+    batch.delete(this.db.doc('klinik_config/queueAudioMeta'));
+    await batch.commit();
     return true;
   }
 
