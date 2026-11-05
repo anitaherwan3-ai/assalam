@@ -37,49 +37,7 @@ service cloud.firestore {
     }
 
     function isQueueAudioClipDoc(document) {
-      return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi);
-    }
-    function validQueueAudioClipData(document) {
-      return request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
-        request.resource.data.keys().hasAll(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
-        request.resource.data.type == 'queue_audio_clip' &&
-        request.resource.data.clipId is string &&
-        document == 'queueAudioClip_' + request.resource.data.clipId &&
-        request.resource.data.audioData is string &&
-        request.resource.data.audioData.size() <= 820500 &&
-        request.resource.data.sizeBytes is number &&
-        request.resource.data.sizeBytes > 0 &&
-        request.resource.data.sizeBytes <= 614400 &&
-        request.resource.data.fileName is string &&
-        request.resource.data.fileName.size() <= 120 &&
-        request.resource.data.mimeType == 'audio/mpeg' &&
-        request.resource.data.updatedAt is number &&
-        request.resource.data.updatedBy is string;
-    }
-
-    match /klinik_config/{document} {
-      allow read: if signedIn();
-
-      // Konfigurasi umum selain klip suara tetap mengikuti hak Pimpinan lama.
-      allow create: if
-        (pimpinan() && !isQueueAudioClipDoc(document)) ||
-        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document));
-
-      // Izin Display TV lama dipertahankan; klip suara harus lolos validasi untuk Admin/Pimpinan.
-      allow update: if
-        (pimpinan() && !isQueueAudioClipDoc(document)) ||
-        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document)) ||
-        (adminOrPimpinan() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
-          request.resource.data.set.diff(resource.data.set).affectedKeys()
-            .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
-
-      // Pimpinan tetap memiliki hak hapus konfigurasi umum; Admin hanya klip suara.
-      allow delete: if pimpinan() ||
-        (adminOrPimpinan() && isQueueAudioClipDoc(document));
-    }
-
-    match /k_users/{document} {
+      return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)    match /k_users/{document} {
       // Pimpinan dapat melihat semua profil; staf hanya dapat membaca profil sendiri.
       allow read: if initialOwner() ||
         (request.auth != null && document == request.auth.token.email);
