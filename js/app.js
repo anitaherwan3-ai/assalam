@@ -4161,7 +4161,11 @@ function previewRunningTextAdmin() {
 
 function handleQueueAudioSelected(file) {
   if (!file) return;
-  if (!/\.mp3$/i.test(file.name || '') || (file.type && !/^audio\/(mpeg|mp3)$/i.test(file.type))) {
+  pendingQueueAudioData = '';
+  pendingQueueAudioName = '';
+  pendingQueueAudioSize = 0;
+  if (!/\.mp3$/i.test(file.name || '') ||
+      (file.type && !/^(audio\/(mpeg|mp3|x-mpeg)|application\/octet-stream)$/i.test(file.type))) {
     showAlert('Pilih file berformat MP3.');
     return;
   }
@@ -4171,11 +4175,12 @@ function handleQueueAudioSelected(file) {
   }
   const reader = new FileReader();
   reader.onload = () => {
-    if (typeof reader.result !== 'string' || !reader.result.startsWith('data:audio/')) {
+    if (typeof reader.result !== 'string' || !reader.result.startsWith('data:')) {
       showAlert('File MP3 tidak dapat dibaca.');
       return;
     }
-    pendingQueueAudioData = reader.result;
+    // Beberapa pengelola file Android melaporkan MIME generik; ekstensi sudah divalidasi.
+    pendingQueueAudioData = reader.result.replace(/^data:[^;]+;base64,/, 'data:audio/mpeg;base64,');
     pendingQueueAudioName = file.name;
     pendingQueueAudioSize = file.size;
     const status = document.getElementById('dtv-chime-file-status');
