@@ -956,6 +956,68 @@ class FirebaseBackend {
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
+  // Alokasikan nomor antrean lintas perangkat secara atomik di Firestore.
+  async registerPatientWithQueueNumber(patient) {
+    if (!this.db || !this.auth || !this.auth.currentUser ||
+        !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
+      throw new Error('Firebase belum terhubung. Pendaftaran antrean membutuhkan koneksi aktif.');
+    }
+    if (!patient || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(patient.tgl || ''))) {
+      throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
+    }
+
+    const date = String(patient.tgl);
+    const counterRef = this.db.collection('k_queueCounters').doc(date);
+    const patientRef = this.db.collection('k_pasien').doc(String(patient.id));
+
+    // Ambil nomor tertinggi yang sudah tersimpan pada hari ini untuk migrasi aman
+    // dari penghitung lama (settings.seq) ke koleksi penghitung atomik.
+    const dayPatients = await this.db.collection('k_pasien').where('tgl', '==', date).get({ source: 'server' });
+    let existingMax = 0;
+    dayPatients.forEach(doc => {
+      const value = String((doc.data() || {}).no || '').match(/^A-?(\\d+)$/i);
+      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
+    });
+    (this.store.state.pasien || []).forEach(item => {
+      if (!item || item.tgl !== date) return;
+      const value = String(item.no || '').match(/^A-?(\\d+)$/i);
+      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
+    });
+    existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
+
+    let assignedNumber = 0;
+    const now = Date.now();
+    await this.db.runTransaction(async transaction => {
+      const counterSnap = await transaction.get(counterRef);
+      const patientSnap = await transaction.get(patientRef);
+      if (patientSnap.exists) throw new Error('ID pendaftaran sudah digunakan. Silakan coba lagi.');
+
+      const currentNumber = counterSnap.exists
+        ? Number((counterSnap.data() || {}).lastNumber)
+        : existingMax;
+      if (!Number.isSafeInteger(currentNumber) || currentNumber < 0 || currentNumber >= 999999) {
+        throw new Error('Penghitung nomor antrean tidak valid atau telah mencapai batas. Hubungi Pimpinan.');
+      }
+      assignedNumber = currentNumber + 1;
+      const counterData = {
+        tgl: date,
+        lastNumber: assignedNumber,
+        updatedAt: now,
+        updatedBy: this.currentProfile.u || this.currentProfile.email || '-'
+      };
+      if (counterSnap.exists) transaction.update(counterRef, counterData);
+      else transaction.set(counterRef, counterData);
+
+      const savedPatient = Object.assign({}, patient, {
+        no: 'A' + String(assignedNumber).padStart(3, '0'),
+        _t: now
+      });
+      transaction.set(patientRef, savedPatient);
+    });
+
+    return { no: 'A' + String(assignedNumber).padStart(3, '0'), number: assignedNumber };
+  }
+
   // Simpan transaksi Kasir dan pengurangan stok/batch dalam satu transaksi Firestore.
   async commitCashierTransaction(trx, patientId, stockChanges) {
     if (!this.db || !this.auth || !this.auth.currentUser ||
