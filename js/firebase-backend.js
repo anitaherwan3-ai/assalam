@@ -1120,7 +1120,7 @@ class FirebaseBackend {
     const profile = this.currentProfile;
     if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengelola suara antrean.');
     const id = String(audio && audio.clipId || ''), data = audio && audio.audioData, size = Number(audio && audio.sizeBytes || 0);
-    if (!/^(prefix|suffix|letter_[A-Z]|digit_[0-9])$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
+    if (!/^(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
     if (typeof data !== 'string' || !/^data:audio\/(mpeg|mp3);base64,/i.test(data) || !Number.isFinite(size) || size <= 0 || size > 600 * 1024 || data.length > 820500) throw new Error('File harus MP3 dan berukuran maksimal 600 KB.');
     await this.db.doc('klinik_config/queueAudioClip_' + id).set({
       type:'queue_audio_clip', clipId:id, audioData:data, sizeBytes:size,
@@ -1134,7 +1134,7 @@ class FirebaseBackend {
     if (!this.db || !this.auth || !this.auth.currentUser) throw new Error('Firebase belum terhubung.');
     const profile = this.currentProfile, id = String(clipId || '');
     if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengelola suara antrean.');
-    if (!/^(prefix|suffix|letter_[A-Z]|digit_[0-9])$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
+    if (!/^(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
     await this.db.doc('klinik_config/queueAudioClip_' + id).delete();
     return true;
   }
