@@ -632,6 +632,8 @@
     // Audio Context & Voice Synthesizer
     let audioCtx = null;
     let audioEnabled = false;
+    let customChimeUrl = '';
+    let customChimeVolume = 0.75;
     let currentYtVideoId = '';
     let lastNotifiedCallKey = '';
     function notifyPatientCall(patient, poli) {
@@ -667,8 +669,28 @@
       playChime();
     }
 
-    // Station-style two-note announcement chime: warm, clear and restrained.
+    function configureQueueAudio(settings) {
+      if (!settings) return;
+      customChimeUrl = typeof settings.queueChimeUrl === 'string' ? settings.queueChimeUrl.trim() : '';
+      customChimeVolume = Math.max(0, Math.min(1, Number(settings.queueChimeVolume ?? 75) / 100));
+    }
+
+    // MP3 publik menggantikan bunyi pembuka; jika gagal, gunakan chime digital bawaan.
     function playChime() {
+      if (customChimeUrl) {
+        const audio = new Audio(customChimeUrl);
+        audio.volume = customChimeVolume;
+        audio.play().catch(err => {
+          console.warn('MP3 antrean gagal diputar; memakai chime bawaan:', err);
+          playDefaultChime();
+        });
+        return;
+      }
+      playDefaultChime();
+    }
+
+    // Station-style two-note announcement chime: warm, clear and restrained.
+    function playDefaultChime() {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -949,6 +971,7 @@
         if (!raw) return;
         const data = JSON.parse(raw);
         const set = Object.assign({}, data.set || {}, displayCloudSettings || {});
+        configureQueueAudio(set);
         const patientData = Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []);
         const today = getDisplayTodayWIB();
 
@@ -1073,6 +1096,7 @@
           const remote = doc.data() || {};
           const set = remote.set || {};
           displayCloudSettings = set;
+          configureQueueAudio(set);
           if (set.nama) document.getElementById('display-clinic-name').textContent = set.nama;
           if (set.alamat) document.getElementById('display-clinic-addr').textContent = set.alamat;
           if (set.logoImg) {
