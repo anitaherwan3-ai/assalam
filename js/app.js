@@ -617,8 +617,25 @@ function printShiftSlip(shiftId) {
 // -------------------------------------------------------------
 function viewPasien() {
   const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus');
+  // Pasien yang belum dilayani tampil lebih dahulu, diurutkan dari waktu kedatangan.
+  // Pasien yang sudah dilayani otomatis pindah ke bagian paling bawah.
+  const sortedTodayPatients = todayPatients.slice().sort((a, b) => {
+    const aDone = a.done ? 1 : 0;
+    const bDone = b.done ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    const aTime = Number(a.registeredAt) || 0;
+    const bTime = Number(b.registeredAt) || 0;
+    if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+    const aJam = String(a.jam || '');
+    const bJam = String(b.jam || '');
+    const byJam = aJam.localeCompare(bJam);
+    if (byJam) return byJam;
+    const aNo = Number(String(a.no || '').replace(/\\D/g, '')) || 0;
+    const bNo = Number(String(b.no || '').replace(/\\D/g, '')) || 0;
+    return aNo - bNo;
+  });
 
-  const rows = todayPatients.map(p => [
+  const rows = sortedTodayPatients.map(p => [
     esc(p.no),
     esc(p.jam),
     esc(p.nama),
