@@ -40,16 +40,27 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if pimpinan() ||
         (document == 'queueAudio' && adminOrPimpinan() &&
+          request.resource.data.keys().hasOnly(['audioData', 'sizeBytes', 'mimeType', 'updatedAt', 'updatedBy']) &&
           request.resource.data.audioData is string &&
           request.resource.data.audioData.size() <= 820500 &&
+          request.resource.data.sizeBytes is number &&
+          request.resource.data.sizeBytes > 0 &&
+          request.resource.data.sizeBytes <= 614400) ||
+        (document == 'queueAudioMeta' && adminOrPimpinan() &&
+          request.resource.data.keys().hasOnly(['fileName', 'sizeBytes', 'updatedAt', 'updatedBy']) &&
           request.resource.data.sizeBytes is number &&
           request.resource.data.sizeBytes > 0 &&
           request.resource.data.sizeBytes <= 614400);
       allow update: if pimpinan() ||
         (document == 'queueAudio' && adminOrPimpinan() &&
-          request.resource.data.keys().hasOnly(['audioData', 'fileName', 'sizeBytes', 'mimeType', 'updatedAt', 'updatedBy']) &&
+          request.resource.data.keys().hasOnly(['audioData', 'sizeBytes', 'mimeType', 'updatedAt', 'updatedBy']) &&
           request.resource.data.audioData is string &&
           request.resource.data.audioData.size() <= 820500 &&
+          request.resource.data.sizeBytes is number &&
+          request.resource.data.sizeBytes > 0 &&
+          request.resource.data.sizeBytes <= 614400) ||
+        (document == 'queueAudioMeta' && adminOrPimpinan() &&
+          request.resource.data.keys().hasOnly(['fileName', 'sizeBytes', 'updatedAt', 'updatedBy']) &&
           request.resource.data.sizeBytes is number &&
           request.resource.data.sizeBytes > 0 &&
           request.resource.data.sizeBytes <= 614400) ||
@@ -57,7 +68,8 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay', 'queueChimeUrl', 'queueChimeVolume']));
-      allow delete: if pimpinan() || (document == 'queueAudio' && adminOrPimpinan());
+      allow delete: if pimpinan() ||
+        ((document == 'queueAudio' || document == 'queueAudioMeta') && adminOrPimpinan());
     }
 
     match /k_users/{document} {
