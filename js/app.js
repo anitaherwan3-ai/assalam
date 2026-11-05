@@ -716,7 +716,11 @@ async function actionAddPasien() {
     patient.id = allocation.id;
     patient.no = allocation.no;
     patient._t = Date.now();
-    store.state.pasien.push(patient);
+    // Listener Firestore mungkin sudah memasukkan dokumen ini sebelum
+    // promise transaksi selesai. Cegah pasien yang sama tampil dua kali.
+    if (!store.get('pasien', patient.id)) {
+      store.state.pasien.push(patient);
+    }
     store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
     store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
     store.saveLocal();
