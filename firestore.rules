@@ -40,14 +40,14 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if pimpinan() ||
         (adminOrPimpinan() &&
-          document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])') &&
+          document.matches('queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)') &&
           request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
           request.resource.data.type == 'queue_audio_clip' &&
           request.resource.data.audioData is string && request.resource.data.audioData.size() <= 820500 &&
           request.resource.data.sizeBytes is number && request.resource.data.sizeBytes > 0 && request.resource.data.sizeBytes <= 614400);
       allow update: if pimpinan() ||
         (adminOrPimpinan() &&
-          document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])') &&
+          document.matches('queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)') &&
           request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
           request.resource.data.type == 'queue_audio_clip' &&
           request.resource.data.audioData is string && request.resource.data.audioData.size() <= 820500 &&
@@ -57,7 +57,7 @@ service cloud.firestore {
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
       allow delete: if pimpinan() ||
-        (adminOrPimpinan() && document.matches('queueAudioClip_(prefix|suffix|letter_[A-Z]|digit_[0-9])'));
+        (adminOrPimpinan() && document.matches('queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)'));
     }
 
     match /k_users/{document} {
