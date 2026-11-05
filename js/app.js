@@ -6,6 +6,9 @@ const store = window.clinicStore;
 // State navigasi & form aktif
 let currentUser = null;
 let currentRole = null;
+let queueAudioClipMeta = {};
+let pendingQueueAudioClip = null;
+window.onQueueAudioClipMeta = function(meta) { queueAudioClipMeta = meta || {}; };
 let activeTab = '';
 let cartItems = [];
 let cashierSearchQuery = '';
@@ -34,7 +37,7 @@ let dateFilter = {
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
-  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
@@ -4202,6 +4205,27 @@ function viewDisplayTV() {
   const currentText     = set.runningTextDisplay || '';
   const enableVideo     = set.enableYoutubeDisplay !== false;
 
+  const clipGroups = [
+    { title: 'Kata Pembuka', items: [{ id: 'prefix', label: 'Kata pembuka / nomor antrean' }] },
+    { title: 'Huruf Antrean', items: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => ({ id: 'letter_' + letter, label: 'Huruf ' + letter })) },
+    { title: 'Angka', items: '0123456789'.split('').map(digit => ({ id: 'digit_' + digit, label: 'Angka ' + digit })) },
+    { title: 'Kata Penutup', items: [{ id: 'suffix', label: 'Kata penutup' }] }
+  ];
+  const clipUploadHtml = clipGroups.map(group => `
+    <details style="margin:12px 0;padding:10px;border:1px solid var(--bdr);border-radius:10px;" ${group.title === 'Kata Pembuka' || group.title === 'Angka' || group.title === 'Kata Penutup' ? 'open' : ''}>
+      <summary style="font-weight:700;cursor:pointer;">${esc(group.title)}</summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:8px;">
+        ${group.items.map(item => {
+          const meta = queueAudioClipMeta[item.id];
+          return `<label style="font-size:12px;">${esc(item.label)}
+            <input type="file" accept=".mp3,audio/mpeg" onchange="handleQueueAudioClipSelected('${item.id}',this.files&&this.files[0])" style="display:block;width:100%;margin-top:4px;">
+            <small id="queue-audio-status-${item.id}" style="color:var(--mu);">${meta ? 'Terpasang: ' + esc(meta.fileName || 'MP3') + ' (' + Math.round(Number(meta.sizeBytes || 0)/1024) + ' KB)' : 'Belum diunggah'}</small>
+            <button class="s" type="button" onclick="deleteQueueAudioClip('${item.id}')" style="margin-top:4px;padding:3px 7px;font-size:11px;">Hapus</button>
+          </label>`;
+        }).join('')}
+      </div>
+    </details>`).join('');
+
   return `
     <div class="card" style="border-left:4px solid #06b6d4;">
       <h2>📺 Pengaturan Layar Display TV (HDMI Ruang Tunggu)</h2>
@@ -4250,11 +4274,78 @@ function viewDisplayTV() {
     </div>
 
     <div class="card">
+      <h2>🎙️ Suara Panggilan Nomor Antrean (MP3)</h2>
+      <p style="color:var(--mu);font-size:13px;line-height:1.6;">
+        Unggah potongan MP3 terpisah. Sistem menyusunnya otomatis: kata pembuka, huruf antrean, angka satu per satu, lalu kata penutup. Maksimal 600 KB per potongan. Huruf yang belum diunggah akan dibacakan TTS sementara.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="s" type="button" onclick="previewQueueAudioCall()">▶️ Tes susunan suara</button>
+        <button class="p" type="button" onclick="savePendingQueueAudioClip()">⬆️ Simpan MP3 terpilih</button>
+      </div>
+      <div id="queue-audio-pending-status" style="font-size:12px;color:var(--mu);margin-bottom:8px;">Belum ada file baru yang dipilih.</div>
+      ${clipUploadHtml}
+    </div>
+
+    <div class="card">
       <button class="p" style="width:100%;font-size:15px;padding:14px;" onclick="actionSaveDisplayTV()">
         💾 Simpan &amp; Sinkronkan ke Layar TV
       </button>
     </div>
   `;
+}
+
+function handleQueueAudioClipSelected(clipId, file) {
+  if (!file) return;
+  pendingQueueAudioClip = null;
+  const status = document.getElementById('queue-audio-pending-status');
+  if (!/^(prefix|suffix|letter_[A-Z]|digit_[0-9])$/.test(clipId)) return showAlert('Jenis potongan suara tidak valid.');
+  if (!/\.mp3$/i.test(file.name || '') || (file.type && !/^(audio\/(mpeg|mp3|x-mpeg)|application\/octet-stream)$/i.test(file.type))) return showAlert('Pilih file berformat MP3.');
+  if (file.size <= 0 || file.size > 600 * 1024) return showAlert('Ukuran setiap MP3 maksimal 600 KB.');
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result !== 'string' || !reader.result.startsWith('data:')) return showAlert('File MP3 tidak dapat dibaca.');
+    pendingQueueAudioClip = { clipId, audioData: reader.result.replace(/^data:[^;]+;base64,/, 'data:audio/mpeg;base64,'), fileName: file.name, sizeBytes: file.size };
+    if (status) status.textContent = 'Siap disimpan: ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB). Tekan Simpan MP3 terpilih.';
+    const itemStatus = document.getElementById('queue-audio-status-' + clipId);
+    if (itemStatus) itemStatus.textContent = 'File baru siap disimpan: ' + file.name;
+  };
+  reader.onerror = () => showAlert('Gagal membaca file MP3 dari perangkat.');
+  reader.readAsDataURL(file);
+}
+
+async function savePendingQueueAudioClip() {
+  if (!pendingQueueAudioClip) return showAlert('Pilih satu file MP3 terlebih dahulu.');
+  try {
+    await window.firebaseBackend.saveQueueAudioClip(pendingQueueAudioClip);
+    pendingQueueAudioClip = null;
+    const status = document.getElementById('queue-audio-pending-status');
+    if (status) status.textContent = 'MP3 berhasil disimpan dan disinkronkan.';
+    showAlert('Potongan MP3 berhasil disimpan. Layar TV menerima pembaruan otomatis.', 'Suara Antrean');
+  } catch (err) { showAlert(err.message || 'Gagal menyimpan potongan MP3.'); }
+}
+
+function deleteQueueAudioClip(clipId) {
+  showConfirm('Hapus potongan suara ini dari semua layar TV?', async () => {
+    try { await window.firebaseBackend.deleteQueueAudioClip(clipId); showAlert('Potongan suara berhasil dihapus.'); }
+    catch (err) { showAlert(err.message || 'Gagal menghapus potongan suara.'); }
+  });
+}
+
+async function previewQueueAudioCall() {
+  const clips = await window.firebaseBackend.getQueueAudioClips().catch(() => ({}));
+  if (pendingQueueAudioClip) clips[pendingQueueAudioClip.clipId] = pendingQueueAudioClip.audioData;
+  const play = src => new Promise(resolve => {
+    const audio = new Audio(src); audio.onended = resolve; audio.onerror = resolve;
+    const result = audio.play(); if (result && result.catch) result.catch(resolve);
+  });
+  const say = text => new Promise(resolve => {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return resolve();
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'id-ID'; u.onend = resolve; u.onerror = resolve; window.speechSynthesis.speak(u);
+  });
+  const parts = [{id:'prefix',fallback:'Nomor antrean'},{id:'letter_A',fallback:'A'},
+    {id:'digit_0',fallback:'nol'},{id:'digit_0',fallback:'nol'},{id:'digit_1',fallback:'satu'},{id:'suffix',fallback:'dipersilakan'}];
+  for (const part of parts) { if (clips[part.id]) await play(clips[part.id]); else await say(part.fallback); }
+  await say('menuju Poli Umum');
 }
 
 function parseYouTubeIdAdmin(input) {
