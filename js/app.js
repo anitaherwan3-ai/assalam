@@ -741,7 +741,7 @@ function exportPasienShiftPDF() {
     if (aTime && bTime && aTime !== bTime) return aTime - bTime;
     const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
     if (byJam) return byJam;
-    return (Number(String(a.no || '').replace(/\\D/g, '')) || 0) -
+    return (Number(String(a.no || '').replace(/\D/g, '')) || 0) -
       (Number(String(b.no || '').replace(/\\D/g, '')) || 0);
   });
   if (!patients.length) {
