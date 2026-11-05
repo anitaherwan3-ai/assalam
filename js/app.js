@@ -630,8 +630,8 @@ function viewPasien() {
     const bJam = String(b.jam || '');
     const byJam = aJam.localeCompare(bJam);
     if (byJam) return byJam;
-    const aNo = Number(String(a.no || '').replace(/\\D/g, '')) || 0;
-    const bNo = Number(String(b.no || '').replace(/\\D/g, '')) || 0;
+    const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+    const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
     return aNo - bNo;
   });
 
