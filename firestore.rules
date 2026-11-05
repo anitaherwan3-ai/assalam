@@ -44,6 +44,7 @@ service cloud.firestore {
         request.resource.data.keys().hasAll(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
         request.resource.data.type == 'queue_audio_clip' &&
         request.resource.data.clipId is string &&
+        document == 'queueAudioClip_' + request.resource.data.clipId &&
         request.resource.data.audioData is string &&
         request.resource.data.audioData.size() <= 820500 &&
         request.resource.data.sizeBytes is number &&
