@@ -6,6 +6,17 @@ const store = window.clinicStore;
 // State navigasi & form aktif
 let currentUser = null;
 let currentRole = null;
+let queueAudioMeta = null;
+let pendingQueueAudioData = '';
+let pendingQueueAudioName = '';
+let pendingQueueAudioSize = 0;
+window.onQueueAudioMeta = function(meta) {
+  queueAudioMeta = meta || null;
+  const status = document.getElementById('dtv-chime-file-status');
+  if (status) status.textContent = queueAudioMeta
+    ? `Terpasang: ${queueAudioMeta.fileName || 'Suara antrean'} (${Math.round(Number(queueAudioMeta.sizeBytes || 0) / 1024)} KB)`
+    : 'Belum ada file MP3 yang dipasang.';
+};
 let activeTab = '';
 let cartItems = [];
 let cashierSearchQuery = '';
@@ -4089,16 +4100,28 @@ function viewDisplayTV() {
     </div>
 
     <div class="card">
-      <h2>🔔 Suara Antrean (Opsional)</h2>
-      <p style="font-size:13px;color:var(--mu);line-height:1.6;">Masukkan tautan langsung file MP3 untuk mengganti bunyi pembuka antrean. Gunakan tautan HTTPS publik yang bisa diputar tanpa login. Kosongkan untuk kembali ke bunyi digital bawaan.</p>
-      <label style="display:block;margin-bottom:10px;">Tautan MP3 bunyi pembuka
-        <input id="dtv-chimeUrl" type="url" value="${esc(currentChimeUrl)}" placeholder="https://contoh.com/bunyi-antrean.mp3" style="width:100%;box-sizing:border-box;">
+      <h2>🔔 Suara Antrean MP3</h2>
+      <p style="font-size:13px;color:var(--mu);line-height:1.6;">
+        Pilih file MP3 dari tablet. File disimpan terpusat di Firestore agar semua layar TV memakai suara yang sama.
+        Maksimum 600 KB per file; cocok untuk bunyi notifikasi singkat.
+      </p>
+      <label style="display:block;margin:12px 0;">Pilih file MP3
+        <input id="dtv-chime-file" type="file" accept=".mp3,audio/mpeg" onchange="handleQueueAudioSelected(this.files && this.files[0])" style="display:block;width:100%;margin-top:8px;">
       </label>
-      <label style="display:block;margin-bottom:10px;">Volume <b id="dtv-chimeVolumeLabel">${currentChimeVolume}%</b>
+      <div id="dtv-chime-file-status" style="font-size:12px;color:var(--mu);padding:10px;background:var(--bg);border-radius:8px;">
+        ${queueAudioMeta ? `Terpasang: ${esc(queueAudioMeta.fileName || 'Suara antrean')} (${Math.round(Number(queueAudioMeta.sizeBytes || 0) / 1024)} KB)` : 'Belum ada file MP3 yang dipasang.'}
+      </div>
+      <label style="display:block;margin:12px 0;">Volume <b id="dtv-chimeVolumeLabel">${currentChimeVolume}%</b>
         <input id="dtv-chimeVolume" type="range" min="0" max="100" value="${currentChimeVolume}" oninput="document.getElementById('dtv-chimeVolumeLabel').textContent=this.value+'%'" style="width:100%;">
       </label>
-      <button class="s" onclick="previewQueueChimeAdmin()">▶️ Tes Bunyi MP3</button>
-      <p style="font-size:12px;color:var(--mu);margin-top:8px;">MP3 ini menggantikan bunyi pembuka saja. Pengucapan nomor antrean tetap memakai suara Indonesia bawaan perangkat, agar nomor dan poli berubah otomatis.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="s" onclick="previewQueueChimeAdmin()">▶️ Tes Suara</button>
+        <button class="p" onclick="actionUploadQueueAudio()">⬆️ Simpan MP3 ke Cloud</button>
+        <button class="s" onclick="actionDeleteQueueAudio()">🗑️ Hapus MP3</button>
+      </div>
+      <p style="font-size:12px;color:var(--mu);margin-top:10px;">
+        MP3 menggantikan bunyi pembuka saja. Pengucapan nomor antrean dan poli tetap menggunakan suara Indonesia perangkat.
+      </p>
     </div>
 
     <div class="card">
@@ -4136,29 +4159,96 @@ function previewRunningTextAdmin() {
   preview.textContent = input.value || 'Pratinjau teks berjalan...';
 }
 
-function previewQueueChimeAdmin() {
-  const url = document.getElementById('dtv-chimeUrl')?.value.trim() || '';
+function handleQueueAudioSelected(file) {
+  if (!file) return;
+  if (!/\.mp3$/i.test(file.name || '') || (file.type && !/^audio\/(mpeg|mp3)$/i.test(file.type))) {
+    showAlert('Pilih file berformat MP3.');
+    return;
+  }
+  if (file.size > 600 * 1024) {
+    showAlert('Ukuran MP3 maksimal 600 KB. Pilih bunyi notifikasi yang lebih singkat atau kecil.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result !== 'string' || !reader.result.startsWith('data:audio/')) {
+      showAlert('File MP3 tidak dapat dibaca.');
+      return;
+    }
+    pendingQueueAudioData = reader.result;
+    pendingQueueAudioName = file.name;
+    pendingQueueAudioSize = file.size;
+    const status = document.getElementById('dtv-chime-file-status');
+    if (status) status.textContent = 'Siap disimpan: ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
+  };
+  reader.onerror = () => showAlert('Gagal membaca file MP3 dari perangkat.');
+  reader.readAsDataURL(file);
+}
+
+async function previewQueueChimeAdmin() {
   const volume = Number(document.getElementById('dtv-chimeVolume')?.value ?? 75);
-  if (!url) return showAlert('Masukkan tautan langsung file MP3 terlebih dahulu.');
-  if (!/^https:\/\//i.test(url) || !/\.mp3(?:$|[?#])/i.test(url)) return showAlert('Gunakan tautan HTTPS langsung yang berakhiran .mp3.');
-  const audio = new Audio(url);
+  let source = pendingQueueAudioData;
+  if (!source) {
+    const backend = window.firebaseBackend;
+    if (!backend || !backend.getQueueAudio) return showAlert('Firebase belum siap.');
+    try {
+      const saved = await backend.getQueueAudio();
+      source = saved && saved.audioData || '';
+    } catch (err) {
+      return showAlert(err.message || 'Gagal memuat MP3 tersimpan.');
+    }
+  }
+  if (!source) return showAlert('Pilih atau pasang file MP3 terlebih dahulu.');
+  const audio = new Audio(source);
   audio.volume = Math.max(0, Math.min(1, volume / 100));
-  audio.play().catch(() => showAlert('MP3 tidak dapat diputar. Periksa tautan publik dan izin akses file.'));
+  audio.play().catch(() => showAlert('MP3 tidak dapat diputar. Coba file MP3 lain.'));
+}
+
+async function actionUploadQueueAudio() {
+  if (!pendingQueueAudioData || !pendingQueueAudioName) return showAlert('Pilih file MP3 terlebih dahulu.');
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.isOnline || !backend.saveQueueAudio) return showAlert('Firebase belum terhubung.');
+  try {
+    await backend.saveQueueAudio({ audioData: pendingQueueAudioData, fileName: pendingQueueAudioName, sizeBytes: pendingQueueAudioSize });
+    pendingQueueAudioData = '';
+    pendingQueueAudioName = '';
+    pendingQueueAudioSize = 0;
+    const input = document.getElementById('dtv-chime-file');
+    if (input) input.value = '';
+    showAlert('MP3 berhasil disimpan. Layar TV lain akan menerima suara yang sama.', 'Suara Antrean');
+  } catch (err) {
+    console.error('Upload MP3 antrean gagal:', err);
+    showAlert(err.message || 'MP3 gagal disimpan ke Cloud.');
+  }
+}
+
+function actionDeleteQueueAudio() {
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.isOnline || !backend.deleteQueueAudio) return showAlert('Firebase belum terhubung.');
+  showConfirm('Hapus MP3 antrean dari semua layar TV dan kembali ke bunyi digital bawaan?', async () => {
+    try {
+      await backend.deleteQueueAudio();
+      pendingQueueAudioData = '';
+      pendingQueueAudioName = '';
+      pendingQueueAudioSize = 0;
+      showAlert('MP3 dihapus. Layar TV kembali menggunakan bunyi digital bawaan.');
+    } catch (err) {
+      showAlert(err.message || 'MP3 gagal dihapus.');
+    }
+  });
 }
 
 async function actionSaveDisplayTV() {
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';
-  const chimeUrl = document.getElementById('dtv-chimeUrl')?.value.trim() || '';
   const chimeVolume = Number(document.getElementById('dtv-chimeVolume')?.value ?? 75);
   const vid = parseYouTubeIdAdmin(rawYt);
-  if (chimeUrl && (!/^https:\/\//i.test(chimeUrl) || !/\.mp3(?:$|[?#])/i.test(chimeUrl))) return showAlert('Tautan bunyi antrean harus berupa HTTPS langsung ke file MP3.');
   const settings = {
     youtubeVideoId: vid || rawYt,
     enableYoutubeDisplay: enableYt,
     runningTextDisplay: rtxt,
-    queueChimeUrl: chimeUrl,
+    queueChimeUrl: '',
     queueChimeVolume: Math.max(0, Math.min(100, chimeVolume))
   };
 
