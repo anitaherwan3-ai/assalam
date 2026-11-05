@@ -1044,7 +1044,9 @@ class FirebaseBackend {
         set: {
           youtubeVideoId: String(settings.youtubeVideoId || ''),
           enableYoutubeDisplay: settings.enableYoutubeDisplay !== false,
-          runningTextDisplay: String(settings.runningTextDisplay || '')
+          runningTextDisplay: String(settings.runningTextDisplay || ''),
+          queueChimeUrl: String(settings.queueChimeUrl || ''),
+          queueChimeVolume: Math.max(0, Math.min(100, Number(settings.queueChimeVolume ?? 75)))
         }
       }, { merge: true });
       this.updateBadge('online');
@@ -1081,7 +1083,9 @@ class FirebaseBackend {
           operations.push({ ref: this.db.doc('klinik_config/settings'),
             data: { set: { youtubeVideoId: settings.youtubeVideoId || '',
               enableYoutubeDisplay: settings.enableYoutubeDisplay !== false,
-              runningTextDisplay: settings.runningTextDisplay || '' } }, merge: true });
+              runningTextDisplay: settings.runningTextDisplay || '',
+              queueChimeUrl: settings.queueChimeUrl || '',
+              queueChimeVolume: Math.max(0, Math.min(100, Number(settings.queueChimeVolume ?? 75))) } }, merge: true });
         }
 
         // Batasi penulisan berdasarkan hak akses masing-masing peran.
