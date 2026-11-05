@@ -4038,6 +4038,8 @@ function viewDisplayTV() {
   const currentVideoId  = set.youtubeVideoId    || '';
   const currentText     = set.runningTextDisplay || '';
   const enableVideo     = set.enableYoutubeDisplay !== false;
+  const currentChimeUrl = set.queueChimeUrl || '';
+  const currentChimeVolume = Math.max(0, Math.min(100, Number(set.queueChimeVolume ?? 75)));
 
   return `
     <div class="card" style="border-left:4px solid #06b6d4;">
@@ -4087,6 +4089,19 @@ function viewDisplayTV() {
     </div>
 
     <div class="card">
+      <h2>🔔 Suara Antrean (Opsional)</h2>
+      <p style="font-size:13px;color:var(--mu);line-height:1.6;">Masukkan tautan langsung file MP3 untuk mengganti bunyi pembuka antrean. Gunakan tautan HTTPS publik yang bisa diputar tanpa login. Kosongkan untuk kembali ke bunyi digital bawaan.</p>
+      <label style="display:block;margin-bottom:10px;">Tautan MP3 bunyi pembuka
+        <input id="dtv-chimeUrl" type="url" value="${esc(currentChimeUrl)}" placeholder="https://contoh.com/bunyi-antrean.mp3" style="width:100%;box-sizing:border-box;">
+      </label>
+      <label style="display:block;margin-bottom:10px;">Volume <b id="dtv-chimeVolumeLabel">${currentChimeVolume}%</b>
+        <input id="dtv-chimeVolume" type="range" min="0" max="100" value="${currentChimeVolume}" oninput="document.getElementById('dtv-chimeVolumeLabel').textContent=this.value+'%'" style="width:100%;">
+      </label>
+      <button class="s" onclick="previewQueueChimeAdmin()">▶️ Tes Bunyi MP3</button>
+      <p style="font-size:12px;color:var(--mu);margin-top:8px;">MP3 ini menggantikan bunyi pembuka saja. Pengucapan nomor antrean tetap memakai suara Indonesia bawaan perangkat, agar nomor dan poli berubah otomatis.</p>
+    </div>
+
+    <div class="card">
       <button class="p" style="width:100%;font-size:15px;padding:14px;" onclick="actionSaveDisplayTV()">
         💾 Simpan &amp; Sinkronkan ke Layar TV
       </button>
@@ -4121,15 +4136,30 @@ function previewRunningTextAdmin() {
   preview.textContent = input.value || 'Pratinjau teks berjalan...';
 }
 
+function previewQueueChimeAdmin() {
+  const url = document.getElementById('dtv-chimeUrl')?.value.trim() || '';
+  const volume = Number(document.getElementById('dtv-chimeVolume')?.value ?? 75);
+  if (!url) return showAlert('Masukkan tautan langsung file MP3 terlebih dahulu.');
+  if (!/^https:\/\//i.test(url) || !/\.mp3(?:$|[?#])/i.test(url)) return showAlert('Gunakan tautan HTTPS langsung yang berakhiran .mp3.');
+  const audio = new Audio(url);
+  audio.volume = Math.max(0, Math.min(1, volume / 100));
+  audio.play().catch(() => showAlert('MP3 tidak dapat diputar. Periksa tautan publik dan izin akses file.'));
+}
+
 async function actionSaveDisplayTV() {
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';
+  const chimeUrl = document.getElementById('dtv-chimeUrl')?.value.trim() || '';
+  const chimeVolume = Number(document.getElementById('dtv-chimeVolume')?.value ?? 75);
   const vid = parseYouTubeIdAdmin(rawYt);
+  if (chimeUrl && (!/^https:\/\//i.test(chimeUrl) || !/\.mp3(?:$|[?#])/i.test(chimeUrl))) return showAlert('Tautan bunyi antrean harus berupa HTTPS langsung ke file MP3.');
   const settings = {
     youtubeVideoId: vid || rawYt,
     enableYoutubeDisplay: enableYt,
-    runningTextDisplay: rtxt
+    runningTextDisplay: rtxt,
+    queueChimeUrl: chimeUrl,
+    queueChimeVolume: Math.max(0, Math.min(100, chimeVolume))
   };
 
   const backend = window.firebaseBackend;
