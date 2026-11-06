@@ -979,7 +979,7 @@ class FirebaseBackend {
       const snap = await transaction.get(ref);
       if (!snap.exists) throw new Error('Data retur tidak ditemukan di Cloud.');
       const retur = snap.data() || {};
-      if (retur.status !== 'disetujui') throw new Error('Retur harus disetujui Admin sebelum uang dikembalikan.');
+      if (retur.status !== 'disetujui') throw new Error('Retur harus mendapat persetujuan akhir Pimpinan sebelum uang dikembalikan.');
       if (!retur.pengembalian || retur.pengembalian.status !== 'menunggu') {
         throw new Error('Data retur lama perlu rekonsiliasi Pimpinan dan tidak dapat dibayar ulang dari tombol ini.');
       }
