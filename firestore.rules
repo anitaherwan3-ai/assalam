@@ -122,7 +122,9 @@ service cloud.firestore {
     match /k_pasien/{document} {
       allow read: if signedIn();
       // Pendaftaran pasien hanya dibuat oleh Kasir/Pimpinan.
-      allow create: if kasirOrPimpinan();
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document);
       // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
       // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
       allow update: if
@@ -147,7 +149,15 @@ service cloud.firestore {
     }
     match /k_trx/{document} {
       allow read: if signedIn();
-      allow create: if kasirOrPimpinan();
+      // Kasir hanya dapat membuat nota atas identitasnya sendiri dan dalam
+      // transaksi atomik yang juga menandai pasien selesai di Cloud.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.pid is string &&
+          exists(/databases/$(database)/documents/k_pasien/$(request.resource.data.pid)) &&
+          getAfter(/databases/$(database)/documents/k_pasien/$(request.resource.data.pid)).data.done == true);
       // Nota yang sudah dibuat bersifat historis: Kasir/Pimpinan hanya boleh
       // memperbarui metadata sinkronisasi, bukan item, qty, harga, diskon, atau total.
       allow update: if
