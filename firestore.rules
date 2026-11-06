@@ -123,12 +123,22 @@ service cloud.firestore {
       // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
       // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
       allow update: if
+        // Kasir/Pimpinan hanya boleh menandai pasien selesai melalui alur transaksi.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
           request.resource.data.done == true) ||
+        // Admin/Pimpinan dapat mengembalikan status pasien menjadi belum selesai.
         (adminOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
-          request.resource.data.done == false);
+          request.resource.data.done == false) ||
+        // Kasir/Pimpinan boleh mengaktifkan atau melepas panggilan TV,
+        // tanpa mengubah identitas, nomor antrean, atau data pasien lainnya.
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
+          request.resource.data.calling is bool &&
+          resource.data.done != true &&
+          resource.data.status != 'batal_berobat' &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null));
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
