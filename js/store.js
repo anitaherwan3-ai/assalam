@@ -362,7 +362,10 @@ class ClinicStore {
 
     // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
     (this.state.pasien || []).forEach(p => {
-      if (p.tgl === today && p.calling && !p.done && !p.deletedAt &&
+      // Setiap Kasir memiliki antrean sendiri. Memanggil pasien tidak boleh
+      // mengubah status panggilan milik Kasir lain pada perangkat bersama.
+      if (p.tgl === today && p.kasir === patient.kasir &&
+          p.calling && !p.done && !p.deletedAt &&
           p.status !== 'dihapus' && p.status !== 'batal_berobat') {
         p.calling = false;
         p._t = now;
