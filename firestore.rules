@@ -184,15 +184,21 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
             'pelimpahanAlasan', 'pelimpahanPada', '_t'
-          ])) ||
-        // Kasir/Pimpinan hanya boleh mengubah status panggilan TV.
-        ((pimpinan() || (staffActive() && staffProfile().role == 'kasir' &&
-          resource.data.kasir == staffProfile().u)) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
-          request.resource.data.calling is bool &&
-          resource.data.done != true &&
-          (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
-          (!('deletedAt' in resource.data) || resource.data.deletedAt == null));
+          ]));
+      // Aturan panggilan TV dipisahkan menjadi allow update tersendiri.
+      // Hak akses tetap dibatasi untuk Pimpinan atau Kasir pemilik pasien,
+      // hanya field calling/_t, dan pasien yang belum selesai/dibatalkan/dihapus.
+      allow update: if
+        (pimpinan() ||
+          (staffActive() &&
+            staffProfile().role == 'kasir' &&
+            resource.data.kasir == staffProfile().u)) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['calling', '_t']) &&
+        request.resource.data.calling is bool &&
+        resource.data.done != true &&
+        (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
+        (!('deletedAt' in resource.data) || resource.data.deletedAt == null);
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
