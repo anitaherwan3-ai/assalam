@@ -1334,9 +1334,20 @@ class FirebaseBackend {
           for (const op of chunk) {
             batch.set(op.ref, op.data, { merge: op.merge });
           }
-          // Jika batch berikutnya gagal, antrean akan menampilkan status error.
-          // Batch yang sudah berhasil bersifat idempoten karena memakai set+merge.
-          await batch.commit();
+          // Jika batch ditolak, tampilkan path dokumen yang ikut dalam batch.
+          // Ini diagnostik saja: tidak mengubah Rules atau mencoba ulang write satu per satu.
+          try {
+            await batch.commit();
+          } catch (batchError) {
+            console.error('[SYNC-DIAG] Batch Firestore ditolak', {
+              role: profile.role,
+              batchIndex: Math.floor(i / batchSize) + 1,
+              documentPaths: chunk.map(op => op.ref && op.ref.path).filter(Boolean),
+              errorCode: batchError && batchError.code,
+              errorMessage: batchError && batchError.message
+            });
+            throw batchError;
+          }
         }
 
         this.updateBadge('online');
