@@ -1302,6 +1302,17 @@ class FirebaseBackend {
             if (!payload._t) payload._t = Date.now();
 
             const docId = (col === 'users') ? (payload.u || payload.id) : payload.id;
+
+            // Log staf bersifat append-only. Jangan kirim ulang dokumen log yang
+            // sudah ada: Rules hanya mengizinkan create log baru atau update _t saja.
+            // Cache lokal lama dapat berbeda dari audit log Cloud dan membuat batch ditolak.
+            if (col === 'log' && profile.role !== 'pimpinan' && docId) {
+              const logRef = this.db.collection('k_log').doc(String(docId));
+              const remoteLog = await logRef.get();
+              if (remoteLog.exists) continue;
+              operations.push({ ref: logRef, data: payload, merge: false });
+              continue;
+            }
             if (docId) {
               const docRef = this.db.collection('k_' + col).doc(String(docId));
               // Hindari perangkat Admin/Pimpinan mengirim ulang saldo lokal lama
@@ -1328,25 +1339,33 @@ class FirebaseBackend {
         }
 
         const batchSize = 400;
-        for (let i = 0; i < operations.length; i += batchSize) {
-          const batch = this.db.batch();
-          const chunk = operations.slice(i, i + batchSize);
-          for (const op of chunk) {
-            batch.set(op.ref, op.data, { merge: op.merge });
-          }
-          // Jika batch ditolak, tampilkan path dokumen yang ikut dalam batch.
-          // Ini diagnostik saja: tidak mengubah Rules atau mencoba ulang write satu per satu.
-          try {
-            await batch.commit();
-          } catch (batchError) {
-            console.error('[SYNC-DIAG] Batch Firestore ditolak', {
-              role: profile.role,
-              batchIndex: Math.floor(i / batchSize) + 1,
-              documentPaths: chunk.map(op => op.ref && op.ref.path).filter(Boolean),
-              errorCode: batchError && batchError.code,
-              errorMessage: batchError && batchError.message
-            });
-            throw batchError;
+        // Pisahkan batch berdasarkan koleksi agar satu aturan yang menolak tidak
+        // menggagalkan penulisan koleksi lain dan sumber permission-denied terlihat jelas.
+        const operationsByCollection = new Map();
+        operations.forEach(op => {
+          const collectionPath = op.ref && op.ref.parent && op.ref.parent.path || 'unknown';
+          if (!operationsByCollection.has(collectionPath)) operationsByCollection.set(collectionPath, []);
+          operationsByCollection.get(collectionPath).push(op);
+        });
+        for (const [collectionPath, collectionOps] of operationsByCollection) {
+          for (let i = 0; i < collectionOps.length; i += batchSize) {
+            const batch = this.db.batch();
+            const chunk = collectionOps.slice(i, i + batchSize);
+            for (const op of chunk) {
+              batch.set(op.ref, op.data, { merge: op.merge });
+            }
+            try {
+              await batch.commit();
+            } catch (batchError) {
+              console.error('[SYNC-DIAG] Koleksi Firestore ditolak', {
+                role: profile.role,
+                collection: collectionPath,
+                documentPaths: chunk.map(op => op.ref && op.ref.path).filter(Boolean),
+                errorCode: batchError && batchError.code,
+                errorMessage: batchError && batchError.message
+              });
+              throw batchError;
+            }
           }
         }
 
