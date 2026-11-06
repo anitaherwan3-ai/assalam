@@ -247,10 +247,9 @@ async function resetLoginPassword() {
 function getPendingPatientsForLogout() {
   if (!currentUser || currentRole !== 'kasir') return [];
   todayStr = getClinicTodayStr();
-  const shift = getCurrentShift();
   return (store.state.pasien || []).filter(p =>
     p && p.tgl === todayStr && p.kasir === currentUser.u &&
-    (!shift || p.sh === shift.id) && !p.done && !p.deletedAt &&
+    !p.done && !p.deletedAt &&
     p.status !== 'dihapus' && p.status !== 'batal_berobat'
   ).sort((a,b)=>(Number(a.registeredAt)||0)-(Number(b.registeredAt)||0));
 }
