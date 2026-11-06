@@ -1386,6 +1386,12 @@ class FirebaseBackend {
                 role: profile.role,
                 collection: collectionPath,
                 documentPaths: chunk.map(op => op.ref && op.ref.path).filter(Boolean),
+                // Nama field saja: cukup untuk menemukan patch yang tidak cocok
+                // dengan whitelist Rules, tanpa membocorkan isi data pasien.
+                documentChanges: chunk.map(op => ({
+                  path: op.ref && op.ref.path,
+                  fields: Object.keys(op.data || {}).sort()
+                })),
                 errorCode: batchError && batchError.code,
                 errorMessage: batchError && batchError.message
               });
