@@ -86,7 +86,7 @@ service cloud.firestore {
           request.resource.data.active == true &&
           (!('uid' in resource.data) || resource.data.uid == null || resource.data.uid == request.auth.uid))
         ||
-        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'] &&
           request.resource.data.email == document &&
           request.resource.data.role in ['admin', 'kasir'] &&
           request.resource.data.active is bool)
@@ -98,13 +98,13 @@ service cloud.firestore {
           request.resource.data.role == 'pimpinan' &&
           request.resource.data.active == true)
         ||
-        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'] &&
           request.resource.data.email == document &&
           request.resource.data.role in ['admin', 'kasir'] &&
           request.resource.data.active == true)
       );
       allow delete: if initialOwner() &&
-        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'];
     }
 
     match /k_log/{document} {
@@ -122,11 +122,13 @@ service cloud.firestore {
     match /k_pasien/{document} {
       allow read: if signedIn();
       // Pendaftaran pasien hanya dibuat oleh Kasir/Pimpinan.
-      allow create: if kasirOrPimpinan();
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document);
       // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
       // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
       allow update: if
-        // Kasir/Pimpinan hanya boleh menandai pasien selesai melalui alur transaksi.
+        // Penyelesaian pasien hanya melalui transaksi Kasir atomik.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
           request.resource.data.done == true) ||
@@ -134,8 +136,34 @@ service cloud.firestore {
         (adminOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
           request.resource.data.done == false) ||
-        // Kasir/Pimpinan boleh mengaktifkan atau melepas panggilan TV,
-        // tanpa mengubah identitas, nomor antrean, atau data pasien lainnya.
+        // Kasir boleh mengedit hanya nama dan nomor HP; identitas/antrean tetap terkunci.
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama', 'hp', '_t']) &&
+          request.resource.data.nama is string &&
+          request.resource.data.hp is string &&
+          resource.data.done != true &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
+          (!('status' in resource.data) || resource.data.status != 'dihapus')) ||
+        // Kasir boleh mencatat Batal Berobat untuk pasien yang belum dilayani.
+        (kasirOrPimpinan() &&
+          resource.data.done != true &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
+          (!('status' in resource.data) || resource.data.status != 'dihapus') &&
+          request.resource.data.status == 'batal_berobat' &&
+          request.resource.data.batalBerobatOleh == staffProfile().u &&
+          request.resource.data.calling == false &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', 'calling', '_t'])) ||
+        // Pemulihan antrean hanya dari status Batal Berobat, tanpa mengubah data pasien.
+        (kasirOrPimpinan() &&
+          resource.data.status == 'batal_berobat' &&
+          resource.data.done != true &&
+          request.resource.data.status == 'aktif' &&
+          request.resource.data.batalBerobatPada == null &&
+          request.resource.data.batalBerobatOleh == null &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t'])) ||
+        // Kasir/Pimpinan hanya boleh mengubah status panggilan TV.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
           request.resource.data.calling is bool &&
@@ -147,7 +175,15 @@ service cloud.firestore {
     }
     match /k_trx/{document} {
       allow read: if signedIn();
-      allow create: if kasirOrPimpinan();
+      // Kasir hanya dapat membuat nota atas identitasnya sendiri dan dalam
+      // transaksi atomik yang juga menandai pasien selesai di Cloud.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.pid is string &&
+          exists(/databases/$(database)/documents/k_pasien/$(request.resource.data.pid)) &&
+          getAfter(/databases/$(database)/documents/k_pasien/$(request.resource.data.pid)).data.done == true);
       // Nota yang sudah dibuat bersifat historis: Kasir/Pimpinan hanya boleh
       // memperbarui metadata sinkronisasi, bukan item, qty, harga, diskon, atau total.
       allow update: if
@@ -182,8 +218,62 @@ service cloud.firestore {
             .hasOnly(['status', 'alasan', 'tgl', '_t', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada']));
       allow delete: if pimpinan();
     }
-    match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
-    match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_shift/{document} {
+      allow read: if signedIn();
+      // Kasir hanya membuka shift miliknya sendiri.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.status == 'buka' &&
+          request.resource.data.modal is number &&
+          request.resource.data.modal >= 0);
+      // Kasir hanya menutup shift miliknya; Admin hanya memverifikasi setoran.
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'jamT', 'sistem', 'fisik', 'selisih', 'verif', '_t']) &&
+          ((resource.data.status == 'buka' &&
+            request.resource.data.status in ['buka', 'tutup'] &&
+            (request.resource.data.status != 'tutup' || request.resource.data.verif == false)) ||
+           (resource.data.status == 'tutup' &&
+            request.resource.data.status == 'tutup' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t'])))) ||
+        (staffActive() && staffProfile().role == 'admin' &&
+          resource.data.status == 'tutup' &&
+          request.resource.data.status == 'tutup' &&
+          request.resource.data.verif == true &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['verif', 'oleh', '_t']));
+      allow delete: if pimpinan();
+    }
+    match /k_petty/{document} {
+      allow read: if signedIn();
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.ket is string &&
+          request.resource.data.ket.size() > 0 &&
+          request.resource.data.jml is number &&
+          request.resource.data.jml > 0 &&
+          request.resource.data.tgl is string);
+      // Identitas petugas, tanggal, dan shift tidak dapat diubah setelah dicatat.
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ket', 'jml', '_t']) &&
+          request.resource.data.ket is string &&
+          request.resource.data.ket.size() > 0 &&
+          request.resource.data.jml is number &&
+          request.resource.data.jml > 0);
+      allow delete: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u);
+    }
     match /k_obat/{document} {
       allow read: if signedIn();
       allow create, delete: if adminOrPimpinan();

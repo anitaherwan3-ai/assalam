@@ -204,11 +204,13 @@ class FirebaseBackend {
     const local = Array.isArray(localUsers) ? localUsers : [];
     const definitions = [
       { email: 'assalamadmin1@gmail.com', role: 'admin', u: 'admin-gudang', fallbackName: 'Admin Gudang & Keuangan' },
-      { email: 'assalamkasir1@gmail.com', role: 'kasir', u: 'kasir', fallbackName: 'Kasir' }
+      { email: 'assalamkasir1@gmail.com', role: 'kasir', u: 'kasir', fallbackName: 'Kasir Shift Pagi' },
+      { email: 'assalamkasir2@gmail.com', role: 'kasir', u: 'kasir2', fallbackName: 'Kasir Shift Sore' }
     ];
     const results = [];
     for (const item of definitions) {
-      const prior = local.find(x => x.role === item.role && x.role !== 'pimpinan') || {};
+      const prior = local.find(x => x.u === item.u || x.email === item.email ||
+        (item.email === 'assalamadmin1@gmail.com' && x.role === 'admin')) || {};
       const profile = {
         email: item.email, u: item.u,
         nama: prior.nama || item.fallbackName,
@@ -249,7 +251,7 @@ class FirebaseBackend {
     if (!this.auth) throw new Error('Firebase Authentication belum siap.');
     const normalized = String(email || '').trim().toLowerCase();
     const allowed = ['praktekrose@gmail.com', 'nursalim42@gmail.com',
-      'assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+      'assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'];
     if (!allowed.includes(normalized)) throw new Error('Email belum terdaftar sebagai akun Assalam.');
     return this.auth.sendPasswordResetEmail(normalized);
   }
@@ -1250,6 +1252,11 @@ class FirebaseBackend {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
+            // Kasir hanya menyinkronkan shift dan kas kecil miliknya sendiri.
+            if (profile.role === 'kasir' && col === 'shift' && item.kasir !== profile.u) continue;
+            if (profile.role === 'kasir' && col === 'petty' && item.kasir !== profile.u) continue;
+            // Admin hanya meneruskan perubahan verifikasi shift yang sudah disetujui.
+            if (profile.role === 'admin' && col === 'shift' && item.verif !== true) continue;
             // Kasir hanya boleh menyinkronkan nota yang dibuat atas identitasnya sendiri.
             // Nota kasir lain tetap tersimpan di cache lokal untuk dibaca, bukan ditulis ulang.
             if (col === 'trx' && profile.role === 'kasir' && item.kasir !== profile.u) continue;
@@ -1259,10 +1266,67 @@ class FirebaseBackend {
             if (col === 'returJual' && profile.role === 'kasir' &&
                 (item.kasir !== profile.u || item.status !== 'menunggu')) continue;
 
+            // Dokumen pasien Kasir disinkronkan sebagai patch terbatas, bukan
+            // set seluruh cache lokal. Pendaftaran baru sudah dibuat atomik oleh
+            // registerPatientWithQueueNumber; jangan membuat ulang pasien lama yang hilang.
+            if (col === 'pasien' && profile.role === 'kasir') {
+              const patientId = String(item.id || '');
+              if (!patientId) continue;
+              const patientRef = this.db.collection('k_pasien').doc(patientId);
+              const remoteSnap = await patientRef.get();
+              if (!remoteSnap.exists) continue;
+              const remote = remoteSnap.data() || {};
+              const localTime = Number(item._t || 0);
+              const remoteTime = Number(remote._t || 0);
+              if (localTime <= remoteTime) continue;
+              const patientFields = [
+                'nama', 'hp', 'calling', 'done', 'status',
+                'batalBerobatPada', 'batalBerobatOleh'
+              ];
+              const patch = {};
+              patientFields.forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(item, key) &&
+                    JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
+                  patch[key] = item[key];
+                }
+              });
+              // Jangan izinkan cache Kasir mengubah status panggilan pasien
+              // yang di Cloud sudah selesai, dibatalkan, atau dihapus.
+              // Cache lintas perangkat dapat tertinggal; Rules Cloud tetap menjadi
+              // otoritas status pasien.
+              if (Object.prototype.hasOwnProperty.call(patch, 'calling') &&
+                  (remote.done === true ||
+                   remote.deletedAt != null ||
+                   remote.status === 'dihapus' ||
+                   remote.status === 'batal_berobat')) {
+                console.warn('[SYNC-DIAG] Lewati perubahan calling pasien nonaktif', {
+                  patientId, done: remote.done === true,
+                  status: remote.status || '', deletedAt: remote.deletedAt || null
+                });
+                delete patch.calling;
+              }
+              // Jangan mengirim update timestamp kosong atau menulis ulang
+              // dokumen yang hanya berbeda pada metadata lokal.
+              if (!Object.keys(patch).length) continue;
+              patch._t = Math.max(Date.now(), remoteTime + 1);
+              operations.push({ ref: patientRef, data: patch, merge: true });
+              continue;
+            }
+
             const payload = JSON.parse(JSON.stringify(item));
             if (!payload._t) payload._t = Date.now();
 
             const docId = (col === 'users') ? (payload.u || payload.id) : payload.id;
+
+            // Log staf hanya dikirim bila benar-benar dibuat setelah mekanisme
+            // penanda pending diterapkan. Kasir/Admin tidak boleh membaca k_log,
+            // sehingga sinkronisasi tidak boleh melakukan get() untuk memeriksa ID.
+            if (col === 'log' && profile.role !== 'pimpinan') {
+              if (item._pendingSync !== true || !docId) continue;
+              const logRef = this.db.collection('k_log').doc(String(docId));
+              operations.push({ ref: logRef, data: payload, merge: false, sourceItem: item });
+              continue;
+            }
             if (docId) {
               const docRef = this.db.collection('k_' + col).doc(String(docId));
               // Hindari perangkat Admin/Pimpinan mengirim ulang saldo lokal lama
@@ -1289,15 +1353,43 @@ class FirebaseBackend {
         }
 
         const batchSize = 400;
-        for (let i = 0; i < operations.length; i += batchSize) {
-          const batch = this.db.batch();
-          const chunk = operations.slice(i, i + batchSize);
-          for (const op of chunk) {
-            batch.set(op.ref, op.data, { merge: op.merge });
+        // Pisahkan batch berdasarkan koleksi agar satu aturan yang menolak tidak
+        // menggagalkan penulisan koleksi lain dan sumber permission-denied terlihat jelas.
+        const operationsByCollection = new Map();
+        operations.forEach(op => {
+          const collectionPath = op.ref && op.ref.parent && op.ref.parent.path || 'unknown';
+          if (!operationsByCollection.has(collectionPath)) operationsByCollection.set(collectionPath, []);
+          operationsByCollection.get(collectionPath).push(op);
+        });
+        for (const [collectionPath, collectionOps] of operationsByCollection) {
+          for (let i = 0; i < collectionOps.length; i += batchSize) {
+            const batch = this.db.batch();
+            const chunk = collectionOps.slice(i, i + batchSize);
+            for (const op of chunk) {
+              batch.set(op.ref, op.data, { merge: op.merge });
+            }
+            try {
+              await batch.commit();
+              // Tandai log lokal sudah tersinkron hanya setelah commit Firestore berhasil.
+              let syncedLog = false;
+              chunk.forEach(op => {
+                if (op.sourceItem) {
+                  op.sourceItem._pendingSync = false;
+                  syncedLog = true;
+                }
+              });
+              if (syncedLog) this.store.saveLocal(false);
+            } catch (batchError) {
+              console.error('[SYNC-DIAG] Koleksi Firestore ditolak', {
+                role: profile.role,
+                collection: collectionPath,
+                documentPaths: chunk.map(op => op.ref && op.ref.path).filter(Boolean),
+                errorCode: batchError && batchError.code,
+                errorMessage: batchError && batchError.message
+              });
+              throw batchError;
+            }
           }
-          // Jika batch berikutnya gagal, antrean akan menampilkan status error.
-          // Batch yang sudah berhasil bersifat idempoten karena memakai set+merge.
-          await batch.commit();
         }
 
         this.updateBadge('online');

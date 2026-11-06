@@ -1729,16 +1729,20 @@ function viewPetty() {
   const list = inFilterRange(store.state.petty).slice().reverse();
   const totalHariIni = (store.state.petty || []).filter(p => p.tgl === todayStr).reduce((s, p) => s + Number(p.jml || 0), 0);
 
-  const rows = list.map(p => [
-    esc(p.tgl),
-    esc(p.kasir || '-'),
-    esc(p.ket),
-    rp(p.jml),
-    `
-      <button class="s" onclick="editPetty('${p.id}')">Edit</button>
-      <button class="s btn-danger" onclick="delPetty('${p.id}')">Hapus</button>
-    `
-  ]);
+  const rows = list.map(p => {
+    const canManage = currentRole === 'pimpinan' ||
+      (currentRole === 'kasir' && currentUser && p.kasir === currentUser.u);
+    return [
+      esc(p.tgl),
+      esc(p.kasir || '-'),
+      esc(p.ket),
+      rp(p.jml),
+      canManage ? `
+        <button class="s" onclick="editPetty('${p.id}')">Edit</button>
+        <button class="s btn-danger" onclick="delPetty('${p.id}')">Hapus</button>
+      ` : '<span style="color:var(--mu);">—</span>'
+    ];
+  });
 
   return `
     <div class="card">
@@ -3897,10 +3901,11 @@ function viewPengguna() {
 
     <div class="card">
       <h2>Akun Staf Firebase</h2>
-      <p class="muted" style="font-size:12px;">Akun berikut menggunakan Firebase Authentication. Tombol ini membuat profil akses Firestore untuk dua email staf yang sudah didaftarkan. Password tidak disimpan di aplikasi atau Firestore.</p>
+      <p class="muted" style="font-size:12px;">Buat akun staf terlebih dahulu di Firebase Authentication. Tombol ini kemudian menyiapkan profil akses Firestore untuk email staf tersebut. Password tidak disimpan di aplikasi atau Firestore.</p>
       <div style="margin:10px 0 14px;line-height:1.8;">
         <div><b>Admin Gudang & Keuangan:</b> assalamadmin1@gmail.com</div>
-        <div><b>Kasir:</b> assalamkasir1@gmail.com</div>
+        <div><b>Kasir Shift Pagi:</b> assalamkasir1@gmail.com</div>
+        <div><b>Kasir Shift Sore:</b> assalamkasir2@gmail.com</div>
       </div>
       <button class="p" onclick="actionProvisionStaffAccounts()">Aktifkan / Perbarui Profil Akses Staf</button>
       <p class="muted" style="font-size:11px;margin-top:10px;">Jalankan tombol ini dari akun Pimpinan. Akun lokal lama tidak dihapus selama masa pengujian.</p>
@@ -3918,7 +3923,7 @@ async function actionProvisionStaffAccounts() {
   showConfirm('Buat profil akses Firestore untuk Admin Gudang & Keuangan dan Kasir? Password tidak akan disimpan. Akun Pimpinan dan data operasional tidak diubah.', async () => {
     try {
       const profiles = await backend.provisionDefaultStaffProfiles(store.state.users || []);
-      showAlert('Profil akses staf berhasil disiapkan.\n\nAdmin: ' + profiles[0].email + '\nKasir: ' + profiles[1].email + '\n\nSilakan uji login masing-masing akun pada perangkat terpisah.');
+      showAlert('Profil akses staf berhasil disiapkan.\n\n' + profiles.map(p => p.role.toUpperCase() + ' (' + p.u + '): ' + p.email).join('\n') + '\n\nSilakan uji login masing-masing akun pada perangkat terpisah.');
       store.logActivity('Aktivasi', 'Pengguna', 'Profil Firebase staf disiapkan oleh Pimpinan');
     } catch (err) {
       console.error('Provision profil staf gagal:', err);

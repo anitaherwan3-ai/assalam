@@ -239,6 +239,7 @@ class ClinicStore {
     const entry = {
       id: uid(),
       _t: Date.now(),
+      _pendingSync: true,
       tgl: now.toISOString().slice(0, 10),
       jam: now.toTimeString().slice(0, 5),
       u: user,
@@ -361,7 +362,8 @@ class ClinicStore {
 
     // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
     (this.state.pasien || []).forEach(p => {
-      if (p.tgl === today && p.calling) {
+      if (p.tgl === today && p.calling && !p.done && !p.deletedAt &&
+          p.status !== 'dihapus' && p.status !== 'batal_berobat') {
         p.calling = false;
         p._t = now;
       }
