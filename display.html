@@ -650,7 +650,8 @@
       hero.classList.add('flash');
       if (audioEnabled) {
         playChime();
-        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 1250);
+        // Mulai suara setelah chime selesai (durasi efektif sekitar 1,12 detik).
+        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 1120);
       }
     }
 
