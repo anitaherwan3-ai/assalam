@@ -128,7 +128,7 @@ service cloud.firestore {
       // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
       // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
       allow update: if
-        // Kasir/Pimpinan hanya boleh menandai pasien selesai melalui alur transaksi.
+        // Penyelesaian pasien hanya melalui transaksi Kasir atomik.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
           request.resource.data.done == true) ||
@@ -136,8 +136,34 @@ service cloud.firestore {
         (adminOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
           request.resource.data.done == false) ||
-        // Kasir/Pimpinan boleh mengaktifkan atau melepas panggilan TV,
-        // tanpa mengubah identitas, nomor antrean, atau data pasien lainnya.
+        // Kasir boleh mengedit hanya nama dan nomor HP; identitas/antrean tetap terkunci.
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama', 'hp', '_t']) &&
+          request.resource.data.nama is string &&
+          request.resource.data.hp is string &&
+          resource.data.done != true &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
+          (!('status' in resource.data) || resource.data.status != 'dihapus')) ||
+        // Kasir boleh mencatat Batal Berobat untuk pasien yang belum dilayani.
+        (kasirOrPimpinan() &&
+          resource.data.done != true &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
+          (!('status' in resource.data) || resource.data.status != 'dihapus') &&
+          request.resource.data.status == 'batal_berobat' &&
+          request.resource.data.batalBerobatOleh == staffProfile().u &&
+          request.resource.data.calling == false &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', 'calling', '_t'])) ||
+        // Pemulihan antrean hanya dari status Batal Berobat, tanpa mengubah data pasien.
+        (kasirOrPimpinan() &&
+          resource.data.status == 'batal_berobat' &&
+          resource.data.done != true &&
+          request.resource.data.status == 'aktif' &&
+          request.resource.data.batalBerobatPada == null &&
+          request.resource.data.batalBerobatOleh == null &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t'])) ||
+        // Kasir/Pimpinan hanya boleh mengubah status panggilan TV.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
           request.resource.data.calling is bool &&
