@@ -2893,7 +2893,8 @@ function printReturJual(returId) {
   const statusRetur = retur.status === 'disetujui' ? 'DISETUJUI PIMPINAN' :
     retur.status === 'menunggu_pimpinan' ? 'MENUNGGU PERSETUJUAN PIMPINAN' :
     retur.status === 'ditolak' ? 'DITOLAK' : 'MENUNGGU VERIFIKASI ADMIN';
-  const statusUang = retur.status !== 'disetujui' ? 'Menunggu persetujuan akhir Pimpinan' : (!refund ? 'Belum ada pencatatan pengembalian uang' :
+  const statusUang = retur.status === 'ditolak' ? 'Tidak ada pengembalian uang (retur ditolak)' :
+    retur.status !== 'disetujui' ? 'Menunggu persetujuan akhir Pimpinan' : (!refund ? 'Belum ada pencatatan pengembalian uang' :
     refund.status === 'dibayar' ? 'SUDAH DIKEMBALIKAN' : 'MENUNGGU PIMPINAN');
   const dateText = value => value
     ? new Date(value).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
@@ -3710,7 +3711,11 @@ function viewPengawasanRetur() {
       ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') +
         ' / ' + esc(refund.dibayarOleh || '-') +
         (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID') : '')
-      : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') : (refund ? '-' : 'Periksa arsip lama'));
+      : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') :
+        status === 'menunggu' ? 'Menunggu pemeriksaan Admin' :
+        status === 'menunggu_pimpinan' ? 'Diverifikasi Admin: ' + esc(r.diverifikasiAdminOleh || '-') +
+          (r.diverifikasiAdminPada ? ' / ' + new Date(r.diverifikasiAdminPada).toLocaleString('id-ID') : '') :
+        (refund ? '-' : 'Periksa arsip lama'));
     const finalApprovalActions = status === 'menunggu_pimpinan'
       ? '<button class="p" onclick="actionFinalizeReturJual(\'' + esc(r.id) + '\')">Setujui Akhir</button> ' +
         '<button class="s btn-danger" onclick="actionRejectReturJual(\'' + esc(r.id) + '\')">Tolak</button>'
