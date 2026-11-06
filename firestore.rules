@@ -182,8 +182,62 @@ service cloud.firestore {
             .hasOnly(['status', 'alasan', 'tgl', '_t', 'alasanPenolakan', 'diverifikasiOleh', 'diverifikasiPada']));
       allow delete: if pimpinan();
     }
-    match /k_shift/{document} { allow read: if signedIn(); allow write: if adminOrPimpinan() || kasirOrPimpinan(); }
-    match /k_petty/{document} { allow read: if signedIn(); allow write: if kasirOrPimpinan(); }
+    match /k_shift/{document} {
+      allow read: if signedIn();
+      // Kasir hanya membuka shift miliknya sendiri.
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.status == 'buka' &&
+          request.resource.data.modal is number &&
+          request.resource.data.modal >= 0);
+      // Kasir hanya menutup shift miliknya; Admin hanya memverifikasi setoran.
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'jamT', 'sistem', 'fisik', 'selisih', 'verif', '_t']) &&
+          ((resource.data.status == 'buka' &&
+            request.resource.data.status in ['buka', 'tutup'] &&
+            (request.resource.data.status != 'tutup' || request.resource.data.verif == false)) ||
+           (resource.data.status == 'tutup' &&
+            request.resource.data.status == 'tutup' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t']))) ||
+        (staffActive() && staffProfile().role == 'admin' &&
+          resource.data.status == 'tutup' &&
+          request.resource.data.status == 'tutup' &&
+          request.resource.data.verif == true &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['verif', 'oleh', '_t']));
+      allow delete: if pimpinan();
+    }
+    match /k_petty/{document} {
+      allow read: if signedIn();
+      allow create: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.ket is string &&
+          request.resource.data.ket.size() > 0 &&
+          request.resource.data.jml is number &&
+          request.resource.data.jml > 0 &&
+          request.resource.data.tgl is string);
+      // Identitas petugas, tanggal, dan shift tidak dapat diubah setelah dicatat.
+      allow update: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ket', 'jml', '_t']) &&
+          request.resource.data.ket is string &&
+          request.resource.data.ket.size() > 0 &&
+          request.resource.data.jml is number &&
+          request.resource.data.jml > 0);
+      allow delete: if pimpinan() ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u);
+    }
     match /k_obat/{document} {
       allow read: if signedIn();
       allow create, delete: if adminOrPimpinan();
