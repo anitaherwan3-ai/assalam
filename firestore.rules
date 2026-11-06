@@ -214,7 +214,7 @@ service cloud.firestore {
             (request.resource.data.status != 'tutup' || request.resource.data.verif == false)) ||
            (resource.data.status == 'tutup' &&
             request.resource.data.status == 'tutup' &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t']))) ||
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t'])))) ||
         (staffActive() && staffProfile().role == 'admin' &&
           resource.data.status == 'tutup' &&
           request.resource.data.status == 'tutup' &&
