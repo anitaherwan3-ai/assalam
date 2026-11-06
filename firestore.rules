@@ -36,15 +36,41 @@ service cloud.firestore {
       return signedIn() && (initialOwner() || staffProfile().role == 'kasir');
     }
 
+    function isQueueAudioClipDoc(document) {
+      return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$');
+    }
+    function validQueueAudioClipData(document) {
+      return request.resource.data.keys().hasOnly(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.keys().hasAll(['type', 'clipId', 'audioData', 'sizeBytes', 'fileName', 'mimeType', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.type == 'queue_audio_clip' &&
+        request.resource.data.clipId is string &&
+        document == 'queueAudioClip_' + request.resource.data.clipId &&
+        request.resource.data.audioData is string &&
+        request.resource.data.audioData.size() <= 820500 &&
+        request.resource.data.sizeBytes is number &&
+        request.resource.data.sizeBytes > 0 &&
+        request.resource.data.sizeBytes <= 614400 &&
+        request.resource.data.fileName is string &&
+        request.resource.data.fileName.size() <= 120 &&
+        request.resource.data.mimeType == 'audio/mpeg' &&
+        request.resource.data.updatedAt is number &&
+        request.resource.data.updatedBy is string;
+    }
+
     match /klinik_config/{document} {
       allow read: if signedIn();
-      allow create: if pimpinan();
-      allow update: if pimpinan() ||
-        (adminOrPimpinan() &&
+      allow create: if
+        (pimpinan() && !isQueueAudioClipDoc(document)) ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document));
+      allow update: if
+        (pimpinan() && !isQueueAudioClipDoc(document)) ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document) && validQueueAudioClipData(document)) ||
+        (adminOrPimpinan() && !isQueueAudioClipDoc(document) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
-      allow delete: if pimpinan();
+      allow delete: if pimpinan() ||
+        (adminOrPimpinan() && isQueueAudioClipDoc(document));
     }
 
     match /k_users/{document} {
@@ -92,10 +118,29 @@ service cloud.firestore {
     }
     match /k_pasien/{document} {
       allow read: if signedIn();
-      allow write: if kasirOrPimpinan();
-      allow update: if adminOrPimpinan() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
-        request.resource.data.done == false;
+      // Pendaftaran pasien hanya dibuat oleh Kasir/Pimpinan.
+      allow create: if kasirOrPimpinan();
+      // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
+      // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
+      allow update: if
+        // Kasir/Pimpinan hanya boleh menandai pasien selesai melalui alur transaksi.
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+          request.resource.data.done == true) ||
+        // Admin/Pimpinan dapat mengembalikan status pasien menjadi belum selesai.
+        (adminOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+          request.resource.data.done == false) ||
+        // Kasir/Pimpinan boleh mengaktifkan atau melepas panggilan TV,
+        // tanpa mengubah identitas, nomor antrean, atau data pasien lainnya.
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
+          request.resource.data.calling is bool &&
+          resource.data.done != true &&
+          (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null));
+      // Penghapusan data pasien dibatasi untuk Pimpinan.
+      allow delete: if pimpinan();
     }
     match /k_trx/{document} {
       allow read: if signedIn();
@@ -178,7 +223,7 @@ service cloud.firestore {
           resource.data.itemIndex == request.resource.data.itemIndex &&
           request.resource.data.lastReturId is string &&
           request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
-          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&

@@ -519,6 +519,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
 </head>
 <body>
 
@@ -634,6 +635,7 @@
     let audioEnabled = false;
     let currentYtVideoId = '';
     let lastNotifiedCallKey = '';
+    let queueAudioClips = {};
     function notifyPatientCall(patient, poli) {
       if (!patient) return;
       // ID pasien saja tidak cukup: pasien yang sama bisa dipanggil ulang.
@@ -648,7 +650,8 @@
       hero.classList.add('flash');
       if (audioEnabled) {
         playChime();
-        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 420);
+        // Mulai suara setelah chime selesai (durasi efektif sekitar 1,12 detik).
+        setTimeout(() => speakCall(patient.no, poli || patient.layanan || 'Poli Umum'), 1120);
       }
     }
 
@@ -696,21 +699,58 @@
       }
     }
 
-    // Pengumuman antrean dengan gaya petugas stasiun: formal, tenang, dan jelas.
-    function speakCall(noAntrean, poli) {
-      if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return;
-      window.speechSynthesis.cancel();
-      const chars = String(noAntrean || '').split('').map(c => c === '0' ? 'nol' : c).join(' ');
-      const utterance = new SpeechSynthesisUtterance(`Perhatian. Nomor antrean, ${chars}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
-      utterance.lang = 'id-ID';
-      utterance.rate = 0.88;
-      utterance.pitch = 0.92;
-      utterance.volume = 1;
-      const voices = window.speechSynthesis.getVoices();
-      const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
-      const naturalVoice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
-      if (naturalVoice) utterance.voice = naturalVoice;
-      window.speechSynthesis.speak(utterance);
+    function speakFallback(text) {
+      return new Promise(resolve => {
+        if (!('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return resolve();
+        const u = new SpeechSynthesisUtterance(text); u.lang = 'id-ID'; u.rate = 0.88; u.pitch = 0.92; u.volume = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const idVoices = voices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian/i.test(v.name));
+        const voice = idVoices.find(v => /natural|neural|google|microsoft/i.test(v.name)) || idVoices[0];
+        if (voice) u.voice = voice;
+        u.onend = resolve; u.onerror = resolve; window.speechSynthesis.speak(u);
+      });
+    }
+    function playQueueClip(id, fallback) {
+      return new Promise(resolve => {
+        const src = queueAudioClips[id];
+        if (!src) return speakFallback(fallback).then(resolve);
+        const audio = new Audio(src);
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const useFallback = () => {
+          if (settled) return;
+          settled = true;
+          speakFallback(fallback).then(resolve).catch(resolve);
+        };
+        audio.onended = finish;
+        audio.onerror = useFallback;
+        try {
+          const result = audio.play();
+          if (result && typeof result.catch === 'function') result.catch(useFallback);
+        } catch (_) {
+          useFallback();
+        }
+      });
+    }
+    async function speakCall(noAntrean, poli) {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      const match = String(noAntrean || '').trim().match(/^([A-Z])[- ]?(\d+)$/i);
+      if (!match) return speakFallback(`Nomor antrean ${String(noAntrean || '').split('').join(' ')}. Dipersilakan menuju ${poli || 'Poli Umum'}.`);
+      const letter = match[1].toUpperCase(), digits = match[2].split('');
+      const names = {'0':'nol','1':'satu','2':'dua','3':'tiga','4':'empat','5':'lima','6':'enam','7':'tujuh','8':'delapan','9':'sembilan'};
+      await playQueueClip('notification','Notifikasi');
+      await playQueueClip('prefix','Nomor antrean');
+      await playQueueClip('letter_' + letter,letter);
+      for (const digit of digits) await playQueueClip('digit_' + digit,names[digit]);
+      await playQueueClip('suffix','Dipersilakan');
+      const tujuan = String(poli || 'Poli Umum').toLowerCase();
+      if (tujuan.includes('gigi')) await playQueueClip('counter_gigi','menuju Konter Dokter Gigi');
+      else if (tujuan.includes('umum')) await playQueueClip('counter_umum','menuju Konter Dokter Umum');
+      else await speakFallback('menuju ' + (poli || 'Poli Umum'));
     }
 
     // Digital Clock
@@ -972,7 +1012,16 @@
         showVideoOrFallback(videoId, enableVideo);
 
         // Patients waiting today
-        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done);
+        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
+          const aTime = Number(a.registeredAt) || 0;
+          const bTime = Number(b.registeredAt) || 0;
+          if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+          const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+          if (byJam) return byJam;
+          const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+          const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+          return aNo - bNo;
+        });
         
         // Active called patient
         const called = patientData
@@ -1051,14 +1100,15 @@
     });
 
         // Firebase Cloud Realtime Sync for TV Display
-    const firebaseDisplayConfig = {
+    const isProductionDisplayHost = window.location.hostname === 'klinikassalaam.vercel.app';
+    const firebaseDisplayConfig = isProductionDisplayHost ? {
       apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
       authDomain: "assalam-db.firebaseapp.com",
       projectId: "assalam-db",
       storageBucket: "assalam-db.firebasestorage.app",
       messagingSenderId: "735617963454",
       appId: "1:735617963454:web:cea7a5ab29eb398e8855ef"
-    };
+    } : window.ASSALAM_FIREBASE_CONFIG;
 
     let fbDisplayDb = null;
     let fbDisplayAuth = null;
@@ -1091,6 +1141,13 @@
         console.warn('FB Display settings listener error:', err);
       });
 
+      // 1b. Sinkronkan potongan MP3 panggilan antrean ke semua layar TV.
+      fbDisplayDb.collection('klinik_config').where('type', '==', 'queue_audio_clip').onSnapshot(snapshot => {
+        const clips = {};
+        snapshot.forEach(doc => { const data = doc.data() || {}; if (data.audioData) clips[doc.id.replace(/^queueAudioClip_/, '')] = data.audioData; });
+        queueAudioClips = clips;
+      }, err => console.warn('FB Display queue audio listener error:', err));
+
       // 2. Listen Realtime Patient Queue. Access requires a valid staff Firebase session.
       fbDisplayDb.collection('k_pasien').onSnapshot(snapshot => {
         const today = getDisplayTodayWIB();
@@ -1098,7 +1155,16 @@
         // tidak muncul kembali di daftar antrean.
         const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
-        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done);
+        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
+          const aTime = Number(a.registeredAt) || 0;
+          const bTime = Number(b.registeredAt) || 0;
+          if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+          const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+          if (byJam) return byJam;
+          const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+          const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+          return aNo - bNo;
+        });
         const called = docs
           .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
@@ -1150,7 +1216,9 @@
     }
 
     try {
-      if (typeof firebase !== 'undefined' && firebase.auth) {
+      if (firebaseDisplayConfig && firebaseDisplayConfig.apiKey && firebaseDisplayConfig.projectId &&
+          (isProductionDisplayHost || firebaseDisplayConfig.projectId !== 'assalam-db') &&
+          typeof firebase !== 'undefined' && firebase.auth) {
         if (!firebase.apps.length) firebase.initializeApp(firebaseDisplayConfig);
         fbDisplayDb = firebase.firestore();
         fbDisplayAuth = firebase.auth();
