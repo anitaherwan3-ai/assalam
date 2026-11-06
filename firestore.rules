@@ -36,6 +36,27 @@ service cloud.firestore {
       return signedIn() && (initialOwner() || staffProfile().role == 'kasir');
     }
 
+    // Verifikasi kepemilikan Kasir secara langsung dari profil Firestore.
+    // Fungsi ini dipakai khusus untuk update status panggilan pasien.
+    function activeKasirOwnsPatient() {
+      return request.auth != null &&
+        request.auth.token.email is string &&
+        exists(/databases/$(database)/documents/k_users/$(request.auth.token.email)) &&
+        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('email', '') == request.auth.token.email &&
+        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('active', false) == true &&
+        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('role', '') == 'kasir' &&
+        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('u', '') == resource.data.get('kasir', '');
+    }
+    function validPatientCallingUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['calling', '_t']) &&
+        request.resource.data.get('calling', false) is bool &&
+        resource.data.get('done', false) != true &&
+        resource.data.get('status', '') != 'batal_berobat' &&
+        resource.data.get('status', '') != 'dihapus' &&
+        resource.data.get('deletedAt', null) == null;
+    }
+
     function isQueueAudioClipDoc(document) {
       return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$');
     }
@@ -185,20 +206,10 @@ service cloud.firestore {
             'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
             'pelimpahanAlasan', 'pelimpahanPada', '_t'
           ]));
-      // Aturan panggilan TV dipisahkan menjadi allow update tersendiri.
-      // Hak akses tetap dibatasi untuk Pimpinan atau Kasir pemilik pasien,
-      // hanya field calling/_t, dan pasien yang belum selesai/dibatalkan/dihapus.
-      allow update: if
-        (pimpinan() ||
-          (staffActive() &&
-            staffProfile().role == 'kasir' &&
-            resource.data.kasir == staffProfile().u)) &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['calling', '_t']) &&
-        request.resource.data.calling is bool &&
-        resource.data.done != true &&
-        (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
-        (!('deletedAt' in resource.data) || resource.data.deletedAt == null);
+      // Status panggilan: Pimpinan atau Kasir aktif pemilik pasien.
+      // Perubahan dibatasi pada calling/_t; pasien selesai/dibatalkan/dihapus ditolak.
+      allow update: if pimpinan() && validPatientCallingUpdate();
+      allow update: if activeKasirOwnsPatient() && validPatientCallingUpdate();
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
