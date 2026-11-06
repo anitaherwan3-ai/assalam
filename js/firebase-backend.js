@@ -1252,6 +1252,11 @@ class FirebaseBackend {
           const items = state[col] || [];
           for (const item of items) {
             if (!item) continue;
+            // Kasir hanya menyinkronkan shift dan kas kecil miliknya sendiri.
+            if (profile.role === 'kasir' && col === 'shift' && item.kasir !== profile.u) continue;
+            if (profile.role === 'kasir' && col === 'petty' && item.kasir !== profile.u) continue;
+            // Admin hanya meneruskan perubahan verifikasi shift yang sudah disetujui.
+            if (profile.role === 'admin' && col === 'shift' && item.verif !== true) continue;
             // Kasir hanya boleh menyinkronkan nota yang dibuat atas identitasnya sendiri.
             // Nota kasir lain tetap tersimpan di cache lokal untuk dibaca, bukan ditulis ulang.
             if (col === 'trx' && profile.role === 'kasir' && item.kasir !== profile.u) continue;
