@@ -3901,7 +3901,7 @@ function viewPengguna() {
 
     <div class="card">
       <h2>Akun Staf Firebase</h2>
-      <p class="muted" style="font-size:12px;">Akun berikut menggunakan Firebase Authentication. Tombol ini membuat profil akses Firestore untuk email staf yang sudah didaftarkan. Password tidak disimpan di aplikasi atau Firestore.</p>
+      <p class="muted" style="font-size:12px;">Buat akun staf terlebih dahulu di Firebase Authentication. Tombol ini kemudian menyiapkan profil akses Firestore untuk email staf tersebut. Password tidak disimpan di aplikasi atau Firestore.</p>
       <div style="margin:10px 0 14px;line-height:1.8;">
         <div><b>Admin Gudang & Keuangan:</b> assalamadmin1@gmail.com</div>
         <div><b>Kasir Shift Pagi:</b> assalamkasir1@gmail.com</div>
