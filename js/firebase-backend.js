@@ -1276,6 +1276,15 @@ class FirebaseBackend {
               const remoteSnap = await patientRef.get();
               if (!remoteSnap.exists) continue;
               const remote = remoteSnap.data() || {};
+              // Cache pasien dibaca bersama oleh semua perangkat, tetapi Kasir hanya boleh
+              // mendorong perubahan pada pasien yang saat ini menjadi tanggung jawabnya.
+              // Ini mencegah cache lama Kasir 1 menulis ulang dokumen saat Kasir 2 bekerja.
+              if (remote.kasir !== profile.u) {
+                console.warn('[SYNC-DIAG] Lewati pasien milik kasir lain', {
+                  patientId, owner: remote.kasir || '-', currentKasir: profile.u
+                });
+                continue;
+              }
               const localTime = Number(item._t || 0);
               const remoteTime = Number(remote._t || 0);
               if (localTime <= remoteTime) continue;
