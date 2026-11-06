@@ -941,8 +941,11 @@ function delPasien(id) {
 // MODULE: TRANSAKSI & KASIR (POS)
 // -------------------------------------------------------------
 function viewTrx() {
+  // Transaksi Kasir hanya untuk pasien hari ini yang sedang dipanggil dari antrean.
+  // Pasien yang masih menunggu tidak boleh muncul di pilihan transaksi.
   const waitingPatients = (store.state.pasien || [])
-    .filter(p => !p.done && !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat')
+    .filter(p => p.tgl === todayStr && p.calling === true && !p.done &&
+      !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat')
     .slice()
     .sort((a, b) => {
       const aTime = Number(a.registeredAt) || 0;
@@ -984,7 +987,7 @@ function viewTrx() {
           <div style="flex:1;">
             <div style="font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;">PILIH PASIEN</div>
             <select id="trx-pasien" style="margin-top:4px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--bg);color:var(--tx);font-size:13px;font-weight:600;">
-              ${waitingPatients.length === 0 ? '<option value="">-- Belum ada pasien antrean --</option>' : ''}
+              ${waitingPatients.length === 0 ? '<option value="">-- Panggil pasien terlebih dahulu --</option>' : ''}
               ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.jam || "--:--")} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
             </select>
           </div>
@@ -1418,8 +1421,9 @@ async function actionBayarTrx(totalCart) {
   }
   const pid = val('trx-pasien');
   const pasien = store.get('pasien', pid);
-  if (!pasien || pasien.deletedAt || pasien.status === 'dihapus' || pasien.status === 'batal_berobat') {
-    showAlert('Pasien tidak aktif untuk transaksi. Pilih pasien dari antrean aktif.');
+  if (!pasien || pasien.tgl !== todayStr || pasien.calling !== true || pasien.done ||
+      pasien.deletedAt || pasien.status === 'dihapus' || pasien.status === 'batal_berobat') {
+    showAlert('Pasien belum dipanggil atau sudah tidak aktif untuk transaksi. Panggil pasien dari antrean terlebih dahulu.');
     return;
   }
   if (cartItems.length === 0) {
@@ -2842,8 +2846,9 @@ function viewRiwayat() {
   });
   const returRows = returList.map(r => {
     const status = r.status || 'disetujui';
-    const badge = status === 'menunggu' ? '<span class="badge-warn">Menunggu Verifikasi</span>' :
-      status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
+    const badge = status === 'menunggu' ? '<span class="badge-warn">Menunggu Admin</span>' :
+      status === 'menunggu_pimpinan' ? '<span class="badge-warn">Menunggu Pimpinan</span>' :
+      status === 'disetujui' ? '<span class="badge-ok">Disetujui Pimpinan</span>' : '<span class="badge-bad">Ditolak</span>';
     const refund = r.pengembalian || null;
     const legacyRefund = status === 'disetujui' && !refund;
     const refundBadge = legacyRefund
@@ -2851,8 +2856,8 @@ function viewRiwayat() {
       : (refund && refund.status === 'dibayar'
         ? '<span class="badge-ok">Uang Sudah Dikembalikan</span>'
         : (status === 'disetujui' ? '<span class="badge-warn">Menunggu Pimpinan</span>' : '-'));
-    const processActions = status === 'menunggu' && (currentRole === 'admin' || currentRole === 'pimpinan')
-      ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Setujui</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>`
+    const processActions = status === 'menunggu' && currentRole === 'admin'
+      ? `<button class="p" onclick="actionApproveReturJual('${r.id}')">Verifikasi &amp; Teruskan</button> <button class="s btn-danger" onclick="actionRejectReturJual('${r.id}')">Tolak</button>`
       : (status === 'disetujui' && refund && refund.status === 'menunggu' && currentRole === 'pimpinan'
         ? `<button class="p" onclick="actionPayReturJual('${r.id}')">Catat Uang Kembali</button>` : '');
     const actions = `<button class="s" onclick="printReturJual('${r.id}')">Nota Retur</button> ${processActions}`;
@@ -2874,7 +2879,7 @@ function viewRiwayat() {
       <p style="color:var(--mu);font-size:13px;">Nota dan stok hanya berubah setelah Admin menyetujui pengajuan.</p>
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
     <div class="card"><h2>Riwayat Retur Penjualan Pasien</h2>
-      <p style="color:var(--mu);font-size:13px;">Retur disetujui Admin untuk mengembalikan stok. Pengembalian uang dicatat terpisah dan hanya dapat dilakukan Pimpinan.</p>
+      <p style="color:var(--mu);font-size:13px;">Admin memverifikasi pengajuan terlebih dahulu. Stok obat/batch baru dipulihkan setelah persetujuan akhir Pimpinan.</p>
       ${renderTable(['Tanggal','No. Nota','Nama Pasien','Item Diretur','Qty','Nilai Retur','Alasan','Kasir','Status Retur','Diputuskan Oleh / Waktu','Status Uang','Bukti / Metode / Waktu Bayar','Tindakan'], returRows, { key: 'retur_jual_tbl' })}</div>
   `;
 }
@@ -2885,10 +2890,12 @@ function printReturJual(returId) {
   const trx = store.get('trx', retur.trxId);
   const set = store.state.set || {};
   const refund = retur.pengembalian || null;
-  const statusRetur = retur.status === 'disetujui' ? 'DISETUJUI' :
-    retur.status === 'ditolak' ? 'DITOLAK' : 'MENUNGGU VERIFIKASI';
-  const statusUang = !refund ? 'Belum ada pencatatan pengembalian uang' :
-    refund.status === 'dibayar' ? 'SUDAH DIKEMBALIKAN' : 'MENUNGGU PIMPINAN';
+  const statusRetur = retur.status === 'disetujui' ? 'DISETUJUI PIMPINAN' :
+    retur.status === 'menunggu_pimpinan' ? 'MENUNGGU PERSETUJUAN PIMPINAN' :
+    retur.status === 'ditolak' ? 'DITOLAK' : 'MENUNGGU VERIFIKASI ADMIN';
+  const statusUang = retur.status === 'ditolak' ? 'Tidak ada pengembalian uang (retur ditolak)' :
+    retur.status !== 'disetujui' ? 'Menunggu persetujuan akhir Pimpinan' : (!refund ? 'Belum ada pencatatan pengembalian uang' :
+    refund.status === 'dibayar' ? 'SUDAH DIKEMBALIKAN' : 'MENUNGGU PIMPINAN');
   const dateText = value => value
     ? new Date(value).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
     : '-';
@@ -2953,14 +2960,28 @@ function printReturJual(returId) {
 }
 
 function actionApproveReturJual(id) {
-  if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
-  showConfirm('Setujui retur ini? Stok obat, batch asal, dan status retur akan diperbarui bersama di cloud.', async () => {
+  if (currentRole !== 'admin') return;
+  showConfirm('Verifikasi pengajuan retur dan teruskan kepada Pimpinan? Stok dan batch belum akan berubah pada tahap ini.', async () => {
     try {
       await window.firebaseBackend.approveReturJual(id);
-      showAlert('Retur disetujui. Stok dan batch asal sudah diperbarui di cloud.', 'Retur Disetujui');
+      showAlert('Verifikasi Admin berhasil. Pengajuan diteruskan kepada Pimpinan; stok belum berubah.', 'Diteruskan ke Pimpinan');
     } catch (err) {
       console.error('Persetujuan retur gagal:', err);
       showAlert(err.message || 'Persetujuan gagal. Stok tidak diubah.', 'Gagal');
+    }
+    renderApp();
+  });
+}
+
+function actionFinalizeReturJual(id) {
+  if (currentRole !== 'pimpinan') return;
+  showConfirm('Setujui retur ini sebagai keputusan akhir? Jika disetujui, stok dan batch obat asal akan dipulihkan sekarang. Retur jasa/tindakan tidak mengubah stok.', async () => {
+    try {
+      await window.firebaseBackend.finalizeReturJual(id);
+      showAlert('Retur disetujui Pimpinan. Stok/batch obat dipulihkan bila item berupa obat atau paket; pengembalian uang menunggu pencatatan Pimpinan.', 'Persetujuan Akhir Berhasil');
+    } catch (err) {
+      console.error('Persetujuan akhir retur gagal:', err);
+      showAlert(err.message || 'Persetujuan akhir gagal. Stok tidak diubah.', 'Gagal');
     }
     renderApp();
   });
@@ -3670,8 +3691,9 @@ async function actionMigrateReturKuota() {
 function viewPengawasanRetur() {
   if (currentRole !== 'pimpinan') return '<div class="card">Akses hanya untuk Pimpinan.</div>';
   const list = (store.state.returJual || []).slice().sort((a, b) =>
-    Number(b.diverifikasiPada || b._t || 0) - Number(a.diverifikasiPada || a._t || 0)
+    Number(b.diverifikasiPada || b.diverifikasiAdminPada || b._t || 0) - Number(a.diverifikasiPada || a.diverifikasiAdminPada || a._t || 0)
   );
+  const pendingFinalApproval = list.filter(r => r.status === 'menunggu_pimpinan').length;
   const pendingPayment = list.filter(r => r.status === 'disetujui' && r.pengembalian && r.pengembalian.status === 'menunggu').length;
   const paid = list.filter(r => r.status === 'disetujui' && r.pengembalian && r.pengembalian.status === 'dibayar').length;
   const legacy = list.filter(r => r.status === 'disetujui' && !r.pengembalian).length;
@@ -3679,7 +3701,8 @@ function viewPengawasanRetur() {
     const status = r.status || 'disetujui';
     const refund = r.pengembalian || null;
     const statusRetur = status === 'menunggu' ? '<span class="badge-warn">Menunggu Admin</span>' :
-      status === 'disetujui' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-bad">Ditolak</span>';
+      status === 'menunggu_pimpinan' ? '<span class="badge-warn">Menunggu Keputusan Pimpinan</span>' :
+      status === 'disetujui' ? '<span class="badge-ok">Disetujui Pimpinan</span>' : '<span class="badge-bad">Ditolak</span>';
     const statusUang = status !== 'disetujui' ? '-' : (!refund
       ? '<span class="badge-warn">Retur Lama - Perlu Rekonsiliasi</span>'
       : (refund.status === 'dibayar' ? '<span class="badge-ok">Sudah Dikembalikan</span>' :
@@ -3688,25 +3711,34 @@ function viewPengawasanRetur() {
       ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') +
         ' / ' + esc(refund.dibayarOleh || '-') +
         (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID') : '')
-      : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') : (refund ? '-' : 'Periksa arsip lama'));
+      : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') :
+        status === 'menunggu' ? 'Menunggu pemeriksaan Admin' :
+        status === 'menunggu_pimpinan' ? 'Diverifikasi Admin: ' + esc(r.diverifikasiAdminOleh || '-') +
+          (r.diverifikasiAdminPada ? ' / ' + new Date(r.diverifikasiAdminPada).toLocaleString('id-ID') : '') :
+        (refund ? '-' : 'Periksa arsip lama'));
+    const finalApprovalActions = status === 'menunggu_pimpinan'
+      ? '<button class="p" onclick="actionFinalizeReturJual(\'' + esc(r.id) + '\')">Setujui Akhir</button> ' +
+        '<button class="s btn-danger" onclick="actionRejectReturJual(\'' + esc(r.id) + '\')">Tolak</button>'
+      : '';
     const payAction = status === 'disetujui' && refund && refund.status === 'menunggu'
       ? '<button class="p" onclick="actionPayReturJual(\'' + esc(r.id) + '\')">Catat Uang Kembali</button>'
       : '';
-    const action = '<button class="s" onclick="printReturJual(\'' + esc(r.id) + '\')">Nota Retur</button> ' + payAction;
+    const action = '<button class="s" onclick="printReturJual(\'' + esc(r.id) + '\')">Nota Retur</button> ' + finalApprovalActions + payAction;
     return [esc(r.tgl || '-'), esc(r.noNota || '-'), esc(r.namaPasien || '-'),
       esc(r.namaItem || '-'), Number(r.qty || 0), rp(r.total), esc(r.kasir || '-'),
       statusRetur, statusUang, detail, action];
   });
   return `
     <div class="card">
-      <h2>Pengawasan Pengembalian Uang Retur</h2>
-      <p style="color:var(--mu);font-size:13px;">Pimpinan hanya perlu mencatat pengembalian uang setelah retur disetujui Admin. Persetujuan stok tetap ditangani Admin; setiap pembayaran tercatat satu kali beserta metode, referensi, petugas, dan waktunya.</p>
+      <h2>Persetujuan Akhir &amp; Pengawasan Retur</h2>
+      <p style="color:var(--mu);font-size:13px;">Pimpinan memutuskan akhir setiap retur setelah verifikasi Admin. Stok/batch obat dipulihkan hanya saat Pimpinan menyetujui. Retur jasa/tindakan tidak mengubah stok. Pengembalian uang tunai atau transfer dicatat terpisah dan hanya satu kali.</p>
       <div style="margin:10px 0 14px;">
         <button class="s p" onclick="actionMigrateReturKuota()">Siapkan / Periksa Kuota Retur Nota Lama</button>
         <p style="color:var(--mu);font-size:12px;">Jalankan sekali setelah pembaruan. Dokumen kuota terpisah; nota, stok, dan riwayat lama tidak ditimpa.</p>
       </div>
       <div class="grid">
-        <div class="kpi"><span>Menunggu Pengembalian</span><b>${pendingPayment}</b></div>
+        <div class="kpi"><span>Menunggu Persetujuan Akhir</span><b>${pendingFinalApproval}</b></div>
+        <div class="kpi"><span>Menunggu Pengembalian Uang</span><b>${pendingPayment}</b></div>
         <div class="kpi"><span>Sudah Dikembalikan</span><b>${paid}</b></div>
         <div class="kpi"><span>Retur Lama Perlu Rekonsiliasi</span><b>${legacy}</b></div>
       </div>

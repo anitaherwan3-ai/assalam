@@ -740,11 +740,37 @@ class FirebaseBackend {
     return { created, existed, invoices: trxSnapshot.size };
   }
 
-  // Persetujuan retur memverifikasi ulang nominal terhadap nota asli di Cloud.
+  // Tahap pertama: Admin memverifikasi pengajuan. Stok belum disentuh.
   async approveReturJual(returId) {
     const profile = this.currentProfile;
-    if (!profile || !['admin', 'pimpinan'].includes(profile.role)) {
-      throw new Error('Hanya Admin/Pimpinan yang dapat menyetujui retur.');
+    if (!profile || profile.role !== 'admin') {
+      throw new Error('Hanya Admin yang dapat memverifikasi pengajuan retur.');
+    }
+    if (!this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Koneksi Firebase belum siap. Pengajuan belum diteruskan.');
+    }
+    const ref = this.db.collection('k_returJual').doc(String(returId));
+    const now = Date.now();
+    await this.db.runTransaction(async transaction => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists || (snap.data() || {}).status !== 'menunggu') {
+        throw new Error('Pengajuan tidak ditemukan atau bukan menunggu verifikasi Admin.');
+      }
+      transaction.update(ref, {
+        status: 'menunggu_pimpinan',
+        diverifikasiAdminOleh: profile.u || profile.email || '-',
+        diverifikasiAdminPada: now,
+        _t: now
+      });
+    });
+    return true;
+  }
+
+  // Tahap kedua: hanya Pimpinan yang memutuskan akhir dan memulihkan stok/batch.
+  async finalizeReturJual(returId) {
+    const profile = this.currentProfile;
+    if (!profile || profile.role !== 'pimpinan') {
+      throw new Error('Hanya Pimpinan yang dapat menyetujui akhir retur dan memulihkan stok.');
     }
     if (!this.db || !this.auth || !this.auth.currentUser) {
       throw new Error('Koneksi Firebase belum siap. Retur belum disetujui.');
@@ -771,7 +797,7 @@ class FirebaseBackend {
       const trxSnap = await transaction.get(trxRef);
       if (!returSnap.exists || !trxSnap.exists) throw new Error('Retur atau nota asli tidak ditemukan.');
       const retur = returSnap.data() || {}, trx = trxSnap.data() || {};
-      if (retur.status !== 'menunggu') throw new Error('Retur sudah diproses atau bukan status menunggu.');
+      if (retur.status !== 'menunggu_pimpinan') throw new Error('Retur belum diverifikasi Admin atau sudah pernah diproses.');
       if (trx.status === 'dibatalkan') throw new Error('Nota asli sudah dibatalkan.');
       if (!Array.isArray(retur.batchRestores)) {
         throw new Error('Rincian retur tidak valid. Stok tidak diubah.');
@@ -903,10 +929,14 @@ class FirebaseBackend {
     const now = Date.now();
     await this.db.runTransaction(async transaction => {
       const snap = await transaction.get(ref);
-      if (!snap.exists || (snap.data() || {}).status !== 'menunggu') {
-        throw new Error('Retur tidak ditemukan atau sudah pernah diproses.');
-      }
+      if (!snap.exists) throw new Error('Retur tidak ditemukan.');
       const retur = snap.data() || {};
+      const expectedStatus = profile.role === 'admin' ? 'menunggu' : 'menunggu_pimpinan';
+      if (retur.status !== expectedStatus) {
+        throw new Error(profile.role === 'admin'
+          ? 'Retur bukan menunggu verifikasi Admin.'
+          : 'Retur belum diverifikasi Admin atau sudah pernah diproses.');
+      }
       const quotaId = retur.quotaId || (retur.trxId != null && retur.itemIndex != null
         ? this.returQuotaId(retur.trxId, retur.itemIndex) : '');
       const quotaRef = quotaId
@@ -949,7 +979,7 @@ class FirebaseBackend {
       const snap = await transaction.get(ref);
       if (!snap.exists) throw new Error('Data retur tidak ditemukan di Cloud.');
       const retur = snap.data() || {};
-      if (retur.status !== 'disetujui') throw new Error('Retur harus disetujui Admin sebelum uang dikembalikan.');
+      if (retur.status !== 'disetujui') throw new Error('Retur harus mendapat persetujuan akhir Pimpinan sebelum uang dikembalikan.');
       if (!retur.pengembalian || retur.pengembalian.status !== 'menunggu') {
         throw new Error('Data retur lama perlu rekonsiliasi Pimpinan dan tidak dapat dibayar ulang dari tombol ini.');
       }
