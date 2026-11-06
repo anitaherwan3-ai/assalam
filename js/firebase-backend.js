@@ -1266,6 +1266,38 @@ class FirebaseBackend {
             if (col === 'returJual' && profile.role === 'kasir' &&
                 (item.kasir !== profile.u || item.status !== 'menunggu')) continue;
 
+            // Dokumen pasien Kasir disinkronkan sebagai patch terbatas, bukan
+            // set seluruh cache lokal. Pendaftaran baru sudah dibuat atomik oleh
+            // registerPatientWithQueueNumber; jangan membuat ulang pasien lama yang hilang.
+            if (col === 'pasien' && profile.role === 'kasir') {
+              const patientId = String(item.id || '');
+              if (!patientId) continue;
+              const patientRef = this.db.collection('k_pasien').doc(patientId);
+              const remoteSnap = await patientRef.get();
+              if (!remoteSnap.exists) continue;
+              const remote = remoteSnap.data() || {};
+              const localTime = Number(item._t || 0);
+              const remoteTime = Number(remote._t || 0);
+              if (localTime <= remoteTime) continue;
+              const patientFields = [
+                'nama', 'hp', 'calling', 'done', 'status',
+                'batalBerobatPada', 'batalBerobatOleh'
+              ];
+              const patch = {};
+              patientFields.forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(item, key) &&
+                    JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
+                  patch[key] = item[key];
+                }
+              });
+              // Jangan mengirim update timestamp kosong atau menulis ulang
+              // dokumen yang hanya berbeda pada metadata lokal.
+              if (!Object.keys(patch).length) continue;
+              patch._t = Math.max(Date.now(), remoteTime + 1);
+              operations.push({ ref: patientRef, data: patch, merge: true });
+              continue;
+            }
+
             const payload = JSON.parse(JSON.stringify(item));
             if (!payload._t) payload._t = Date.now();
 
