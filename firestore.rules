@@ -86,7 +86,7 @@ service cloud.firestore {
           request.resource.data.active == true &&
           (!('uid' in resource.data) || resource.data.uid == null || resource.data.uid == request.auth.uid))
         ||
-        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'] &&
           request.resource.data.email == document &&
           request.resource.data.role in ['admin', 'kasir'] &&
           request.resource.data.active is bool)
@@ -98,13 +98,13 @@ service cloud.firestore {
           request.resource.data.role == 'pimpinan' &&
           request.resource.data.active == true)
         ||
-        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'] &&
+        (document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'] &&
           request.resource.data.email == document &&
           request.resource.data.role in ['admin', 'kasir'] &&
           request.resource.data.active == true)
       );
       allow delete: if initialOwner() &&
-        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+        document in ['assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'];
     }
 
     match /k_log/{document} {
