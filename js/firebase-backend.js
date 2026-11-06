@@ -1303,14 +1303,13 @@ class FirebaseBackend {
 
             const docId = (col === 'users') ? (payload.u || payload.id) : payload.id;
 
-            // Log staf bersifat append-only. Jangan kirim ulang dokumen log yang
-            // sudah ada: Rules hanya mengizinkan create log baru atau update _t saja.
-            // Cache lokal lama dapat berbeda dari audit log Cloud dan membuat batch ditolak.
-            if (col === 'log' && profile.role !== 'pimpinan' && docId) {
+            // Log staf hanya dikirim bila benar-benar dibuat setelah mekanisme
+            // penanda pending diterapkan. Kasir/Admin tidak boleh membaca k_log,
+            // sehingga sinkronisasi tidak boleh melakukan get() untuk memeriksa ID.
+            if (col === 'log' && profile.role !== 'pimpinan') {
+              if (item._pendingSync !== true || !docId) continue;
               const logRef = this.db.collection('k_log').doc(String(docId));
-              const remoteLog = await logRef.get();
-              if (remoteLog.exists) continue;
-              operations.push({ ref: logRef, data: payload, merge: false });
+              operations.push({ ref: logRef, data: payload, merge: false, sourceItem: item });
               continue;
             }
             if (docId) {
@@ -1356,6 +1355,15 @@ class FirebaseBackend {
             }
             try {
               await batch.commit();
+              // Tandai log lokal sudah tersinkron hanya setelah commit Firestore berhasil.
+              let syncedLog = false;
+              chunk.forEach(op => {
+                if (op.sourceItem) {
+                  op.sourceItem._pendingSync = false;
+                  syncedLog = true;
+                }
+              });
+              if (syncedLog) this.store.saveLocal(false);
             } catch (batchError) {
               console.error('[SYNC-DIAG] Koleksi Firestore ditolak', {
                 role: profile.role,
