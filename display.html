@@ -712,9 +712,26 @@
       return new Promise(resolve => {
         const src = queueAudioClips[id];
         if (!src) return speakFallback(fallback).then(resolve);
-        const audio = new Audio(src); audio.onended = resolve;
-        audio.onerror = () => speakFallback(fallback).then(resolve);
-        const result = audio.play(); if (result && result.catch) result.catch(() => speakFallback(fallback).then(resolve));
+        const audio = new Audio(src);
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const useFallback = () => {
+          if (settled) return;
+          settled = true;
+          speakFallback(fallback).then(resolve).catch(resolve);
+        };
+        audio.onended = finish;
+        audio.onerror = useFallback;
+        try {
+          const result = audio.play();
+          if (result && typeof result.catch === 'function') result.catch(useFallback);
+        } catch (_) {
+          useFallback();
+        }
       });
     }
     async function speakCall(noAntrean, poli) {
