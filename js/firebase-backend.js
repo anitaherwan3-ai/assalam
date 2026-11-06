@@ -84,12 +84,20 @@ class FirebaseBackend {
   };
 
   init() {
-    let config = this.store.state.firebaseConfig;
-    if (!config || !config.apiKey || !config.projectId) {
-      config = FirebaseBackend.DEFAULT_CONFIG;
-      this.store.state.firebaseConfig = config;
-      this.store.saveLocal(false);
+    const isProductionHost = window.location.hostname === 'klinikassalaam.vercel.app';
+    let config = isProductionHost
+      ? (this.store.state.firebaseConfig || FirebaseBackend.DEFAULT_CONFIG)
+      : window.ASSALAM_FIREBASE_CONFIG;
+    // Fail closed on Preview/local hosts: never connect to the operational Firebase project.
+    if (!config || !config.apiKey || !config.projectId ||
+        (!isProductionHost && config.projectId === FirebaseBackend.DEFAULT_CONFIG.projectId)) {
+      this.updateBadge('error', 'Firebase khusus Preview belum dikonfigurasi');
+      console.warn('Firebase Preview dinonaktifkan sampai konfigurasi database uji tersedia.');
+      return;
     }
+    if (isProductionHost && (!config.apiKey || !config.projectId)) config = FirebaseBackend.DEFAULT_CONFIG;
+    this.store.state.firebaseConfig = config;
+    this.store.saveLocal(false);
     try {
       if (typeof firebase === 'undefined') {
         console.warn('Firebase SDK belum termuat dari CDN.');
