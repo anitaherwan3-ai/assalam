@@ -186,7 +186,8 @@ service cloud.firestore {
             'pelimpahanAlasan', 'pelimpahanPada', '_t'
           ])) ||
         // Kasir/Pimpinan hanya boleh mengubah status panggilan TV.
-        (kasirOrPimpinan() &&
+        ((pimpinan() || (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u)) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&
           request.resource.data.calling is bool &&
           resource.data.done != true &&
