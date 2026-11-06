@@ -1290,6 +1290,21 @@ class FirebaseBackend {
                   patch[key] = item[key];
                 }
               });
+              // Jangan izinkan cache Kasir mengubah status panggilan pasien
+              // yang di Cloud sudah selesai, dibatalkan, atau dihapus.
+              // Cache lintas perangkat dapat tertinggal; Rules Cloud tetap menjadi
+              // otoritas status pasien.
+              if (Object.prototype.hasOwnProperty.call(patch, 'calling') &&
+                  (remote.done === true ||
+                   remote.deletedAt != null ||
+                   remote.status === 'dihapus' ||
+                   remote.status === 'batal_berobat')) {
+                console.warn('[SYNC-DIAG] Lewati perubahan calling pasien nonaktif', {
+                  patientId, done: remote.done === true,
+                  status: remote.status || '', deletedAt: remote.deletedAt || null
+                });
+                delete patch.calling;
+              }
               // Jangan mengirim update timestamp kosong atau menulis ulang
               // dokumen yang hanya berbeda pada metadata lokal.
               if (!Object.keys(patch).length) continue;
