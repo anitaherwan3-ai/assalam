@@ -118,10 +118,19 @@ service cloud.firestore {
     }
     match /k_pasien/{document} {
       allow read: if signedIn();
-      allow write: if kasirOrPimpinan();
-      allow update: if adminOrPimpinan() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
-        request.resource.data.done == false;
+      // Pendaftaran pasien hanya dibuat oleh Kasir/Pimpinan.
+      allow create: if kasirOrPimpinan();
+      // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
+      // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
+      allow update: if
+        (kasirOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+          request.resource.data.done == true) ||
+        (adminOrPimpinan() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
+          request.resource.data.done == false);
+      // Penghapusan data pasien dibatasi untuk Pimpinan.
+      allow delete: if pimpinan();
     }
     match /k_trx/{document} {
       allow read: if signedIn();
@@ -204,7 +213,7 @@ service cloud.firestore {
           resource.data.itemIndex == request.resource.data.itemIndex &&
           request.resource.data.lastReturId is string &&
           request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
-          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&
