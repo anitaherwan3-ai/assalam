@@ -1011,7 +1011,16 @@
         showVideoOrFallback(videoId, enableVideo);
 
         // Patients waiting today
-        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done);
+        const patients = patientData.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
+          const aTime = Number(a.registeredAt) || 0;
+          const bTime = Number(b.registeredAt) || 0;
+          if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+          const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+          if (byJam) return byJam;
+          const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+          const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+          return aNo - bNo;
+        });
         
         // Active called patient
         const called = patientData
@@ -1145,7 +1154,16 @@
         // tidak muncul kembali di daftar antrean.
         const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
-        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done);
+        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
+          const aTime = Number(a.registeredAt) || 0;
+          const bTime = Number(b.registeredAt) || 0;
+          if (aTime && bTime && aTime !== bTime) return aTime - bTime;
+          const byJam = String(a.jam || '').localeCompare(String(b.jam || ''));
+          if (byJam) return byJam;
+          const aNo = Number(String(a.no || '').replace(/\D/g, '')) || 0;
+          const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
+          return aNo - bNo;
+        });
         const called = docs
           .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
