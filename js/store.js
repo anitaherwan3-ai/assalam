@@ -239,6 +239,7 @@ class ClinicStore {
     const entry = {
       id: uid(),
       _t: Date.now(),
+      _pendingSync: true,
       tgl: now.toISOString().slice(0, 10),
       jam: now.toTimeString().slice(0, 5),
       u: user,
