@@ -204,11 +204,13 @@ class FirebaseBackend {
     const local = Array.isArray(localUsers) ? localUsers : [];
     const definitions = [
       { email: 'assalamadmin1@gmail.com', role: 'admin', u: 'admin-gudang', fallbackName: 'Admin Gudang & Keuangan' },
-      { email: 'assalamkasir1@gmail.com', role: 'kasir', u: 'kasir', fallbackName: 'Kasir' }
+      { email: 'assalamkasir1@gmail.com', role: 'kasir', u: 'kasir', fallbackName: 'Kasir Shift Pagi' },
+      { email: 'assalamkasir2@gmail.com', role: 'kasir', u: 'kasir2', fallbackName: 'Kasir Shift Sore' }
     ];
     const results = [];
     for (const item of definitions) {
-      const prior = local.find(x => x.role === item.role && x.role !== 'pimpinan') || {};
+      const prior = local.find(x => x.u === item.u || x.email === item.email ||
+        (item.email === 'assalamadmin1@gmail.com' && x.role === 'admin')) || {};
       const profile = {
         email: item.email, u: item.u,
         nama: prior.nama || item.fallbackName,
@@ -249,7 +251,7 @@ class FirebaseBackend {
     if (!this.auth) throw new Error('Firebase Authentication belum siap.');
     const normalized = String(email || '').trim().toLowerCase();
     const allowed = ['praktekrose@gmail.com', 'nursalim42@gmail.com',
-      'assalamadmin1@gmail.com', 'assalamkasir1@gmail.com'];
+      'assalamadmin1@gmail.com', 'assalamkasir1@gmail.com', 'assalamkasir2@gmail.com'];
     if (!allowed.includes(normalized)) throw new Error('Email belum terdaftar sebagai akun Assalam.');
     return this.auth.sendPasswordResetEmail(normalized);
   }
