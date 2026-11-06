@@ -680,7 +680,7 @@ function printShiftSlip(shiftId) {
 // MODULE: PASIEN & ANTREAN
 // -------------------------------------------------------------
 function viewPasien() {
-  const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus');
+  const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus' && (currentRole !== 'kasir' || (currentUser && p.kasir === currentUser.u)));
   // Pasien yang belum dilayani tampil lebih dahulu, diurutkan dari waktu kedatangan.
   // Pasien yang sudah dilayani otomatis pindah ke bagian paling bawah.
   const sortedTodayPatients = todayPatients.slice().sort((a, b) => {
