@@ -1,12 +1,10 @@
-// Isi hanya dengan konfigurasi Firebase KHUSUS untuk Preview/testing.
-// Jangan gunakan projectId "assalam-db" di file ini.
-// Contoh:
-// window.ASSALAM_FIREBASE_CONFIG = {
-//   apiKey: "API_KEY_PROJECT_UJI",
-//   authDomain: "PROJECT_UJI.firebaseapp.com",
-//   projectId: "ID_PROJECT_UJI",
-//   storageBucket: "PROJECT_UJI.firebasestorage.app",
-//   messagingSenderId: "SENDER_ID_PROJECT_UJI",
-//   appId: "APP_ID_PROJECT_UJI"
-// };
-window.ASSALAM_FIREBASE_CONFIG = null;
+// Konfigurasi Firebase KHUSUS untuk Preview/testing.
+// Project ini terpisah dari Firebase operasional assalam-db.
+window.ASSALAM_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB7za1bfLVvbelR53HLbGRA9l1a7ZRd-J8",
+  authDomain: "assalam-preview-test.firebaseapp.com",
+  projectId: "assalam-preview-test",
+  storageBucket: "assalam-preview-test.firebasestorage.app",
+  messagingSenderId: "543374676169",
+  appId: "1:543374676169:web:9562d6510e7dd1877ebd18"
+};
