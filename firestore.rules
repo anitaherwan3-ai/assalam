@@ -228,7 +228,7 @@ service cloud.firestore {
           request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['qtyTerpakai', 'lastReturId', 'lastPriorQty', 'lastQty', '_t']) &&
-          get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.qty == request.resource.data.lastQty &&
