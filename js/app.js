@@ -1053,7 +1053,7 @@ function viewTrx() {
             <div style="font-size:11px;color:var(--mu);font-weight:700;letter-spacing:1px;">PILIH PASIEN</div>
             <select id="trx-pasien" style="margin-top:4px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--bg);color:var(--tx);font-size:13px;font-weight:600;">
               ${waitingPatients.length === 0 ? '<option value="">-- Panggil pasien terlebih dahulu --</option>' : ''}
-              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.jam || "--:--")} — ${esc(p.nama)} (${esc(p.layanan)})</option>`).join('')}
+              ${waitingPatients.map(p => `<option value="${p.id}">${esc(p.no)} — ${esc(p.jam || "--:--")} — ${esc(p.nama)} (${esc(p.layanan)})${p.pelimpahanAlasan ? " | 📩 " + esc(p.pelimpahanAlasan) : ""}</option>`).join('')}
             </select>
           </div>
           <div style="display:flex;gap:8px;align-items:flex-end;flex-shrink:0;">
