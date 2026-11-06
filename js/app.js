@@ -3897,10 +3897,11 @@ function viewPengguna() {
 
     <div class="card">
       <h2>Akun Staf Firebase</h2>
-      <p class="muted" style="font-size:12px;">Akun berikut menggunakan Firebase Authentication. Tombol ini membuat profil akses Firestore untuk dua email staf yang sudah didaftarkan. Password tidak disimpan di aplikasi atau Firestore.</p>
+      <p class="muted" style="font-size:12px;">Akun berikut menggunakan Firebase Authentication. Tombol ini membuat profil akses Firestore untuk email staf yang sudah didaftarkan. Password tidak disimpan di aplikasi atau Firestore.</p>
       <div style="margin:10px 0 14px;line-height:1.8;">
         <div><b>Admin Gudang & Keuangan:</b> assalamadmin1@gmail.com</div>
-        <div><b>Kasir:</b> assalamkasir1@gmail.com</div>
+        <div><b>Kasir Shift Pagi:</b> assalamkasir1@gmail.com</div>
+        <div><b>Kasir Shift Sore:</b> assalamkasir2@gmail.com</div>
       </div>
       <button class="p" onclick="actionProvisionStaffAccounts()">Aktifkan / Perbarui Profil Akses Staf</button>
       <p class="muted" style="font-size:11px;margin-top:10px;">Jalankan tombol ini dari akun Pimpinan. Akun lokal lama tidak dihapus selama masa pengujian.</p>
@@ -3918,7 +3919,7 @@ async function actionProvisionStaffAccounts() {
   showConfirm('Buat profil akses Firestore untuk Admin Gudang & Keuangan dan Kasir? Password tidak akan disimpan. Akun Pimpinan dan data operasional tidak diubah.', async () => {
     try {
       const profiles = await backend.provisionDefaultStaffProfiles(store.state.users || []);
-      showAlert('Profil akses staf berhasil disiapkan.\n\nAdmin: ' + profiles[0].email + '\nKasir: ' + profiles[1].email + '\n\nSilakan uji login masing-masing akun pada perangkat terpisah.');
+      showAlert('Profil akses staf berhasil disiapkan.\n\n' + profiles.map(p => p.role.toUpperCase() + ' (' + p.u + '): ' + p.email).join('\n') + '\n\nSilakan uji login masing-masing akun pada perangkat terpisah.');
       store.logActivity('Aktivasi', 'Pengguna', 'Profil Firebase staf disiapkan oleh Pimpinan');
     } catch (err) {
       console.error('Provision profil staf gagal:', err);
