@@ -111,9 +111,12 @@ service cloud.firestore {
       allow read: if adminOrPimpinan();
       allow create: if signedIn() && (initialOwner() ||
         request.resource.data.u == staffProfile().u);
+      // Log staf bersifat append-only: staf hanya boleh mengulang sinkronisasi
+      // dokumen miliknya tanpa mengubah isi audit. Pimpinan tetap dapat mengelola log.
       allow update: if pimpinan() ||
         (signedIn() && resource.data.u == staffProfile().u &&
-          request.resource.data.u == staffProfile().u);
+          request.resource.data.u == staffProfile().u &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['_t']));
       allow delete: if pimpinan();
     }
     match /k_pasien/{document} {
@@ -223,6 +226,8 @@ service cloud.firestore {
           resource.data.itemIndex == request.resource.data.itemIndex &&
           request.resource.data.lastReturId is string &&
           request.resource.data.lastPriorQty == resource.data.qtyTerpakai &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['qtyTerpakai', 'lastReturId', 'lastPriorQty', 'lastQty', '_t']) &&
           get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
@@ -235,8 +240,10 @@ service cloud.firestore {
           request.resource.data.trxId == resource.data.trxId &&
           request.resource.data.itemIndex == resource.data.itemIndex &&
           request.resource.data.lastReturId is string &&
-          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'ditolak' &&
           get(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'menunggu' &&
+          getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.status == 'ditolak' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['qtyTerpakai', 'lastReturId', 'lastQty', '_t']) &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.trxId == resource.data.trxId &&
           getAfter(/databases/$(database)/documents/k_returJual/$(request.resource.data.lastReturId)).data.itemIndex == resource.data.itemIndex &&
           request.resource.data.lastQty is number &&
@@ -248,7 +255,10 @@ service cloud.firestore {
 
     match /k_returJual/{document} {
       allow read: if signedIn();
-      allow create: if kasirOrPimpinan() && request.resource.data.status == 'menunggu' &&
+      allow create: if kasirOrPimpinan() &&
+        (pimpinan() || (staffActive() && staffProfile().role == 'kasir' &&
+          request.resource.data.kasir == staffProfile().u)) &&
+        request.resource.data.status == 'menunggu' &&
         request.resource.data.quotaId is string &&
         getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.lastReturId == document &&
         getAfter(/databases/$(database)/documents/k_returKuota/$(request.resource.data.quotaId)).data.trxId == request.resource.data.trxId &&
