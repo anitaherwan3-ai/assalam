@@ -1729,16 +1729,20 @@ function viewPetty() {
   const list = inFilterRange(store.state.petty).slice().reverse();
   const totalHariIni = (store.state.petty || []).filter(p => p.tgl === todayStr).reduce((s, p) => s + Number(p.jml || 0), 0);
 
-  const rows = list.map(p => [
-    esc(p.tgl),
-    esc(p.kasir || '-'),
-    esc(p.ket),
-    rp(p.jml),
-    `
-      <button class="s" onclick="editPetty('${p.id}')">Edit</button>
-      <button class="s btn-danger" onclick="delPetty('${p.id}')">Hapus</button>
-    `
-  ]);
+  const rows = list.map(p => {
+    const canManage = currentRole === 'pimpinan' ||
+      (currentRole === 'kasir' && currentUser && p.kasir === currentUser.u);
+    return [
+      esc(p.tgl),
+      esc(p.kasir || '-'),
+      esc(p.ket),
+      rp(p.jml),
+      canManage ? `
+        <button class="s" onclick="editPetty('${p.id}')">Edit</button>
+        <button class="s btn-danger" onclick="delPetty('${p.id}')">Hapus</button>
+      ` : '<span style="color:var(--mu);">—</span>'
+    ];
+  });
 
   return `
     <div class="card">
