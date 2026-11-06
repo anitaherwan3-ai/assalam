@@ -163,6 +163,28 @@ service cloud.firestore {
           request.resource.data.batalBerobatOleh == null &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t'])) ||
+        // Pelimpahan pasien hanya oleh Kasir pemilik ke shift kasir lain yang sedang buka.
+        (staffActive() && staffProfile().role == 'kasir' &&
+          resource.data.kasir == staffProfile().u &&
+          resource.data.done != true &&
+          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
+          (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
+          (!('status' in resource.data) || resource.data.status != 'dihapus') &&
+          request.resource.data.kasir != staffProfile().u &&
+          request.resource.data.sh is string &&
+          exists(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)) &&
+          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
+          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
+          request.resource.data.pelimpahanDari == staffProfile().u &&
+          request.resource.data.pelimpahanKe == request.resource.data.kasir &&
+          request.resource.data.pelimpahanAlasan is string &&
+          request.resource.data.pelimpahanAlasan.size() >= 5 &&
+          request.resource.data.pelimpahanPada is int &&
+          request.resource.data.calling == false &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
+            'pelimpahanAlasan', 'pelimpahanPada', '_t'
+          ])) ||
         // Kasir/Pimpinan hanya boleh mengubah status panggilan TV.
         (kasirOrPimpinan() &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling', '_t']) &&

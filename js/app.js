@@ -244,21 +244,83 @@ async function resetLoginPassword() {
   }
 }
 
-function doLogout() {
-  showConfirm('Apakah Anda yakin ingin keluar?', async () => {
-    store.logActivity('Keluar', 'Sesi', `User ${currentUser ? currentUser.nama : ''} logout`);
-    currentUser = null;
-    window.currentUser = null;
-    currentRole = null;
-    activeTab = '';
-    cartItems = [];
-    if (window.firebaseBackend && window.firebaseBackend.auth) {
-      await window.firebaseBackend.performPush(store.state);
-      await window.firebaseBackend.auth.signOut().catch(err => console.warn('Firebase signOut:', err));
+function getPendingPatientsForLogout() {
+  if (!currentUser || currentRole !== 'kasir') return [];
+  todayStr = getClinicTodayStr();
+  const shift = getCurrentShift();
+  return (store.state.pasien || []).filter(p =>
+    p && p.tgl === todayStr && p.kasir === currentUser.u &&
+    (!shift || p.sh === shift.id) && !p.done && !p.deletedAt &&
+    p.status !== 'dihapus' && p.status !== 'batal_berobat'
+  ).sort((a,b)=>(Number(a.registeredAt)||0)-(Number(b.registeredAt)||0));
+}
+function continuePatientService(patientId) {
+  const p=store.get('pasien',patientId);
+  if(!p || p.kasir!==(currentUser&&currentUser.u) || p.done || p.status==='batal_berobat') return;
+  if(!store.callPatient(patientId)){showAlert('Pasien tidak dapat dipanggil. Periksa status pasien.');return;}
+  setTab('Transaksi');
+  setTimeout(()=>{const el=$('trx-pasien');if(el)el.value=patientId;},0);
+}
+function savePatientHandoff(patientId,targetShiftId,reason) {
+  const p=store.get('pasien',patientId), target=store.get('shift',targetShiftId), note=String(reason||'').trim();
+  if(!p||!target||note.length<5){showAlert('Pasien, shift tujuan, dan alasan minimal 5 karakter wajib diisi.');return false;}
+  if(currentRole!=='kasir'||p.kasir!==(currentUser&&currentUser.u)){showAlert('Kasir hanya dapat melimpahkan pasien tanggung jawabnya.','Akses Ditolak');return false;}
+  if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
+  if(target.status!=='buka'||target.kasir===currentUser.u){showAlert('Shift tujuan harus sedang berjalan dan milik kasir lain.');return false;}
+  const now=Date.now(), from=p.kasir;
+  p.kasir=target.kasir;p.sh=target.id;p.calling=false;
+  p.pelimpahanDari=from;p.pelimpahanKe=target.kasir;p.pelimpahanAlasan=note;p.pelimpahanPada=now;p._t=now;
+  store.logActivity('Pelimpahan Pasien','Pasien',`${p.no} - ${p.nama}; ${from} → ${target.kasir}; Alasan: ${note}`);
+  store.saveLocal();if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();renderApp();return true;
+}
+function actionLimpahkanPasien(patientId) {
+  const p=store.get('pasien',patientId);
+  if(!p||currentRole!=='kasir'||p.kasir!==(currentUser&&currentUser.u)){showAlert('Pasien bukan tanggung jawab Kasir ini.');return;}
+  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==currentUser.u);
+  if(!shifts.length){showAlert('Kasir penerima harus membuka shift terlebih dahulu.');return;}
+  showFormModal('Pelimpahan Pasien',[
+    ['tujuan','Limpahkan ke Shift Kasir','select',shifts[0].id,shifts.map(s=>({value:s.id,label:`${s.nama||s.kasir} — ${s.jam||'-'} (${s.tgl||'-'})`}))],
+    ['alasan','Catatan / Alasan Pelimpahan (wajib)','textarea','']
+  ],r=>{if(String(r.alasan||'').trim().length<5){showAlert('Alasan pelimpahan wajib minimal 5 karakter.');return;}savePatientHandoff(patientId,r.tujuan,r.alasan);});
+}
+function showPendingPatientsBeforeLogout() {
+  const pending=getPendingPatientsForLogout();
+  if(!pending.length){showConfirm('Semua pasien pada shift ini sudah selesai, batal berobat, atau dilimpahkan. Yakin ingin keluar?',finishLogout,'Konfirmasi Keluar');return;}
+  const p=pending[0], shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==currentUser.u);
+  const actions=[{value:'lanjut',label:'Lanjutkan Pelayanan Sekarang'},...(shifts.length?[{value:'limpahkan',label:'Limpahkan ke Kasir / Shift Lain'}]:[]),{value:'batal',label:'Tandai Batal Berobat'}];
+  showFormModal('Pasien Belum Diselesaikan',[
+    ['pasien','Pasien','text',`${p.no} — ${p.nama} | ${p.layanan||'-'}`],
+    ['aksi','Tindakan','select','lanjut',actions],
+    ['tujuan','Shift Tujuan Pelimpahan','select',shifts[0]?shifts[0].id:'',shifts.map(s=>({value:s.id,label:`${s.nama||s.kasir} — ${s.jam||'-'}`}))],
+    ['alasan','Catatan Pelimpahan (wajib jika melimpahkan)','textarea','']
+  ],r=>{
+    if(r.aksi==='lanjut'){continuePatientService(p.id);return;}
+    if(r.aksi==='limpahkan'){
+      if(!r.tujuan||String(r.alasan||'').trim().length<5){showAlert('Pilih shift tujuan dan isi alasan minimal 5 karakter.');return;}
+      if(savePatientHandoff(p.id,r.tujuan,r.alasan))showPendingPatientsBeforeLogout();
+      return;
     }
-    $('login-modal').style.display = 'flex';
-    renderApp();
+    showConfirm(`Tandai ${p.nama} sebagai Batal Berobat? Data tetap tersimpan.`,()=>{
+      const patient=store.get('pasien',p.id);if(!patient)return;
+      patient.status='batal_berobat';patient.batalBerobatPada=Date.now();patient.batalBerobatOleh=currentUser?currentUser.u:'kasir';patient.calling=false;patient._t=Date.now();
+      store.logActivity('Batal Berobat','Pasien',`${patient.no} - ${patient.nama}`);
+      store.saveLocal();if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();showPendingPatientsBeforeLogout();
+    },'Konfirmasi Batal Berobat');
   });
+}
+async function finishLogout() {
+  if(currentRole==='kasir'&&getPendingPatientsForLogout().length){showPendingPatientsBeforeLogout();return;}
+  store.logActivity('Keluar','Sesi',`User ${currentUser?currentUser.nama:''} logout`);
+  if(window.firebaseBackend&&window.firebaseBackend.auth){
+    await window.firebaseBackend.performPush(store.state);
+    await window.firebaseBackend.auth.signOut().catch(err=>console.warn('Firebase signOut:',err));
+  }
+  currentUser=null;window.currentUser=null;currentRole=null;activeTab='';cartItems=[];
+  $('login-modal').style.display='flex';renderApp();
+}
+function doLogout() {
+  if(currentRole==='kasir'){showPendingPatientsBeforeLogout();return;}
+  showConfirm('Apakah Anda yakin ingin keluar?',finishLogout);
 }
 
 function setTab(tabName) {
@@ -645,11 +707,13 @@ function viewPasien() {
     esc(p.hp || '-'),
     esc(p.layanan),
     p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
+    p.pelimpahanAlasan ? `<small style="display:block;color:var(--mu);">📨 ${esc(p.pelimpahanAlasan)}<br>${esc(p.pelimpahanDari||'-')} → ${esc(p.pelimpahanKe||p.kasir||'-')}</small>` : '-',
     p.done ? '-' : p.status === 'batal_berobat' ? `
       <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
-    ` : `
-      <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
+    ` : (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u)) ? '<small style="color:var(--mu);">Ditangani kasir lain</small>' : `
+      <button class="s p" onclick="store.callPatient('${p.id}')">📢 Panggil</button>
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
+      ${currentRole === 'kasir' ? `<button class="s" onclick="actionLimpahkanPasien('${p.id}')">↗ Limpahkan</button>` : ''}
       <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
     `
   ]);
@@ -703,7 +767,7 @@ function viewPasien() {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <h2 style="margin:0;">Antrean Pasien Hari Ini (${todayStr})</h2>
       </div>
-      ${renderTable(['No. Antrean', 'Jam', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Aksi'], rows, { key: 'pasien_hari_ini' })}
+      ${renderTable(['No. Antrean', 'Jam', 'Nama Pasien', 'No. HP', 'Layanan', 'Status', 'Catatan Pelimpahan', 'Aksi'], rows, { key: 'pasien_hari_ini' })}
     </div>
     <div class="card">
       <h2>Ekspor Data Pasien per Shift</h2>
@@ -945,6 +1009,7 @@ function viewTrx() {
   // Pasien yang masih menunggu tidak boleh muncul di pilihan transaksi.
   const waitingPatients = (store.state.pasien || [])
     .filter(p => p.tgl === todayStr && p.calling === true && !p.done &&
+      p.kasir === (currentUser && currentUser.u) &&
       !p.deletedAt && p.status !== 'dihapus' && p.status !== 'batal_berobat')
     .slice()
     .sort((a, b) => {

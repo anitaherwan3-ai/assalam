@@ -1281,7 +1281,9 @@ class FirebaseBackend {
               if (localTime <= remoteTime) continue;
               const patientFields = [
                 'nama', 'hp', 'calling', 'done', 'status',
-                'batalBerobatPada', 'batalBerobatOleh'
+                'batalBerobatPada', 'batalBerobatOleh',
+                'kasir', 'sh', 'pelimpahanDari', 'pelimpahanKe',
+                'pelimpahanAlasan', 'pelimpahanPada'
               ];
               const patch = {};
               patientFields.forEach(key => {
