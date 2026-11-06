@@ -1089,14 +1089,15 @@
     });
 
         // Firebase Cloud Realtime Sync for TV Display
-    const firebaseDisplayConfig = {
+    const isProductionDisplayHost = window.location.hostname === 'klinikassalaam.vercel.app';
+    const firebaseDisplayConfig = isProductionDisplayHost ? {
       apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
       authDomain: "assalam-db.firebaseapp.com",
       projectId: "assalam-db",
       storageBucket: "assalam-db.firebasestorage.app",
       messagingSenderId: "735617963454",
       appId: "1:735617963454:web:cea7a5ab29eb398e8855ef"
-    };
+    } : window.ASSALAM_FIREBASE_CONFIG;
 
     let fbDisplayDb = null;
     let fbDisplayAuth = null;
@@ -1195,7 +1196,9 @@
     }
 
     try {
-      if (typeof firebase !== 'undefined' && firebase.auth) {
+      if (firebaseDisplayConfig && firebaseDisplayConfig.apiKey && firebaseDisplayConfig.projectId &&
+          (isProductionDisplayHost || firebaseDisplayConfig.projectId !== 'assalam-db') &&
+          typeof firebase !== 'undefined' && firebase.auth) {
         if (!firebase.apps.length) firebase.initializeApp(firebaseDisplayConfig);
         fbDisplayDb = firebase.firestore();
         fbDisplayAuth = firebase.auth();
