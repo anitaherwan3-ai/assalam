@@ -965,9 +965,9 @@
 
     // Nomor lama tanpa prefix diperlakukan sebagai antrean A.
     function patientQueuePrefix(patient) {
-      const explicit = String(patient && patient.queuePrefix || '').toUpperCase();
+      const explicit = String(patient && (patient.queueDisplayPrefix || patient.queuePrefix) || '').toUpperCase();
       if (explicit === 'A' || explicit === 'B') return explicit;
-      const match = String(patient && patient.no || '').match(/^([AB])-?d+$/i);
+      const match = String(patient && patient.no || '').match(/^([AB])-?[0-9]+$/i);
       return match ? match[1].toUpperCase() : 'A';
     }
     function isPatientInSelectedQueue(patient) {
