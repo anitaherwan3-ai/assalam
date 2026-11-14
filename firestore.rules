@@ -39,13 +39,11 @@ service cloud.firestore {
     // Verifikasi kepemilikan Kasir secara langsung dari profil Firestore.
     // Fungsi ini dipakai khusus untuk update status panggilan pasien.
     function activeKasirOwnsPatient() {
-      return request.auth != null &&
-        request.auth.token.email is string &&
-        exists(/databases/$(database)/documents/k_users/$(request.auth.token.email)) &&
-        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('email', '') == request.auth.token.email &&
-        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('active', false) == true &&
-        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('role', '') == 'kasir' &&
-        get(/databases/$(database)/documents/k_users/$(request.auth.token.email)).data.get('u', '') == resource.data.get('kasir', '');
+      // Gunakan helper profil yang sama dengan staffActive(), yang sudah
+      // dipakai pada izin baca pasien dan operasi Kasir lainnya.
+      return staffActive() &&
+        staffProfile().role == 'kasir' &&
+        resource.data.kasir == staffProfile().u;
     }
     function validPatientCallingUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys()
