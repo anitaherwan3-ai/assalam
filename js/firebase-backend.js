@@ -1018,7 +1018,13 @@ class FirebaseBackend {
       throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
     }
     const date = String(patient.tgl);
-    const prefix = String(patient.queuePrefix || 'A').toUpperCase();
+    const cashierId = String(patient.kasir || '').trim().toLowerCase();
+    const assignedPrefix = cashierId === 'kasir' ? 'A' : (cashierId === 'kasir2' ? 'B' : '');
+    if (this.currentProfile.role === 'kasir' &&
+        (patient.kasir !== this.currentProfile.u || !assignedPrefix)) {
+      throw new Error('Akun Kasir belum memiliki pembagian antrean A/B yang sah.');
+    }
+    const prefix = assignedPrefix || String(patient.queuePrefix || 'A').toUpperCase();
     if (!['A', 'B'].includes(prefix)) throw new Error('Prefix antrean shift harus A atau B.');
 
     // Data lama tanpa prefix dianggap A agar nomor lama tidak berubah/terpakai ulang.
@@ -1057,6 +1063,7 @@ class FirebaseBackend {
           transaction.set(candidateRef, Object.assign({}, patient, {
             id: candidateId,
             queuePrefix: prefix,
+            queueDisplayPrefix: prefix,
             no: prefix + '-' + String(candidate).padStart(3, '0'),
             _t: Date.now()
           }));
