@@ -1240,9 +1240,9 @@ class FirebaseBackend {
         if (profile.role === 'kasir') {
           writableCollections = ['pasien', 'shift', 'petty', 'log']; // Nota Kasir wajib dibuat melalui commitCashierTransaction agar kuota retur ikut dibuat atomik.
         } else if (profile.role === 'admin') {
-          // Admin hanya menulis data operasional gudang/keuangan; data pasien,
-          // transaksi kasir, shift, dan kas kecil tetap menjadi kewenangan Kasir/Pimpinan.
-          writableCollections = writableCollections.filter(name => !['pasien', 'trx', 'petty'].includes(name));
+          // Admin boleh mengoreksi nama/HP pasien melalui patch terbatas,
+          // tetapi tidak boleh membuat pasien, transaksi, atau kas kecil.
+          writableCollections = writableCollections.filter(name => !['trx', 'petty'].includes(name));
         }
 
         // Retur hanya ditulis Kasir saat mengajukan; keputusan dan pembayaran memakai transaksi Cloud khusus.\n        // Semua retur harus melalui submit/approve/reject/pay transaction khusus.
@@ -1265,6 +1265,33 @@ class FirebaseBackend {
             // Kasir hanya mengirim pengajuan retur miliknya yang masih menunggu.
             if (col === 'returJual' && profile.role === 'kasir' &&
                 (item.kasir !== profile.u || item.status !== 'menunggu')) continue;
+
+            // Admin hanya boleh mendorong koreksi nama/HP pasien yang sudah ada.
+            // Patch terbatas mencegah cache Admin menulis ulang status, panggilan,
+            // pemilik kasir, shift, atau data operasional pasien lainnya.
+            if (col === 'pasien' && profile.role === 'admin') {
+              const patientId = String(item.id || '');
+              if (!patientId) continue;
+              const patientRef = this.db.collection('k_pasien').doc(patientId);
+              const remoteSnap = await patientRef.get();
+              if (!remoteSnap.exists) continue;
+              const remote = remoteSnap.data() || {};
+              const localTime = Number(item._t || 0);
+              const remoteTime = Number(remote._t || 0);
+              if (localTime <= remoteTime) continue;
+
+              const patch = {};
+              ['nama', 'hp'].forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(item, key) &&
+                    JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
+                  patch[key] = item[key];
+                }
+              });
+              if (!Object.keys(patch).length) continue;
+              patch._t = Math.max(Date.now(), remoteTime + 1);
+              operations.push({ ref: patientRef, data: patch, merge: true });
+              continue;
+            }
 
             // Dokumen pasien Kasir disinkronkan sebagai patch terbatas, bukan
             // set seluruh cache lokal. Pendaftaran baru sudah dibuat atomik oleh
