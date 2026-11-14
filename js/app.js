@@ -269,9 +269,11 @@ function savePatientHandoff(patientId,targetShiftId,reason) {
     return false;
   }
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
-  if(target.status!=='buka'||target.kasir===p.kasir){showAlert('Shift tujuan harus sedang berjalan dan milik kasir lain.');return false;}
+  if(target.status!=='buka'||target.kasir===p.kasir||target.tgl!==p.tgl){showAlert('Shift tujuan harus sedang berjalan, milik kasir lain, dan pada tanggal pasien yang sama.');return false;}
+  const targetPrefix=String(target.queuePrefix||'A').toUpperCase();
+  if(!['A','B'].includes(targetPrefix)){showAlert('Prefix antrean shift tujuan tidak valid.');return false;}
   const now=Date.now(), from=p.kasir;
-  p.kasir=target.kasir;p.sh=target.id;p.calling=false;
+  p.kasir=target.kasir;p.sh=target.id;p.queueDisplayPrefix=targetPrefix;p.calling=false;
   p.pelimpahanDari=from;p.pelimpahanKe=target.kasir;p.pelimpahanAlasan=note;p.pelimpahanPada=now;p._t=now;
   store.logActivity('Pelimpahan Pasien','Pasien',`${p.no} - ${p.nama}; ${from} → ${target.kasir}; Alasan: ${note}`);
   store.saveLocal();if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();renderApp();return true;
@@ -285,7 +287,7 @@ function actionLimpahkanPasien(patientId) {
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){
     showAlert('Pasien ini tidak dapat dilimpahkan.');return;
   }
-  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==p.kasir);
+  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==p.kasir);
   if(!shifts.length){showAlert('Kasir penerima harus membuka shift terlebih dahulu.');return;}
   showFormModal('Pelimpahan Pasien',[
     ['tujuan','Limpahkan ke Shift Kasir','select',shifts[0].id,shifts.map(s=>({value:s.id,label:`${s.nama||s.kasir} — ${s.jam||'-'} (${s.tgl||'-'})`}))],
@@ -295,7 +297,7 @@ function actionLimpahkanPasien(patientId) {
 function showPendingPatientsBeforeLogout() {
   const pending=getPendingPatientsForLogout();
   if(!pending.length){showConfirm('Semua pasien pada shift ini sudah selesai, batal berobat, atau dilimpahkan. Yakin ingin keluar?',finishLogout,'Konfirmasi Keluar');return;}
-  const p=pending[0], shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==currentUser.u);
+  const p=pending[0], shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==currentUser.u);
   const actions=[{value:'lanjut',label:'Lanjutkan Pelayanan Sekarang'},...(shifts.length?[{value:'limpahkan',label:'Limpahkan ke Kasir / Shift Lain'}]:[]),{value:'batal',label:'Tandai Batal Berobat'}];
   showFormModal('Pasien Belum Diselesaikan',[
     ['pasien','Pasien','text',`${p.no} — ${p.nama} | ${p.layanan||'-'}`],
@@ -946,7 +948,7 @@ async function actionAddPasien() {
   }
   try {
     const shift = getCurrentShift();
-    if (!shift) throw new Error('Buka shift terlebih dahulu sebelum mendaftarkan pasien.');
+    if (!shift || shift.tgl !== todayStr) throw new Error('Buka shift untuk tanggal operasional hari ini sebelum mendaftarkan pasien.');
     const queuePrefix = String(shift.queuePrefix || 'A').toUpperCase();
     if (!['A', 'B'].includes(queuePrefix)) throw new Error('Prefix antrean shift tidak valid. Periksa pengaturan shift.');
     const registeredAt = Date.now();
@@ -962,6 +964,7 @@ async function actionAddPasien() {
       kasir: currentUser ? currentUser.u : '-',
       sh: shift.id,
       queuePrefix: queuePrefix,
+      queueDisplayPrefix: queuePrefix,
       registeredAt: registeredAt,
       _t: registeredAt
     };
