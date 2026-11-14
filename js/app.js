@@ -905,7 +905,7 @@ async function actionSetQueueDisplayMode(mode) {
   if (!['A', 'B'].includes(selected)) return showAlert('Pilihan antrean tidak valid.');
   const backend = window.firebaseBackend;
   if (!backend || !backend.isOnline || !backend.currentProfile ||
-      !['kasir', 'admin', 'pimpinan'].includes(backend.currentProfile.role)) {
+      !['kasir', 'pimpinan'].includes(backend.currentProfile.role)) {
     return showAlert('Akun harus terhubung ke Firebase untuk mengubah tampilan antrean TV.');
   }
   try {
@@ -978,7 +978,10 @@ async function actionAddPasien() {
     if (!store.get('pasien', patient.id)) {
       store.state.pasien.push(patient);
     }
-    store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
+    // Sequence legacy hanya milik antrean A; pendaftaran B tidak boleh menaikkan counter A.
+    if (queuePrefix === 'A') {
+      store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
+    }
     store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
     store.saveLocal();
     if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
