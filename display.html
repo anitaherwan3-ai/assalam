@@ -961,6 +961,18 @@
     // Data cloud menjadi sumber utama di perangkat display setelah listener aktif.
     let displayCloudSettings = null;
     let displayCloudPatients = null;
+    let displayQueueMode = 'A';
+
+    // Nomor lama tanpa prefix diperlakukan sebagai antrean A.
+    function patientQueuePrefix(patient) {
+      const explicit = String(patient && patient.queuePrefix || '').toUpperCase();
+      if (explicit === 'A' || explicit === 'B') return explicit;
+      const match = String(patient && patient.no || '').match(/^([AB])-?d+$/i);
+      return match ? match[1].toUpperCase() : 'A';
+    }
+    function isPatientInSelectedQueue(patient) {
+      return patientQueuePrefix(patient) === displayQueueMode;
+    }
 
     // Tanggal operasional klinik mengikuti WIB (Palembang), bukan UTC perangkat.
     function getDisplayTodayWIB() {
@@ -989,7 +1001,10 @@
         if (!raw) return;
         const data = JSON.parse(raw);
         const set = Object.assign({}, data.set || {}, displayCloudSettings || {});
-        const patientData = Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []);
+        displayQueueMode = String(set.queueDisplayMode || displayQueueMode || 'A').toUpperCase();
+        if (!['A', 'B'].includes(displayQueueMode)) displayQueueMode = 'A';
+        const patientData = (Array.isArray(displayCloudPatients) ? displayCloudPatients : (data.pasien || []))
+          .filter(isPatientInSelectedQueue);
         const today = getDisplayTodayWIB();
 
         // Update clinic branding
@@ -1080,6 +1095,7 @@
     queueChannel.onmessage = event => {
       const { type, patient, poli } = event.data || {};
       if (type === 'CALL_PATIENT') {
+        if (!isPatientInSelectedQueue(patient)) return;
         document.getElementById('active-no').textContent = patient.no;
         document.getElementById('active-name').textContent = patient.nama;
         document.getElementById('active-poli').textContent = poli || patient.layanan || 'Poli Umum';
@@ -1123,6 +1139,9 @@
           const remote = doc.data() || {};
           const set = remote.set || {};
           displayCloudSettings = set;
+          displayQueueMode = String(set.queueDisplayMode || 'A').toUpperCase();
+          if (!['A', 'B'].includes(displayQueueMode)) displayQueueMode = 'A';
+          loadDisplayData();
           if (set.nama) document.getElementById('display-clinic-name').textContent = set.nama;
           if (set.alamat) document.getElementById('display-clinic-addr').textContent = set.alamat;
           if (set.logoImg) {
@@ -1155,7 +1174,8 @@
         // tidak muncul kembali di daftar antrean.
         const docs = snapshot.docs.map(d => Object.assign({}, d.data(), { id: d.id }));
         displayCloudPatients = docs;
-        const patients = docs.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
+        const selectedDocs = docs.filter(isPatientInSelectedQueue);
+        const patients = selectedDocs.filter(p => isDisplayTodayPatient(p) && !p.done).sort((a, b) => {
           const aTime = Number(a.registeredAt) || 0;
           const bTime = Number(b.registeredAt) || 0;
           if (aTime && bTime && aTime !== bTime) return aTime - bTime;
@@ -1165,7 +1185,7 @@
           const bNo = Number(String(b.no || '').replace(/\D/g, '')) || 0;
           return aNo - bNo;
         });
-        const called = docs
+        const called = selectedDocs
           .filter(p => isDisplayTodayPatient(p) && p.calling && !p.done)
           .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
@@ -1176,7 +1196,7 @@
           notifyPatientCall(called, called.layanan || 'Poli Umum');
         } else {
           // Pertahankan nomor pasien terakhir yang selesai dilayani saat tidak ada panggilan aktif.
-          const lastServed = docs
+          const lastServed = selectedDocs
             .filter(p => isDisplayTodayPatient(p) && p.done === true)
             .sort((a, b) => Number(b._t || 0) - Number(a._t || 0))[0] || null;
 
