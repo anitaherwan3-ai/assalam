@@ -392,8 +392,8 @@ function applyDatePreset(days) {
 // MODULE: SHIFT KASIR
 // -------------------------------------------------------------
 // ID internal akun Kasir bersifat stabil meskipun email login berubah.
- // Kasir 1 (u: kasir) bertugas pagi dan selalu memakai antrean A.
- // Kasir 2 (u: kasir2) bertugas sore dan selalu memakai antrean B.
+// Kasir 1 (u: kasir) bertugas pagi dan selalu memakai antrean A.
+// Kasir 2 (u: kasir2) bertugas sore dan selalu memakai antrean B.
 function getQueuePrefixForCashier(cashierId) {
   const id = String(cashierId || '').trim().toLowerCase();
   if (id === 'kasir') return 'A';
