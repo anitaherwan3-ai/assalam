@@ -45,6 +45,55 @@ service cloud.firestore {
         resource.data.get('status', '') != 'dihapus' &&
         resource.data.get('deletedAt', null) == null;
     }
+    // Kasir hanya berwenang mengubah pasien yang saat ini ditugaskan kepadanya.
+    // Identitas kasir diverifikasi dari profil Firebase, bukan dari input aplikasi.
+    function cashierOwnsPatient() {
+      return staffActive() &&
+        staffProfile().role == 'kasir' &&
+        resource.data.get('kasir', '') == staffProfile().get('u', '');
+    }
+    function validPatientCancellation() {
+      return resource.data.get('done', false) != true &&
+        resource.data.get('deletedAt', null) == null &&
+        resource.data.get('status', '') != 'dihapus' &&
+        resource.data.get('status', '') != 'batal_berobat' &&
+        request.resource.data.get('status', '') == 'batal_berobat' &&
+        request.resource.data.get('batalBerobatPada', null) is int &&
+        request.resource.data.get('batalBerobatOleh', '') is string &&
+        request.resource.data.get('calling', false) == false &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', 'calling', '_t']);
+    }
+    function validPatientRestore() {
+      return resource.data.get('status', '') == 'batal_berobat' &&
+        resource.data.get('done', false) != true &&
+        request.resource.data.get('status', '') == 'aktif' &&
+        request.resource.data.get('batalBerobatPada', null) == null &&
+        request.resource.data.get('batalBerobatOleh', null) == null &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t']);
+    }
+    function validPatientHandoff() {
+      return resource.data.get('done', false) != true &&
+        resource.data.get('deletedAt', null) == null &&
+        resource.data.get('status', '') != 'batal_berobat' &&
+        resource.data.get('status', '') != 'dihapus' &&
+        request.resource.data.get('kasir', '') is string &&
+        request.resource.data.get('kasir', '') != resource.data.get('kasir', '') &&
+        request.resource.data.get('sh', '') is string &&
+        request.resource.data.get('pelimpahanKe', '') == request.resource.data.get('kasir', '') &&
+        request.resource.data.get('pelimpahanAlasan', '') is string &&
+        request.resource.data.get('pelimpahanAlasan', '').size() >= 5 &&
+        request.resource.data.get('pelimpahanPada', null) is int &&
+        request.resource.data.get('calling', false) == false &&
+        exists(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)) &&
+        get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
+        get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
+          'pelimpahanAlasan', 'pelimpahanPada', '_t'
+        ]);
+    }
 
     function isQueueAudioClipDoc(document) {
       return document.matches('^queueAudioClip_(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$');
@@ -131,88 +180,71 @@ service cloud.firestore {
     }
     match /k_pasien/{document} {
       allow read: if signedIn();
-      // Pendaftaran pasien hanya dibuat oleh Kasir/Pimpinan.
+
+      // Pendaftaran pasien hanya oleh Kasir aktif atau Pimpinan.
+      // Dokumen wajib memakai ID yang sama dengan data pasien.
       allow create: if pimpinan() ||
         (staffActive() && staffProfile().role == 'kasir' &&
-          request.resource.data.id == document);
-      // Kasir hanya menandai pasien selesai ketika transaksi berhasil.
-      // Admin/Pimpinan dapat mengembalikan status menjadi belum selesai.
+          request.resource.data.id == document &&
+          request.resource.data.kasir == staffProfile().u);
+
+      // Setiap jenis perubahan pasien memiliki kewenangan tersendiri.
       allow update: if
-        // Penyelesaian pasien hanya melalui transaksi Kasir atomik.
-        (kasirOrPimpinan() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
-          request.resource.data.done == true) ||
-        // Admin/Pimpinan dapat mengembalikan status pasien menjadi belum selesai.
+        // Kasir pemilik atau Pimpinan dapat menandai pasien selesai
+        // (dalam alur transaksi atomik yang juga membuat nota).
+        ((pimpinan() || cashierOwnsPatient()) &&
+          resource.data.get('done', false) != true &&
+          request.resource.data.get('done', false) == true &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['done', '_t'])) ||
+
+        // Admin/Pimpinan dapat mengoreksi status selesai menjadi belum selesai.
         (adminOrPimpinan() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done', '_t']) &&
-          request.resource.data.done == false) ||
-        // Kasir boleh mengedit hanya nama dan nomor HP; identitas/antrean tetap terkunci.
-        (kasirOrPimpinan() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nama', 'hp', '_t']) &&
-          request.resource.data.nama is string &&
-          request.resource.data.hp is string &&
-          resource.data.done != true &&
-          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
-          (!('status' in resource.data) || resource.data.status != 'dihapus')) ||
-        // Kasir boleh mencatat Batal Berobat untuk pasien yang belum dilayani.
-        (kasirOrPimpinan() &&
-          resource.data.done != true &&
-          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
-          (!('status' in resource.data) || resource.data.status != 'dihapus') &&
-          request.resource.data.status == 'batal_berobat' &&
-          request.resource.data.batalBerobatOleh == staffProfile().u &&
-          request.resource.data.calling == false &&
+          request.resource.data.get('done', false) == false &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', 'calling', '_t'])) ||
-        // Pemulihan antrean hanya dari status Batal Berobat, tanpa mengubah data pasien.
-        (kasirOrPimpinan() &&
-          resource.data.status == 'batal_berobat' &&
-          resource.data.done != true &&
-          request.resource.data.status == 'aktif' &&
-          request.resource.data.batalBerobatPada == null &&
-          request.resource.data.batalBerobatOleh == null &&
+            .hasOnly(['done', '_t'])) ||
+
+        // Admin/Pimpinan dapat mengoreksi nama dan nomor HP.
+        (adminOrPimpinan() &&
+          request.resource.data.get('nama', null) is string &&
+          request.resource.data.get('hp', null) is string &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t'])) ||
-        // Pelimpahan pasien hanya oleh Kasir pemilik ke shift kasir lain yang sedang buka.
-        (staffActive() && staffProfile().role == 'kasir' &&
-          resource.data.kasir == staffProfile().u &&
-          resource.data.done != true &&
-          (!('deletedAt' in resource.data) || resource.data.deletedAt == null) &&
-          (!('status' in resource.data) || resource.data.status != 'batal_berobat') &&
-          (!('status' in resource.data) || resource.data.status != 'dihapus') &&
-          request.resource.data.kasir != staffProfile().u &&
-          request.resource.data.sh is string &&
-          exists(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)) &&
-          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
-          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
-          request.resource.data.pelimpahanDari == staffProfile().u &&
-          request.resource.data.pelimpahanKe == request.resource.data.kasir &&
-          request.resource.data.pelimpahanAlasan is string &&
-          request.resource.data.pelimpahanAlasan.size() >= 5 &&
-          request.resource.data.pelimpahanPada is int &&
-          request.resource.data.calling == false &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
-            'pelimpahanAlasan', 'pelimpahanPada', '_t'
-          ]));
-      // Status panggilan: Pimpinan, atau Kasir aktif untuk pasien miliknya sendiri.
-      // Jalur Kasir memakai helper otorisasi yang sudah terbukti berhasil pada edit nama pasien.
-      // Pimpinan dipisahkan agar tidak perlu membaca profil staf melalui owner email.
-      allow update: if pimpinan() && validPatientCallingUpdate();
-      allow update: if
-        !pimpinan() &&
-        kasirOrPimpinan() &&
-        staffProfile().role == 'kasir' &&
-        resource.data.get('kasir', '') == staffProfile().get('u', '') &&
-        validPatientCallingUpdate();
-      // DIAGNOSTIK BATAS AKHIR SEMENTARA:
-      // Hanya satu akun dan satu dokumen dummy. Tidak memberi akses ke pasien lain.
-      // Jika update ini masih ditolak, Rules ini tidak sedang diterapkan pada request.
-      allow update: if
-        request.auth != null &&
-        request.auth.token.email == 'assalamkasir2@gmail.com' &&
-        document == 'q_diag_kasir2_20261114_001';
-      // Penghapusan data pasien dibatasi untuk Pimpinan.
+            .hasOnly(['nama', 'hp', '_t'])) ||
+
+        // Kasir hanya dapat mengedit nama/HP pasien miliknya yang belum selesai.
+        (cashierOwnsPatient() &&
+          resource.data.get('done', false) != true &&
+          resource.data.get('deletedAt', null) == null &&
+          resource.data.get('status', '') != 'dihapus' &&
+          request.resource.data.get('nama', null) is string &&
+          request.resource.data.get('hp', null) is string &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['nama', 'hp', '_t'])) ||
+
+        // Pimpinan atau Kasir pemilik dapat memanggil/membatalkan panggilan.
+        ((pimpinan() || cashierOwnsPatient()) &&
+          validPatientCallingUpdate()) ||
+
+        // Batal Berobat: Pimpinan dapat mengelola lintas pasien;
+        // Kasir hanya untuk pasien sendiri dan nama petugas harus cocok.
+        (pimpinan() && validPatientCancellation()) ||
+        (cashierOwnsPatient() &&
+          request.resource.data.get('batalBerobatOleh', '') == staffProfile().u &&
+          validPatientCancellation()) ||
+
+        // Pemulihan antrean Batal Berobat: Pimpinan atau Kasir pemilik.
+        ((pimpinan() || cashierOwnsPatient()) &&
+          validPatientRestore()) ||
+
+        // Pelimpahan: Kasir pemilik atau Pimpinan ke shift kasir lain yang sedang buka.
+        (cashierOwnsPatient() &&
+          request.resource.data.get('pelimpahanDari', '') == staffProfile().u &&
+          validPatientHandoff()) ||
+        (pimpinan() &&
+          request.resource.data.get('pelimpahanDari', '') == resource.data.get('kasir', '') &&
+          validPatientHandoff());
+
+      // Penghapusan/arsip pasien tetap hanya boleh dilakukan Pimpinan.
       allow delete: if pimpinan();
     }
     match /k_trx/{document} {
