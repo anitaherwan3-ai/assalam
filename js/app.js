@@ -707,14 +707,24 @@ function viewPasien() {
     esc(p.layanan),
     p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
     p.pelimpahanAlasan ? `<small style="display:block;color:var(--mu);">📨 ${esc(p.pelimpahanAlasan)}<br>${esc(p.pelimpahanDari||'-')} → ${esc(p.pelimpahanKe||p.kasir||'-')}</small>` : '-',
-    p.done ? '-' : p.status === 'batal_berobat' ? `
-      <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
-    ` : (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u)) ? '<small style="color:var(--mu);">Ditangani kasir lain</small>' : `
-      <button class="s p" onclick="store.callPatient('${p.id}')">📢 Panggil</button>
-      <button class="s" onclick="editPasien('${p.id}')">Edit</button>
-      ${currentRole === 'kasir' ? `<button class="s" onclick="actionLimpahkanPasien('${p.id}')">↗ Limpahkan</button>` : ''}
-      <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
-    `
+    (p.done
+      ? (currentRole === 'admin' || currentRole === 'pimpinan'
+        ? `<button class="s" onclick="editPasien('${p.id}')">Edit</button>` : '-')
+      : p.status === 'batal_berobat'
+        ? (currentRole === 'kasir' || currentRole === 'pimpinan'
+          ? `<button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>`
+          : (currentRole === 'admin'
+            ? `<button class="s" onclick="editPasien('${p.id}')">Edit</button>` : '-'))
+        : currentRole === 'admin'
+          ? `<button class="s" onclick="editPasien('${p.id}')">Edit</button>`
+          : (currentRole === 'kasir' || currentRole === 'pimpinan')
+            ? `
+              <button class="s p" onclick="store.callPatient('${p.id}')">📢 Panggil</button>
+              <button class="s" onclick="editPasien('${p.id}')">Edit</button>
+              ${currentRole === 'kasir' ? `<button class="s" onclick="actionLimpahkanPasien('${p.id}')">↗ Limpahkan</button>` : ''}
+              <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
+            `
+            : '-')
   ]);
 
   const availableShifts = (store.state.shift || []).slice().sort((a, b) =>
@@ -726,7 +736,7 @@ function viewPasien() {
     `<option value="${esc(s.id)}">${esc(s.tgl || '-')} | ${esc(s.jam || '-')} | ${esc(s.nama || s.kasir || 'Kasir')} | ${s.status === 'tutup' ? 'Tutup' : 'Berjalan'}</option>`
   ).join('');
 
-  return `
+  const registrationCard = currentRole === 'admin' ? '' : `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
         <h2 style="margin:0;">Registrasi Kedatangan Pasien Hari Ini</h2>
@@ -762,6 +772,10 @@ function viewPasien() {
         <button class="p" id="btn-daftar-antrean" onclick="actionAddPasien()">+ Daftarkan Antrean</button>
       </div>
     </div>
+`;
+  
+  return `
+    ${registrationCard}
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <h2 style="margin:0;">Antrean Pasien Hari Ini (${todayStr})</h2>
@@ -943,12 +957,13 @@ function editPasien(id) {
 }
 
 function actionBatalBerobat(id) {
-  if (currentRole !== 'kasir') {
-    showAlert('Hanya Kasir yang dapat mencatat pembatalan berobat.', 'Akses Ditolak');
+  if (currentRole !== 'kasir' && currentRole !== 'pimpinan') {
+    showAlert('Hanya Kasir penanggung jawab atau Pimpinan yang dapat mencatat Batal Berobat.', 'Akses Ditolak');
     return;
   }
   const p = store.get('pasien', id);
-  if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat') return;
+  if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat' ||
+      (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u))) return;
   showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', () => {
     p.status = 'batal_berobat';
     p.batalBerobatPada = Date.now();
@@ -962,12 +977,13 @@ function actionBatalBerobat(id) {
 }
 
 function actionPulihkanBatalBerobat(id) {
-  if (currentRole !== 'kasir') {
-    showAlert('Hanya Kasir yang dapat mengaktifkan kembali antrean.', 'Akses Ditolak');
+  if (currentRole !== 'kasir' && currentRole !== 'pimpinan') {
+    showAlert('Hanya Kasir penanggung jawab atau Pimpinan yang dapat mengaktifkan kembali antrean.', 'Akses Ditolak');
     return;
   }
   const p = store.get('pasien', id);
-  if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr) return;
+  if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr ||
+      (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u))) return;
   showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', () => {
     p.status = 'aktif';
     p.batalBerobatPada = null;
