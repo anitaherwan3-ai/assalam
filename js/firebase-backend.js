@@ -1017,37 +1017,37 @@ class FirebaseBackend {
     if (!patient || !/^\d{4}-\d{2}-\d{2}$/.test(String(patient.tgl || ''))) {
       throw new Error('Tanggal antrean tidak valid. Silakan muat ulang halaman.');
     }
-
     const date = String(patient.tgl);
-    // Baca antrean hari ini untuk melanjutkan nomor lama. ID pasien baru
-    // menggunakan pola deterministik agar dokumen pasien sendiri menjadi
-    // pengunci unik lintas perangkat, tanpa koleksi counter atau aturan baru.
+    const prefix = String(patient.queuePrefix || 'A').toUpperCase();
+    if (!['A', 'B'].includes(prefix)) throw new Error('Prefix antrean shift harus A atau B.');
+
+    // Data lama tanpa prefix dianggap A agar nomor lama tidak berubah/terpakai ulang.
     const dayPatients = await this.db.collection('k_pasien')
       .where('tgl', '==', date).get({ source: 'server' });
     let existingMax = 0;
-    dayPatients.forEach(doc => {
-      const value = String((doc.data() || {}).no || '').match(/^A-?(\d+)$/i);
-      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
-    });
+    const readQueueNumber = item => {
+      const match = String(item && item.no || '').match(/^([AB])-?(\d+)$/i);
+      if (!match) return 0;
+      const itemPrefix = String(item.queuePrefix || match[1] || 'A').toUpperCase();
+      return itemPrefix === prefix ? (Number(match[2]) || 0) : 0;
+    };
+    dayPatients.forEach(doc => { existingMax = Math.max(existingMax, readQueueNumber(doc.data() || {})); });
     (this.store.state.pasien || []).forEach(item => {
-      if (!item || item.tgl !== date) return;
-      const value = String(item.no || '').match(/^A-?(\d+)$/i);
-      if (value) existingMax = Math.max(existingMax, Number(value[1]) || 0);
+      if (item && item.tgl === date) existingMax = Math.max(existingMax, readQueueNumber(item));
     });
-    existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
+    // Sequence global lama hanya menjadi batas bawah untuk antrean A.
+    if (prefix === 'A') existingMax = Math.max(existingMax, Number((this.store.state.seq || {})[date]) || 0);
 
     let assignedNumber = 0;
     let assignedId = '';
     await this.db.runTransaction(async transaction => {
-      // Jangan menulis apa pun sampai seluruh dokumen kandidat selesai dibaca.
-      // Bila dua perangkat memilih kandidat sama, transaksi yang kalah akan
-      // diulang Firestore dan melihat ID tersebut sudah terpakai.
       let candidate = existingMax + 1;
       assignedNumber = 0;
       assignedId = '';
       for (let attempt = 0; attempt < 100; attempt++, candidate++) {
         if (!Number.isSafeInteger(candidate) || candidate > 999999) break;
-        const candidateId = 'q_' + date.replace(/-/g, '') + '_' +
+        // ID terpisah per tanggal dan prefix: A-001 tidak bertabrakan dengan B-001.
+        const candidateId = 'q_' + date.replace(/-/g, '') + '_' + prefix + '_' +
           String(candidate).padStart(6, '0');
         const candidateRef = this.db.collection('k_pasien').doc(candidateId);
         const candidateSnap = await transaction.get(candidateRef);
@@ -1056,7 +1056,8 @@ class FirebaseBackend {
           assignedId = candidateId;
           transaction.set(candidateRef, Object.assign({}, patient, {
             id: candidateId,
-            no: 'A' + String(candidate).padStart(3, '0'),
+            queuePrefix: prefix,
+            no: prefix + '-' + String(candidate).padStart(3, '0'),
             _t: Date.now()
           }));
           return;
@@ -1064,14 +1065,12 @@ class FirebaseBackend {
       }
       throw new Error('Tidak dapat memperoleh nomor antrean unik. Silakan coba kembali.');
     });
-
-    if (!assignedId || !assignedNumber) {
-      throw new Error('Nomor antrean belum berhasil dialokasikan. Silakan coba kembali.');
-    }
+    if (!assignedId || !assignedNumber) throw new Error('Nomor antrean belum berhasil dialokasikan. Silakan coba kembali.');
     return {
       id: assignedId,
-      no: 'A' + String(assignedNumber).padStart(3, '0'),
-      number: assignedNumber
+      no: prefix + '-' + String(assignedNumber).padStart(3, '0'),
+      number: assignedNumber,
+      prefix: prefix
     };
   }
 
@@ -1176,6 +1175,22 @@ class FirebaseBackend {
     if (!profile || !['admin', 'pimpinan'].includes(profile.role)) throw new Error('Hanya Admin atau Pimpinan yang dapat mengelola suara antrean.');
     if (!/^(notification|prefix|suffix|letter_[A-Z]|digit_[0-9]|counter_umum|counter_gigi)$/.test(id)) throw new Error('Jenis potongan suara tidak valid.');
     await this.db.doc('klinik_config/queueAudioClip_' + id).delete();
+    return true;
+  }
+
+  async saveQueueDisplayMode(mode) {
+    if (!this.db || !this.auth || !this.auth.currentUser) {
+      throw new Error('Firebase belum terhubung. Pilihan display tidak disimpan.');
+    }
+    const profile = this.currentProfile;
+    const selected = String(mode || '').toUpperCase();
+    if (!profile || !['kasir', 'admin', 'pimpinan'].includes(profile.role) ||
+        !['A', 'B'].includes(selected)) {
+      throw new Error('Akses atau pilihan antrean tidak valid.');
+    }
+    await this.db.doc('klinik_config/settings').update({
+      'set.queueDisplayMode': selected
+    });
     return true;
   }
 
