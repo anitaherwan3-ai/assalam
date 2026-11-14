@@ -35,6 +35,11 @@ service cloud.firestore {
     function kasirOrPimpinan() {
       return signedIn() && (initialOwner() || staffProfile().role == 'kasir');
     }
+    // Pembagian antrean dikunci ke ID internal staf, bukan email login.
+    function expectedCashierQueuePrefix(cashierId) {
+      return cashierId == 'kasir' ? 'A' :
+        (cashierId == 'kasir2' ? 'B' : '');
+    }
 
     function validPatientCallingUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys()
@@ -113,8 +118,9 @@ service cloud.firestore {
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('tgl', '') == resource.data.get('tgl', '') &&
-        request.resource.data.get('queueDisplayPrefix', 'A') ==
-          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('queuePrefix', 'A') &&
+        expectedCashierQueuePrefix(request.resource.data.get('kasir', '')) != '' &&
+        request.resource.data.get('queueDisplayPrefix', '') ==
+          expectedCashierQueuePrefix(request.resource.data.get('kasir', '')) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
           'pelimpahanAlasan', 'pelimpahanPada', 'queueDisplayPrefix', '_t'
@@ -221,7 +227,12 @@ service cloud.firestore {
       allow create: if pimpinan() ||
         (staffActive() && staffProfile().role == 'kasir' &&
           request.resource.data.id == document &&
-          request.resource.data.kasir == staffProfile().u);
+          request.resource.data.kasir == staffProfile().u &&
+          request.resource.data.get('queuePrefix', '') ==
+            expectedCashierQueuePrefix(staffProfile().get('u', '')) &&
+          request.resource.data.get('queueDisplayPrefix', '') ==
+            expectedCashierQueuePrefix(staffProfile().get('u', '')) &&
+          expectedCashierQueuePrefix(staffProfile().get('u', '')) != '');
 
       // Setiap jenis perubahan pasien memiliki kewenangan tersendiri.
       allow update: if
@@ -357,7 +368,9 @@ service cloud.firestore {
           request.resource.data.id == document &&
           request.resource.data.kasir == staffProfile().u &&
           request.resource.data.status == 'buka' &&
-          request.resource.data.queuePrefix in ['A', 'B'] &&
+          request.resource.data.queuePrefix ==
+            expectedCashierQueuePrefix(staffProfile().get('u', '')) &&
+          expectedCashierQueuePrefix(staffProfile().get('u', '')) != '' &&
           request.resource.data.modal is number &&
           request.resource.data.modal >= 0);
       // Kasir hanya menutup shift miliknya; Admin hanya memverifikasi setoran.
