@@ -447,6 +447,12 @@ function viewShift() {
           <label>Modal Awal Uang Laci (Rp)
             <input id="input-shift-modal" type="number" value="100000">
           </label>
+          <label>Prefix Antrean Shift
+            <select id="input-shift-prefix">
+              <option value="A">A — Antrean A</option>
+              <option value="B">B — Antrean B</option>
+            </select>
+          </label>
           <button class="p" onclick="actionBukaShift()">Buka Shift Sekarang</button>
         </div>
       </div>
@@ -456,6 +462,7 @@ function viewShift() {
   const shiftRows = myShifts.map(s => [
     esc(s.tgl),
     esc(s.jam),
+    esc(s.queuePrefix || 'A'),
     esc(s.jamT || '-'),
     rp(s.modal),
     s.status === 'tutup' ? rp(s.sistem) : '-',
@@ -478,13 +485,16 @@ function viewShift() {
   return activeCard + `
     <div class="card">
       <h2>Riwayat Shift Saya</h2>
-      ${renderTable(['Tanggal', 'Buka', 'Tutup', 'Modal', 'Sistem', 'Fisik', 'Selisih', 'Status'], shiftRows, { key: 'shift_me' })}
+      ${renderTable(['Tanggal', 'Buka', 'Antrean', 'Tutup', 'Modal', 'Sistem', 'Fisik', 'Selisih', 'Status'], shiftRows, { key: 'shift_me' })}
     </div>
   `;
 }
 
 function actionBukaShift() {
   const modal = numVal('input-shift-modal');
+  const queuePrefix = String(val('input-shift-prefix') || 'A').toUpperCase();
+  if (!['A', 'B'].includes(queuePrefix)) return showAlert('Prefix antrean shift harus A atau B.');
+  if (getCurrentShift()) return showAlert('Shift Anda masih berjalan. Tutup shift lama sebelum membuka shift baru.');
   const now = new Date();
   store.state.shift.push({
     id: uid(),
@@ -492,6 +502,7 @@ function actionBukaShift() {
     jam: now.toTimeString().slice(0, 5),
     kasir: currentUser.u,
     nama: currentUser.nama,
+    queuePrefix: queuePrefix,
     modal: Number(modal) || 0,
     status: 'buka',
     _t: Date.now()
@@ -751,7 +762,12 @@ function viewPasien() {
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
         <h2 style="margin:0;">Registrasi Kedatangan Pasien Hari Ini</h2>
-        <button class="btn-tv-header s" onclick="openTvDisplay()">📺 Buka Layar Display TV (HDMI)</button>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-tv-header s" onclick="openTvDisplay()">📺 Buka Layar Display TV (HDMI)</button>
+          <span style="font-size:12px;color:var(--mu);">Tampilan TV:</span>
+          <button class="s ${((store.state.set || {}).queueDisplayMode || 'A') === 'A' ? 'p' : ''}" onclick="actionSetQueueDisplayMode('A')">Antrean A</button>
+          <button class="s ${((store.state.set || {}).queueDisplayMode || 'A') === 'B' ? 'p' : ''}" onclick="actionSetQueueDisplayMode('B')">Antrean B</button>
+        </div>
       </div>
 
       <div style="position:relative;margin-bottom:16px;">
@@ -882,6 +898,27 @@ function exportPasienShiftPDF() {
   doc.save(`pasien-shift-${safeDate}-${safeCashier || 'kasir'}.pdf`);
 }
 
+async function actionSetQueueDisplayMode(mode) {
+  const selected = String(mode || '').toUpperCase();
+  if (!['A', 'B'].includes(selected)) return showAlert('Pilihan antrean tidak valid.');
+  const backend = window.firebaseBackend;
+  if (!backend || !backend.isOnline || !backend.currentProfile ||
+      !['kasir', 'admin', 'pimpinan'].includes(backend.currentProfile.role)) {
+    return showAlert('Akun harus terhubung ke Firebase untuk mengubah tampilan antrean TV.');
+  }
+  try {
+    await backend.saveQueueDisplayMode(selected);
+    store.state.set = store.state.set || {};
+    store.state.set.queueDisplayMode = selected;
+    store.saveLocal();
+    renderApp();
+    showAlert('Display TV sekarang menampilkan antrean ' + selected + '.', 'Pilihan Antrean TV');
+  } catch (err) {
+    console.error('Gagal mengubah antrean display:', err);
+    showAlert(err.message || 'Pilihan display gagal disimpan.');
+  }
+}
+
 async function actionAddPasien() {
   const nama = val('p-nama').trim();
   if (!nama) {
@@ -909,6 +946,9 @@ async function actionAddPasien() {
   }
   try {
     const shift = getCurrentShift();
+    if (!shift) throw new Error('Buka shift terlebih dahulu sebelum mendaftarkan pasien.');
+    const queuePrefix = String(shift.queuePrefix || 'A').toUpperCase();
+    if (!['A', 'B'].includes(queuePrefix)) throw new Error('Prefix antrean shift tidak valid. Periksa pengaturan shift.');
     const registeredAt = Date.now();
     const patient = {
       id: '',
@@ -920,7 +960,8 @@ async function actionAddPasien() {
       layanan: val('p-layanan'),
       done: false,
       kasir: currentUser ? currentUser.u : '-',
-      sh: shift ? shift.id : null,
+      sh: shift.id,
+      queuePrefix: queuePrefix,
       registeredAt: registeredAt,
       _t: registeredAt
     };
