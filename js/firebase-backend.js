@@ -1287,9 +1287,21 @@ class FirebaseBackend {
                   patch[key] = item[key];
                 }
               });
+              // Koreksi done:false hanya dikirim setelah Admin menekan tombol
+              // koreksi secara eksplisit; nilai cache biasa tidak pernah dipakai
+              // untuk membuka kembali pasien secara otomatis.
+              if (item._pendingAdminDoneCorrection === true && item.done === false) {
+                patch.done = false;
+              }
               if (!Object.keys(patch).length) continue;
               patch._t = Math.max(Date.now(), remoteTime + 1);
-              operations.push({ ref: patientRef, data: patch, merge: true });
+              operations.push({
+                ref: patientRef,
+                data: patch,
+                merge: true,
+                sourceItem: item,
+                sourceFlagToClear: '_pendingAdminDoneCorrection'
+              });
               continue;
             }
 
@@ -1411,8 +1423,12 @@ class FirebaseBackend {
               // Tandai log lokal sudah tersinkron hanya setelah commit Firestore berhasil.
               let syncedLog = false;
               chunk.forEach(op => {
-                if (op.sourceItem) {
+                if (op.sourceItem && op.sourceItem._pendingSync === true) {
                   op.sourceItem._pendingSync = false;
+                  syncedLog = true;
+                }
+                if (op.sourceItem && op.sourceFlagToClear) {
+                  delete op.sourceItem[op.sourceFlagToClear];
                   syncedLog = true;
                 }
               });
