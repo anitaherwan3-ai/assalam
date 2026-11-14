@@ -1288,19 +1288,28 @@ class FirebaseBackend {
                 }
               });
               // Koreksi done:false hanya dikirim setelah Admin menekan tombol
-              // koreksi secara eksplisit; nilai cache biasa tidak pernah dipakai
-              // untuk membuka kembali pasien secara otomatis.
-              if (item._pendingAdminDoneCorrection === true && item.done === false) {
+              // koreksi secara eksplisit dan Cloud masih menunjukkan pasien selesai.
+              // Cache lama tidak boleh membuka kembali pasien secara otomatis.
+              const correctionRequested = item._pendingAdminDoneCorrection === true;
+              if (correctionRequested && item.done === false &&
+                  remote.done === true && remote.deletedAt == null &&
+                  remote.status !== 'batal_berobat' && remote.status !== 'dihapus') {
                 patch.done = false;
               }
-              if (!Object.keys(patch).length) continue;
+              if (!Object.keys(patch).length) {
+                if (correctionRequested) {
+                  delete item._pendingAdminDoneCorrection;
+                  this.store.saveLocal(false);
+                }
+                continue;
+              }
               patch._t = Math.max(Date.now(), remoteTime + 1);
               operations.push({
                 ref: patientRef,
                 data: patch,
                 merge: true,
-                sourceItem: item,
-                sourceFlagToClear: '_pendingAdminDoneCorrection'
+                sourceItem: correctionRequested ? item : null,
+                sourceFlagToClear: correctionRequested ? '_pendingAdminDoneCorrection' : null
               });
               continue;
             }
