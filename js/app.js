@@ -424,7 +424,7 @@ function viewShift() {
 
     activeCard = `
       <div class="card">
-        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)})</h2>
+        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)}) — Antrean ${esc(shift.queuePrefix || 'A')}</h2>
         <div class="grid">
           <div class="kpi"><span>Modal Awal Laci</span><b>${rp(shift.modal)}</b></div>
           <div class="kpi"><span>Jumlah Transaksi</span><b>${trxs.length}</b></div>
@@ -509,7 +509,7 @@ function actionBukaShift() {
     status: 'buka',
     _t: Date.now()
   });
-  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)}`);
+  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)}, antrean ${queuePrefix}`);
   store.saveLocal();
 }
 
