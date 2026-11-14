@@ -1021,8 +1021,10 @@ class FirebaseBackend {
     const cashierId = String(patient.kasir || '').trim().toLowerCase();
     const assignedPrefix = cashierId === 'kasir' ? 'A' : (cashierId === 'kasir2' ? 'B' : '');
     if (this.currentProfile.role === 'kasir' &&
-        (patient.kasir !== this.currentProfile.u || !assignedPrefix)) {
-      throw new Error('Akun Kasir belum memiliki pembagian antrean A/B yang sah.');
+        (patient.kasir !== this.currentProfile.u ||
+         !assignedPrefix ||
+         String(patient.queuePrefix || '').toUpperCase() !== assignedPrefix)) {
+      throw new Error('Shift lama masih memakai prefix antrean yang berbeda. Selesaikan dan tutup shift lama, lalu buka shift baru.');
     }
     const prefix = assignedPrefix || String(patient.queuePrefix || 'A').toUpperCase();
     if (!['A', 'B'].includes(prefix)) throw new Error('Prefix antrean shift harus A atau B.');
