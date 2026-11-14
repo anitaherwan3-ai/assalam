@@ -205,16 +205,13 @@ service cloud.firestore {
         staffProfile().role == 'kasir' &&
         resource.data.get('kasir', '') == staffProfile().get('u', '') &&
         validPatientCallingUpdate();
-      // DIAGNOSTIK TERISOLASI SEMENTARA:
-      // Hanya akun Kasir 2 dan hanya satu dokumen dummy yang telah disiapkan.
-      // Rule ini sengaja melepas pemeriksaan field untuk memastikan apakah
-      // request update benar-benar mencapai Rules Preview yang sedang diuji.
-      // WAJIB diganti dengan aturan permanen setelah uji berhasil.
+      // DIAGNOSTIK BATAS AKHIR SEMENTARA:
+      // Hanya satu akun dan satu dokumen dummy. Tidak memberi akses ke pasien lain.
+      // Jika update ini masih ditolak, Rules ini tidak sedang diterapkan pada request.
       allow update: if
         request.auth != null &&
         request.auth.token.email == 'assalamkasir2@gmail.com' &&
-        document == 'q_diag_kasir2_20261114_001' &&
-        resource.data.nama == 'ZZ TEST DIAG KASIR2 EDIT';
+        document == 'q_diag_kasir2_20261114_001';
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
