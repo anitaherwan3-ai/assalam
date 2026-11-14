@@ -270,7 +270,7 @@ function savePatientHandoff(patientId,targetShiftId,reason) {
   }
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
   if(target.status!=='buka'||target.kasir===p.kasir||target.tgl!==p.tgl){showAlert('Shift tujuan harus sedang berjalan, milik kasir lain, dan pada tanggal pasien yang sama.');return false;}
-  const targetPrefix=String(target.queuePrefix||'A').toUpperCase();
+  const targetPrefix=getShiftQueuePrefix(target);
   if(!['A','B'].includes(targetPrefix)){showAlert('Prefix antrean shift tujuan tidak valid.');return false;}
   const now=Date.now(), from=p.kasir;
   p.kasir=target.kasir;p.sh=target.id;p.queueDisplayPrefix=targetPrefix;p.calling=false;
@@ -391,6 +391,25 @@ function applyDatePreset(days) {
 // -------------------------------------------------------------
 // MODULE: SHIFT KASIR
 // -------------------------------------------------------------
+// ID internal akun Kasir bersifat stabil meskipun email login berubah.
+ // Kasir 1 (u: kasir) bertugas pagi dan selalu memakai antrean A.
+ // Kasir 2 (u: kasir2) bertugas sore dan selalu memakai antrean B.
+function getQueuePrefixForCashier(cashierId) {
+  const id = String(cashierId || '').trim().toLowerCase();
+  if (id === 'kasir') return 'A';
+  if (id === 'kasir2') return 'B';
+  return '';
+}
+
+function getShiftQueuePrefix(shift) {
+  if (shift && shift.status === 'buka') {
+    const assignedPrefix = getQueuePrefixForCashier(shift.kasir);
+    if (assignedPrefix) return assignedPrefix;
+  }
+  const savedPrefix = String(shift && shift.queuePrefix || '').toUpperCase();
+  return ['A', 'B'].includes(savedPrefix) ? savedPrefix : 'A';
+}
+
 function getCurrentShift() {
   if (!currentUser) return null;
   return (store.state.shift || []).find(s => s.kasir === currentUser.u && s.status === 'buka');
@@ -424,7 +443,7 @@ function viewShift() {
 
     activeCard = `
       <div class="card">
-        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)}) — Antrean ${esc(shift.queuePrefix || 'A')}</h2>
+        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)}) — Antrean ${esc(getShiftQueuePrefix(shift))}</h2>
         <div class="grid">
           <div class="kpi"><span>Modal Awal Laci</span><b>${rp(shift.modal)}</b></div>
           <div class="kpi"><span>Jumlah Transaksi</span><b>${trxs.length}</b></div>
@@ -449,12 +468,11 @@ function viewShift() {
           <label>Modal Awal Uang Laci (Rp)
             <input id="input-shift-modal" type="number" value="100000">
           </label>
-          <label>Prefix Antrean Shift
-            <select id="input-shift-prefix">
-              <option value="A">A — Antrean A</option>
-              <option value="B">B — Antrean B</option>
-            </select>
-          </label>
+          <div style="min-width:180px;display:flex;flex-direction:column;gap:4px;justify-content:center;">
+            <span style="font-size:12px;color:var(--mu);">Prefix Antrean Otomatis</span>
+            <strong style="font-size:16px;color:var(--pr);">Antrean ${esc(getQueuePrefixForCashier(currentUser && currentUser.u) || 'Belum diatur')}</strong>
+            <small style="color:var(--mu);">Kasir 1: A · Kasir 2: B</small>
+          </div>
           <button class="p" onclick="actionBukaShift()">Buka Shift Sekarang</button>
         </div>
       </div>
@@ -464,7 +482,7 @@ function viewShift() {
   const shiftRows = myShifts.map(s => [
     esc(s.tgl),
     esc(s.jam),
-    esc(s.queuePrefix || 'A'),
+    esc(getShiftQueuePrefix(s)),
     esc(s.jamT || '-'),
     rp(s.modal),
     s.status === 'tutup' ? rp(s.sistem) : '-',
@@ -494,8 +512,10 @@ function viewShift() {
 
 function actionBukaShift() {
   const modal = numVal('input-shift-modal');
-  const queuePrefix = String(val('input-shift-prefix') || 'A').toUpperCase();
-  if (!['A', 'B'].includes(queuePrefix)) return showAlert('Prefix antrean shift harus A atau B.');
+  const queuePrefix = getQueuePrefixForCashier(currentUser && currentUser.u);
+  if (currentRole !== 'kasir' || !queuePrefix) {
+    return showAlert('Pembagian antrean akun belum dikenali. Kasir 1 menggunakan A dan Kasir 2 menggunakan B. Hubungi Pimpinan.');
+  }
   if (getCurrentShift()) return showAlert('Shift Anda masih berjalan. Tutup shift lama sebelum membuka shift baru.');
   const now = new Date();
   store.state.shift.push({
@@ -949,7 +969,7 @@ async function actionAddPasien() {
   try {
     const shift = getCurrentShift();
     if (!shift || shift.tgl !== todayStr) throw new Error('Buka shift untuk tanggal operasional hari ini sebelum mendaftarkan pasien.');
-    const queuePrefix = String(shift.queuePrefix || 'A').toUpperCase();
+    const queuePrefix = getShiftQueuePrefix(shift);
     if (!['A', 'B'].includes(queuePrefix)) throw new Error('Prefix antrean shift tidak valid. Periksa pengaturan shift.');
     const registeredAt = Date.now();
     const patient = {
