@@ -149,7 +149,12 @@ service cloud.firestore {
         (adminOrPimpinan() && !isQueueAudioClipDoc(document) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
-            .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay']));
+            .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay'])) ||
+        (staffActive() && staffProfile().role == 'kasir' &&
+          document == 'settings' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
+          request.resource.data.set.diff(resource.data.set).affectedKeys().hasOnly(['queueDisplayMode']) &&
+          request.resource.data.set.queueDisplayMode in ['A', 'B']);
       allow delete: if pimpinan() ||
         (adminOrPimpinan() && isQueueAudioClipDoc(document));
     }
@@ -344,6 +349,7 @@ service cloud.firestore {
           request.resource.data.id == document &&
           request.resource.data.kasir == staffProfile().u &&
           request.resource.data.status == 'buka' &&
+          request.resource.data.queuePrefix in ['A', 'B'] &&
           request.resource.data.modal is number &&
           request.resource.data.modal >= 0);
       // Kasir hanya menutup shift miliknya; Admin hanya memverifikasi setoran.
