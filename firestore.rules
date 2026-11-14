@@ -194,12 +194,19 @@ service cloud.firestore {
         // (dalam alur transaksi atomik yang juga membuat nota).
         ((pimpinan() || cashierOwnsPatient()) &&
           resource.data.get('done', false) != true &&
+          resource.data.get('deletedAt', null) == null &&
+          resource.data.get('status', '') != 'batal_berobat' &&
+          resource.data.get('status', '') != 'dihapus' &&
           request.resource.data.get('done', false) == true &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['done', '_t'])) ||
 
         // Admin/Pimpinan dapat mengoreksi status selesai menjadi belum selesai.
         (adminOrPimpinan() &&
+          resource.data.get('done', false) == true &&
+          resource.data.get('deletedAt', null) == null &&
+          resource.data.get('status', '') != 'batal_berobat' &&
+          resource.data.get('status', '') != 'dihapus' &&
           request.resource.data.get('done', false) == false &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['done', '_t'])) ||
