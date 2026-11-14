@@ -205,19 +205,16 @@ service cloud.firestore {
         staffProfile().role == 'kasir' &&
         resource.data.get('kasir', '') == staffProfile().get('u', '') &&
         validPatientCallingUpdate();
-      // DIAGNOSTIK SEMENTARA: hanya akun Kasir 2 dan satu dokumen uji.
-      // Hapus setelah penyebab penolakan calling teridentifikasi.
+      // DIAGNOSTIK TERISOLASI SEMENTARA:
+      // Hanya akun Kasir 2 dan hanya satu dokumen dummy yang telah disiapkan.
+      // Rule ini sengaja melepas pemeriksaan field untuk memastikan apakah
+      // request update benar-benar mencapai Rules Preview yang sedang diuji.
+      // WAJIB diganti dengan aturan permanen setelah uji berhasil.
       allow update: if
         request.auth != null &&
         request.auth.token.email == 'assalamkasir2@gmail.com' &&
         document == 'q_diag_kasir2_20261114_001' &&
-        resource.data.get('kasir', '') == 'kasir2' &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calling']) &&
-        request.resource.data.get('calling', false) is bool &&
-        resource.data.get('done', false) != true &&
-        resource.data.get('status', '') != 'batal_berobat' &&
-        resource.data.get('status', '') != 'dihapus' &&
-        resource.data.get('deletedAt', null) == null;
+        resource.data.nama == 'ZZ TEST DIAG KASIR2 EDIT';
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
