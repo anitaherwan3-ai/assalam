@@ -118,6 +118,8 @@ service cloud.firestore {
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('tgl', '') == resource.data.get('tgl', '') &&
+        get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('queuePrefix', 'A') ==
+          expectedCashierQueuePrefix(request.resource.data.get('kasir', '')) &&
         expectedCashierQueuePrefix(request.resource.data.get('kasir', '')) != '' &&
         request.resource.data.get('queueDisplayPrefix', '') ==
           expectedCashierQueuePrefix(request.resource.data.get('kasir', '')) &&
