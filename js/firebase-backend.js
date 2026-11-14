@@ -1272,6 +1272,10 @@ class FirebaseBackend {
             if (col === 'pasien' && profile.role === 'admin') {
               const patientId = String(item.id || '');
               if (!patientId) continue;
+              const editRequested = item._pendingAdminPatientEdit === true;
+              const correctionRequested = item._pendingAdminDoneCorrection === true;
+              if (!editRequested && !correctionRequested) continue;
+
               const patientRef = this.db.collection('k_pasien').doc(patientId);
               const remoteSnap = await patientRef.get();
               if (!remoteSnap.exists) continue;
@@ -1281,16 +1285,17 @@ class FirebaseBackend {
               if (localTime <= remoteTime) continue;
 
               const patch = {};
-              ['nama', 'hp'].forEach(key => {
-                if (Object.prototype.hasOwnProperty.call(item, key) &&
-                    JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
-                  patch[key] = item[key];
-                }
-              });
+              if (editRequested) {
+                ['nama', 'hp'].forEach(key => {
+                  if (Object.prototype.hasOwnProperty.call(item, key) &&
+                      JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
+                    patch[key] = item[key];
+                  }
+                });
+              }
               // Koreksi done:false hanya dikirim setelah Admin menekan tombol
               // koreksi secara eksplisit dan Cloud masih menunjukkan pasien selesai.
               // Cache lama tidak boleh membuka kembali pasien secara otomatis.
-              const correctionRequested = item._pendingAdminDoneCorrection === true;
               if (correctionRequested && item.done === false &&
                   remote.done === true && remote.deletedAt == null &&
                   remote.status !== 'batal_berobat' && remote.status !== 'dihapus') {
@@ -1304,12 +1309,15 @@ class FirebaseBackend {
                 continue;
               }
               patch._t = Math.max(Date.now(), remoteTime + 1);
+              const sourceFlagsToClear = [];
+              if (editRequested) sourceFlagsToClear.push('_pendingAdminPatientEdit');
+              if (correctionRequested) sourceFlagsToClear.push('_pendingAdminDoneCorrection');
               operations.push({
                 ref: patientRef,
                 data: patch,
                 merge: true,
-                sourceItem: correctionRequested ? item : null,
-                sourceFlagToClear: correctionRequested ? '_pendingAdminDoneCorrection' : null
+                sourceItem: item,
+                sourceFlagsToClear
               });
               continue;
             }
@@ -1436,9 +1444,9 @@ class FirebaseBackend {
                   op.sourceItem._pendingSync = false;
                   syncedLog = true;
                 }
-                if (op.sourceItem && op.sourceFlagToClear) {
-                  delete op.sourceItem[op.sourceFlagToClear];
-                  syncedLog = true;
+                if (op.sourceItem && Array.isArray(op.sourceFlagsToClear)) {
+                  op.sourceFlagsToClear.forEach(flag => delete op.sourceItem[flag]);
+                  if (op.sourceFlagsToClear.length) syncedLog = true;
                 }
               });
               if (syncedLog) this.store.saveLocal(false);
