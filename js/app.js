@@ -912,7 +912,7 @@ async function actionSetQueueDisplayMode(mode) {
     await backend.saveQueueDisplayMode(selected);
     store.state.set = store.state.set || {};
     store.state.set.queueDisplayMode = selected;
-    store.saveLocal();
+    store.saveLocal(false);
     renderApp();
     showAlert('Display TV sekarang menampilkan antrean ' + selected + '.', 'Pilihan Antrean TV');
   } catch (err) {
