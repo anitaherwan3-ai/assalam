@@ -952,6 +952,7 @@ function editPasien(id) {
     p.nama = res.nama;
     p.hp = res.hp;
     p._t = Date.now();
+    if (currentRole === 'admin') p._pendingAdminPatientEdit = true;
     store.logActivity('Ubah', 'Pasien', `${p.no} - ${p.nama}`);
     store.saveLocal();
   });
