@@ -263,9 +263,13 @@ function continuePatientService(patientId) {
 function savePatientHandoff(patientId,targetShiftId,reason) {
   const p=store.get('pasien',patientId), target=store.get('shift',targetShiftId), note=String(reason||'').trim();
   if(!p||!target||note.length<5){showAlert('Pasien, shift tujuan, dan alasan minimal 5 karakter wajib diisi.');return false;}
-  if(currentRole!=='kasir'||p.kasir!==(currentUser&&currentUser.u)){showAlert('Kasir hanya dapat melimpahkan pasien tanggung jawabnya.','Akses Ditolak');return false;}
+  if(!['kasir','pimpinan'].includes(currentRole) ||
+      (currentRole==='kasir' && p.kasir!==(currentUser&&currentUser.u))){
+    showAlert('Kasir hanya dapat melimpahkan pasien tanggung jawabnya; Pimpinan dapat mengelola seluruh pasien.','Akses Ditolak');
+    return false;
+  }
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
-  if(target.status!=='buka'||target.kasir===currentUser.u){showAlert('Shift tujuan harus sedang berjalan dan milik kasir lain.');return false;}
+  if(target.status!=='buka'||target.kasir===p.kasir){showAlert('Shift tujuan harus sedang berjalan dan milik kasir lain.');return false;}
   const now=Date.now(), from=p.kasir;
   p.kasir=target.kasir;p.sh=target.id;p.calling=false;
   p.pelimpahanDari=from;p.pelimpahanKe=target.kasir;p.pelimpahanAlasan=note;p.pelimpahanPada=now;p._t=now;
@@ -274,8 +278,14 @@ function savePatientHandoff(patientId,targetShiftId,reason) {
 }
 function actionLimpahkanPasien(patientId) {
   const p=store.get('pasien',patientId);
-  if(!p||currentRole!=='kasir'||p.kasir!==(currentUser&&currentUser.u)){showAlert('Pasien bukan tanggung jawab Kasir ini.');return;}
-  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==currentUser.u);
+  if(!p||!['kasir','pimpinan'].includes(currentRole) ||
+      (currentRole==='kasir' && p.kasir!==(currentUser&&currentUser.u))){
+    showAlert('Kasir hanya dapat melimpahkan pasien tanggung jawabnya; Pimpinan dapat mengelola seluruh pasien.');return;
+  }
+  if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){
+    showAlert('Pasien ini tidak dapat dilimpahkan.');return;
+  }
+  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.kasir&&s.kasir!==p.kasir);
   if(!shifts.length){showAlert('Kasir penerima harus membuka shift terlebih dahulu.');return;}
   showFormModal('Pelimpahan Pasien',[
     ['tujuan','Limpahkan ke Shift Kasir','select',shifts[0].id,shifts.map(s=>({value:s.id,label:`${s.nama||s.kasir} — ${s.jam||'-'} (${s.tgl||'-'})`}))],
@@ -722,7 +732,7 @@ function viewPasien() {
             ? `
               <button class="s p" onclick="store.callPatient('${p.id}')">📢 Panggil</button>
               <button class="s" onclick="editPasien('${p.id}')">Edit</button>
-              ${currentRole === 'kasir' ? `<button class="s" onclick="actionLimpahkanPasien('${p.id}')">↗ Limpahkan</button>` : ''}
+              ${(currentRole === 'kasir' || currentRole === 'pimpinan') ? `<button class="s" onclick="actionLimpahkanPasien('${p.id}')">↗ Limpahkan</button>` : ''}
               <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
             `
             : '-')
