@@ -1184,7 +1184,7 @@ class FirebaseBackend {
     }
     const profile = this.currentProfile;
     const selected = String(mode || '').toUpperCase();
-    if (!profile || !['kasir', 'admin', 'pimpinan'].includes(profile.role) ||
+    if (!profile || !['kasir', 'pimpinan'].includes(profile.role) ||
         !['A', 'B'].includes(selected)) {
       throw new Error('Akses atau pilihan antrean tidak valid.');
     }
@@ -1362,7 +1362,7 @@ class FirebaseBackend {
               const patientFields = [
                 'nama', 'hp', 'calling', 'done', 'status',
                 'batalBerobatPada', 'batalBerobatOleh',
-                'kasir', 'sh', 'pelimpahanDari', 'pelimpahanKe',
+                'kasir', 'sh', 'queueDisplayPrefix', 'pelimpahanDari', 'pelimpahanKe',
                 'pelimpahanAlasan', 'pelimpahanPada'
               ];
               const patch = {};
