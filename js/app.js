@@ -270,6 +270,7 @@ function savePatientHandoff(patientId,targetShiftId,reason) {
   }
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
   if(target.status!=='buka'||target.kasir===p.kasir||target.tgl!==p.tgl){showAlert('Shift tujuan harus sedang berjalan, milik kasir lain, dan pada tanggal pasien yang sama.');return false;}
+  if(!isShiftQueuePrefixCurrent(target)){showAlert('Shift tujuan masih memakai prefix lama. Kasir penerima harus menyelesaikan dan menutup shift tersebut, lalu membuka shift baru agar prefix otomatis sesuai.');return false;}
   const targetPrefix=getShiftQueuePrefix(target);
   if(!['A','B'].includes(targetPrefix)){showAlert('Prefix antrean shift tujuan tidak valid.');return false;}
   const now=Date.now(), from=p.kasir;
@@ -287,7 +288,7 @@ function actionLimpahkanPasien(patientId) {
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){
     showAlert('Pasien ini tidak dapat dilimpahkan.');return;
   }
-  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==p.kasir);
+  const shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==p.kasir&&isShiftQueuePrefixCurrent(s));
   if(!shifts.length){showAlert('Kasir penerima harus membuka shift terlebih dahulu.');return;}
   showFormModal('Pelimpahan Pasien',[
     ['tujuan','Limpahkan ke Shift Kasir','select',shifts[0].id,shifts.map(s=>({value:s.id,label:`${s.nama||s.kasir} — ${s.jam||'-'} (${s.tgl||'-'})`}))],
@@ -297,7 +298,7 @@ function actionLimpahkanPasien(patientId) {
 function showPendingPatientsBeforeLogout() {
   const pending=getPendingPatientsForLogout();
   if(!pending.length){showConfirm('Semua pasien pada shift ini sudah selesai, batal berobat, atau dilimpahkan. Yakin ingin keluar?',finishLogout,'Konfirmasi Keluar');return;}
-  const p=pending[0], shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==currentUser.u);
+  const p=pending[0], shifts=(store.state.shift||[]).filter(s=>s.status==='buka'&&s.tgl===p.tgl&&s.kasir&&s.kasir!==currentUser.u&&isShiftQueuePrefixCurrent(s));
   const actions=[{value:'lanjut',label:'Lanjutkan Pelayanan Sekarang'},...(shifts.length?[{value:'limpahkan',label:'Limpahkan ke Kasir / Shift Lain'}]:[]),{value:'batal',label:'Tandai Batal Berobat'}];
   showFormModal('Pasien Belum Diselesaikan',[
     ['pasien','Pasien','text',`${p.no} — ${p.nama} | ${p.layanan||'-'}`],
@@ -402,12 +403,15 @@ function getQueuePrefixForCashier(cashierId) {
 }
 
 function getShiftQueuePrefix(shift) {
-  if (shift && shift.status === 'buka') {
-    const assignedPrefix = getQueuePrefixForCashier(shift.kasir);
-    if (assignedPrefix) return assignedPrefix;
-  }
+  // Prefix tersimpan adalah sumber kebenaran shift yang sedang/ telah berjalan.
+  // Shift lama harus tetap konsisten; shift baru akan diisi otomatis saat dibuka.
   const savedPrefix = String(shift && shift.queuePrefix || '').toUpperCase();
   return ['A', 'B'].includes(savedPrefix) ? savedPrefix : 'A';
+}
+
+function isShiftQueuePrefixCurrent(shift) {
+  const expectedPrefix = getQueuePrefixForCashier(shift && shift.kasir);
+  return !!expectedPrefix && getShiftQueuePrefix(shift) === expectedPrefix;
 }
 
 function getCurrentShift() {
@@ -440,10 +444,16 @@ function viewShift() {
     const waNotice = ownerWa 
       ? `<div style="font-size:12px;color:var(--ok);margin-top:6px;display:flex;align-items:center;gap:6px;"><span>📲</span> <span>Laporan rekap tutup shift akan <b>otomatis terkirim ke WhatsApp Owner</b> (${esc(ownerWa)}).</span></div>`
       : `<div style="font-size:12px;color:var(--rd);margin-top:6px;display:flex;align-items:center;gap:6px;"><span>⚠️</span> <span>Nomor WA Owner belum diatur pada user pimpinan. Atur di menu Pengguna/Pengaturan agar rekap terkirim otomatis.</span></div>`;
+    const assignedQueuePrefix = getQueuePrefixForCashier(shift.kasir);
+    const currentQueuePrefix = getShiftQueuePrefix(shift);
+    const queueSetupNotice = assignedQueuePrefix && currentQueuePrefix !== assignedQueuePrefix
+      ? `<div style="font-size:12px;color:var(--rd);margin-top:10px;padding:10px;border:1px solid currentColor;border-radius:8px;">Shift lama ini masih memakai antrean ${esc(currentQueuePrefix)}. Selesaikan pasien yang tersisa lalu tutup shift ini. Saat membuka shift baru, antrean otomatis akun ini adalah ${esc(assignedQueuePrefix)}.</div>`
+      : '';
 
     activeCard = `
       <div class="card">
         <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)}) — Antrean ${esc(getShiftQueuePrefix(shift))}</h2>
+        ${queueSetupNotice}
         <div class="grid">
           <div class="kpi"><span>Modal Awal Laci</span><b>${rp(shift.modal)}</b></div>
           <div class="kpi"><span>Jumlah Transaksi</span><b>${trxs.length}</b></div>
@@ -971,6 +981,11 @@ async function actionAddPasien() {
     if (!shift || shift.tgl !== todayStr) throw new Error('Buka shift untuk tanggal operasional hari ini sebelum mendaftarkan pasien.');
     const queuePrefix = getShiftQueuePrefix(shift);
     if (!['A', 'B'].includes(queuePrefix)) throw new Error('Prefix antrean shift tidak valid. Periksa pengaturan shift.');
+    const expectedPrefix = getQueuePrefixForCashier(currentUser && currentUser.u);
+    if (!expectedPrefix) throw new Error('Akun Kasir belum memiliki pembagian antrean otomatis.');
+    if (queuePrefix !== expectedPrefix) {
+      throw new Error(`Shift lama ini masih memakai antrean ${queuePrefix}. Selesaikan pasiennya dan tutup shift dahulu, lalu buka shift baru agar antrean otomatis menjadi ${expectedPrefix}.`);
+    }
     const registeredAt = Date.now();
     const patient = {
       id: '',
