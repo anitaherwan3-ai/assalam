@@ -73,6 +73,28 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'batalBerobatPada', 'batalBerobatOleh', '_t']);
     }
+    // Arsip pasien adalah perubahan status, bukan penghapusan dokumen.
+    // Hanya Pimpinan yang dapat mengarsipkan pasien yang belum dilayani.
+    function validPatientArchive() {
+      return resource.data.get('done', false) != true &&
+        resource.data.get('deletedAt', null) == null &&
+        resource.data.get('status', '') != 'dihapus' &&
+        request.resource.data.get('status', '') == 'dihapus' &&
+        request.resource.data.get('deletedAt', null) is int &&
+        request.resource.data.get('deletedBy', '') == ownerDocId() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'deletedAt', 'deletedBy', '_t']);
+    }
+    // Pemulihan arsip mengembalikan status dan metadata arsip menjadi null.
+    function validPatientUnarchive() {
+      return (resource.data.get('deletedAt', null) != null ||
+          resource.data.get('status', '') == 'dihapus') &&
+        request.resource.data.get('status', '') == 'aktif' &&
+        request.resource.data.get('deletedAt', null) == null &&
+        request.resource.data.get('deletedBy', null) == null &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'deletedAt', 'deletedBy', '_t']);
+    }
     function validPatientHandoff() {
       return resource.data.get('done', false) != true &&
         resource.data.get('deletedAt', null) == null &&
@@ -253,6 +275,10 @@ service cloud.firestore {
         // Pemulihan antrean Batal Berobat: Pimpinan atau Kasir pemilik.
         ((pimpinan() || cashierOwnsPatient()) &&
           validPatientRestore()) ||
+
+        // Arsip dan pemulihan arsip hanya oleh Pimpinan.
+        (pimpinan() && validPatientArchive()) ||
+        (pimpinan() && validPatientUnarchive()) ||
 
         // Pelimpahan: Kasir pemilik atau Pimpinan ke shift kasir lain yang sedang buka.
         (cashierOwnsPatient() &&
