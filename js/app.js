@@ -709,7 +709,8 @@ function viewPasien() {
     p.pelimpahanAlasan ? `<small style="display:block;color:var(--mu);">📨 ${esc(p.pelimpahanAlasan)}<br>${esc(p.pelimpahanDari||'-')} → ${esc(p.pelimpahanKe||p.kasir||'-')}</small>` : '-',
     (p.done
       ? (currentRole === 'admin' || currentRole === 'pimpinan'
-        ? `<button class="s" onclick="editPasien('${p.id}')">Edit</button>` : '-')
+        ? `<button class="s" onclick="editPasien('${p.id}')">Edit</button>
+           <button class="s p" onclick="actionKoreksiBelumSelesai('${p.id}')">Koreksi Belum Selesai</button>` : '-')
       : p.status === 'batal_berobat'
         ? (currentRole === 'kasir' || currentRole === 'pimpinan'
           ? `<button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>`
@@ -954,6 +955,23 @@ function editPasien(id) {
     store.logActivity('Ubah', 'Pasien', `${p.no} - ${p.nama}`);
     store.saveLocal();
   });
+}
+
+function actionKoreksiBelumSelesai(id) {
+  if (currentRole !== 'admin' && currentRole !== 'pimpinan') {
+    showAlert('Hanya Admin atau Pimpinan yang dapat mengoreksi status pelayanan.', 'Akses Ditolak');
+    return;
+  }
+  const p = store.get('pasien', id);
+  if (!p || p.done !== true || p.deletedAt ||
+      p.status === 'dihapus' || p.status === 'batal_berobat') return;
+  showConfirm('Kembalikan status pasien menjadi belum selesai? Tindakan ini akan tercatat.', () => {
+    p.done = false;
+    p._t = Date.now();
+    if (currentRole === 'admin') p._pendingAdminDoneCorrection = true;
+    store.logActivity('Koreksi Status Pasien', 'Pasien', `${p.no} - ${p.nama}: selesai → belum selesai`);
+    store.saveLocal();
+  }, 'Konfirmasi Koreksi Status');
 }
 
 function actionBatalBerobat(id) {
