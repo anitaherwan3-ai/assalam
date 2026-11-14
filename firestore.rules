@@ -103,6 +103,7 @@ service cloud.firestore {
         request.resource.data.get('kasir', '') is string &&
         request.resource.data.get('kasir', '') != resource.data.get('kasir', '') &&
         request.resource.data.get('sh', '') is string &&
+        request.resource.data.get('pelimpahanDari', '') == resource.data.get('kasir', '') &&
         request.resource.data.get('pelimpahanKe', '') == request.resource.data.get('kasir', '') &&
         request.resource.data.get('pelimpahanAlasan', '') is string &&
         request.resource.data.get('pelimpahanAlasan', '').size() >= 5 &&
@@ -111,9 +112,12 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)) &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.status == 'buka' &&
         get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.kasir == request.resource.data.kasir &&
+        get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('tgl', '') == resource.data.get('tgl', '') &&
+        request.resource.data.get('queueDisplayPrefix', 'A') ==
+          get(/databases/$(database)/documents/k_shift/$(request.resource.data.sh)).data.get('queuePrefix', 'A') &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
-          'pelimpahanAlasan', 'pelimpahanPada', '_t'
+          'pelimpahanAlasan', 'pelimpahanPada', 'queueDisplayPrefix', '_t'
         ]);
     }
 
@@ -150,6 +154,10 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
           request.resource.data.set.diff(resource.data.set).affectedKeys()
             .hasOnly(['youtubeVideoId', 'enableYoutubeDisplay', 'runningTextDisplay'])) ||
+        (adminOrPimpinan() && document == 'settings' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
+          request.resource.data.set.diff(resource.data.set).affectedKeys().hasOnly(['queueDisplayMode']) &&
+          request.resource.data.set.queueDisplayMode in ['A', 'B']) ||
         (staffActive() && staffProfile().role == 'kasir' &&
           document == 'settings' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['set']) &&
