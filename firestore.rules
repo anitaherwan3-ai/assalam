@@ -36,15 +36,6 @@ service cloud.firestore {
       return signedIn() && (initialOwner() || staffProfile().role == 'kasir');
     }
 
-    // Verifikasi kepemilikan Kasir secara langsung dari profil Firestore.
-    // Fungsi ini dipakai khusus untuk update status panggilan pasien.
-    function activeKasirOwnsPatient() {
-      // Gunakan helper profil yang sama dengan staffActive(), yang sudah
-      // dipakai pada izin baca pasien dan operasi Kasir lainnya.
-      return staffActive() &&
-        staffProfile().role == 'kasir' &&
-        resource.data.kasir == staffProfile().u;
-    }
     function validPatientCallingUpdate() {
       return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['calling', '_t']) &&
@@ -204,10 +195,16 @@ service cloud.firestore {
             'kasir', 'sh', 'calling', 'pelimpahanDari', 'pelimpahanKe',
             'pelimpahanAlasan', 'pelimpahanPada', '_t'
           ]));
-      // Status panggilan: Pimpinan atau Kasir aktif pemilik pasien.
-      // Perubahan dibatasi pada calling/_t; pasien selesai/dibatalkan/dihapus ditolak.
+      // Status panggilan: Pimpinan, atau Kasir aktif untuk pasien miliknya sendiri.
+      // Jalur Kasir memakai helper otorisasi yang sudah terbukti berhasil pada edit nama pasien.
+      // Pimpinan dipisahkan agar tidak perlu membaca profil staf melalui owner email.
       allow update: if pimpinan() && validPatientCallingUpdate();
-      allow update: if activeKasirOwnsPatient() && validPatientCallingUpdate();
+      allow update: if
+        !pimpinan() &&
+        kasirOrPimpinan() &&
+        staffProfile().role == 'kasir' &&
+        resource.data.get('kasir', '') == staffProfile().get('u', '') &&
+        validPatientCallingUpdate();
       // Penghapusan data pasien dibatasi untuk Pimpinan.
       allow delete: if pimpinan();
     }
