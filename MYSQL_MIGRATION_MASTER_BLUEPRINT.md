@@ -434,3 +434,8 @@ No DDL, production change, Firebase mutation or real-data migration was performe
 ## Relational integrity and orphan-data audit
 
 See [MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md](./MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md). It maps patient/visit/queue/invoice, invoice-line/package/batch/return, purchase/stock/loss, shift/cash/finance, identity and audit relationships; documents archive/cancel/return lifecycles; defines candidate FK policies, pre-import orphan checks, quarantine rules, synthetic edge-case tests and unresolved owner policies. This is source-based analysis only: no live orphan query, production data export, DDL or production mutation was performed.
+
+
+## Financial and inventory reconciliation audit
+
+See [MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md](./MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md) for the source-based review of net revenue, returns, HPP, loss, expenses, petty cash, opening float, shift cash, FEFO, weighted-average HPP, purchase settlement, supplier returns, refund payout, reconciliation equations and 28 synthetic regression tests. No live data query, DDL or production mutation was performed.
