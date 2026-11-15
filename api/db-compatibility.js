@@ -118,7 +118,7 @@ module.exports = async function handler(req, res) {
         qty DECIMAL(18,3) NOT NULL,
         nullable_key VARCHAR(40) NULL,
         INDEX idx_parent (parent_id),
-        UNIQUE KEY uq_nullable (nullable_key),
+        UNIQUE KEY uq_parent_nullable (parent_id, nullable_key),
         CONSTRAINT fk_compat_parent FOREIGN KEY (parent_id)
           REFERENCES ${quote(parentTable)} (id)
           ON DELETE RESTRICT ON UPDATE RESTRICT
@@ -138,7 +138,7 @@ module.exports = async function handler(req, res) {
       `INSERT INTO ${quote(childTable)} (id,parent_id,amount,qty,nullable_key) VALUES
        (1,1,125000,1.250,NULL),(2,1,25000,0.125,NULL)`
     );
-    pass("nullable_unique_index", "Two NULL values accepted by a UNIQUE index");
+    pass("composite_nullable_unique_index", "Two NULL values accepted by a composite UNIQUE index");
 
     try {
       await connectionA.query(
@@ -170,18 +170,30 @@ module.exports = async function handler(req, res) {
       await connectionA.query(
         `INSERT INTO ${quote(childTable)} (id,parent_id,amount,qty,nullable_key) VALUES (4,1,1,1,'unique-value'),(5,1,1,1,'unique-value')`
       );
-      fail("unique_non_null_enforcement", new Error("Duplicate non-NULL unique key unexpectedly accepted"));
+      fail("composite_unique_non_null_enforcement", new Error("Duplicate non-NULL composite unique key unexpectedly accepted"));
     } catch (error) {
       if (error.message.includes("unexpectedly accepted")) throw error;
       if (error.code === "ER_DUP_ENTRY" || error.errno === 1062) {
-        pass("unique_non_null_enforcement", "Duplicate non-NULL unique key rejected");
+        pass("composite_unique_non_null_enforcement", "Duplicate non-NULL composite unique key rejected");
       } else {
         fail("unique_non_null_enforcement", error);
       }
     }
 
+    await connectionA.query(
+      `INSERT INTO ${quote(childTable)} (id,parent_id,amount,qty,nullable_key) VALUES (6,1,9007199254740993,0.000,'bigint-boundary')`
+    );
+    const [bigintRows] = await connectionA.query(
+      `SELECT amount FROM ${quote(childTable)} WHERE id=6`
+    );
+    if (String(bigintRows[0].amount) === "9007199254740993") {
+      pass("bigint_above_js_safe_integer", "BIGINT value above Number.MAX_SAFE_INTEGER round-tripped exactly as string");
+    } else {
+      fail("bigint_above_js_safe_integer", new Error("BIGINT precision loss: " + String(bigintRows[0].amount)));
+    }
+
     const [sums] = await connectionA.query(
-      `SELECT SUM(qty) AS total_qty, SUM(amount) AS total_amount FROM ${quote(childTable)}`
+      `SELECT SUM(qty) AS total_qty, SUM(amount) AS total_amount FROM ${quote(childTable)} WHERE id IN (1,2)`
     );
     if (String(sums[0].total_qty) === "1.375" && String(sums[0].total_amount) === "150000") {
       pass("decimal_and_bigint_round_trip", sums[0]);
