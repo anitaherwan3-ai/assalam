@@ -2,19 +2,19 @@
 
 Tanggal: 2026-11-15  
 Branch: `migration/tidb-foundation`  
-Source proposal blob: `f934b7102d86aa6453adb646360b7eb8cd7faaf5`  
+Source proposal blob: `3f671b5718a9aef6656bcdc344a5c81c17b50ade`  
 Status: **STATIC EXTRACTION / REVIEW DRAFT — NOT DDL, NOT APPROVED FOR SCHEMA FREEZE**
 
 ## 1. Tujuan dan batas
 
-Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari tabel inti proposal. Kolom yang tidak memiliki deklarasi NULL/default eksplisit tetap ditandai `UNSPECIFIED`; tidak ada nilai yang ditebak. Ini bukan bukti runtime TiDB. Charset/collation, nama dan urutan index/FK, aksi FK, CHECK, generated expression, strategi PK, dan timestamp semantics per kolom tetap memerlukan keputusan/validasi terpisah.
+Dokumen ini menormalkan kolom yang dapat diekstrak dari definisi tabel inti proposal. Kolom yang tidak memiliki deklarasi NULL/default eksplisit tetap ditandai `UNSPECIFIED`; tidak ada nilai yang ditebak. Ini bukan bukti runtime TiDB. Charset/collation, nama dan urutan index/FK, aksi FK, CHECK, generated expression, strategi PK, dan timestamp semantics per kolom masih memerlukan keputusan/validasi terpisah.
 
 ## 2. Ringkasan cakupan ekstraksi
 
 - Tabel dengan definisi utama yang dipindai: **56**.
 - Kolom unik yang berhasil diekstrak: **566**.
 - `users` dan `user_emails` diambil dari tabel kolom; definisi lainnya diekstrak dari deklarasi inline.
-- Tabel integrity tambahan yang disebut hanya dalam addendum/daftar constraint (mis. `active_email_claims`, `active_role_slots`, `sales_return_events`, `sales_return_quota_events`, `queue_prefix_guards`, `supplier_invoice_line_batch_allocations`) belum dianggap lengkap karena belum memiliki definisi kolom penuh dalam bagian tabel utama.
+- Tabel integrity tambahan yang disebut hanya dalam addendum/daftar constraint (mis. `active_email_claims`, `active_role_slots`, `sales_return_events`, `sales_return_quota_events`, `queue_prefix_guards`, `supplier_invoice_line_batch_allocations`) belum dianggap lengkap karena belum memiliki definisi kolom penuh pada bagian tabel utama.
 
 ## 3. Dictionary per tabel
 
@@ -26,11 +26,11 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `legacy_uid` | `VARCHAR(128)` | NULL | UNSPECIFIED | UID lama jika tersedia |
 | `display_name` | `VARCHAR(120)` | NOT NULL | UNSPECIFIED | Nama tampilan |
 | `phone` | `VARCHAR(32)` | NULL | UNSPECIFIED | Nomor kontak staf |
-| `active` | `TINYINT(1)` | NOT NULL | 1 | Default 1 |
-| `protected_owner` | `TINYINT(1)` | NOT NULL | 0 | Default 0; proteksi master di server |
+| `active` | `TINYINT(1)` | NOT NULL | 1  | Default 1 |
+| `protected_owner` | `TINYINT(1)` | NOT NULL | 0; proteksi master di server  | Default 0; proteksi master di server |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | Server time |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | Server time |
-| `version` | `BIGINT UNSIGNED` | NOT NULL | 1 | Default 1 |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | 1  | Default 1 |
 
 ### `user_emails`
 
@@ -39,7 +39,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `email_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | PK |
 | `user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | FK users |
 | `email_normalized` | `VARCHAR(254)` | NOT NULL | UNSPECIFIED | lowercase + trim |
-| `is_primary` | `TINYINT(1)` | NOT NULL | 0 | Default 0 |
+| `is_primary` | `TINYINT(1)` | NOT NULL | 0  | Default 0 |
 | `verified_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | Verifikasi provider |
 | `valid_from_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | Awal berlaku |
 | `valid_to_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | NULL = masih aktif |
@@ -50,7 +50,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `role_assignment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | role_assignment_id BIGINT |
+| `role_assignment_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | role_assignment_id BIGINT UNSIGNED |
 | `user_id` | `VARCHAR(64)` | UNSPECIFIED | UNSPECIFIED | user_id VARCHAR(64) |
 | `role_code` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | role_code VARCHAR(24) NOT NULL |
 | `scope_type` | `VARCHAR(24)` | NOT NULL | 'clinic' | scope_type VARCHAR(24) NOT NULL DEFAULT 'clinic' |
@@ -68,7 +68,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `setting_value` | `TEXT` | NOT NULL | UNSPECIFIED | setting_value TEXT NOT NULL |
 | `value_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | value_type VARCHAR(20) NOT NULL |
 | `editable_by_admin` | `TINYINT(1)` | NOT NULL | 0 | editable_by_admin TINYINT(1) NOT NULL DEFAULT 0 |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
 | `updated_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | updated_by_user_id VARCHAR(64) NOT NULL |
 
@@ -76,7 +76,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `display_config_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | display_config_id BIGINT |
+| `display_config_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | display_config_id BIGINT UNSIGNED |
 | `config_key` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | config_key VARCHAR(80) |
 | `youtube_video_id` | `VARCHAR(64)` | NULL | UNSPECIFIED | youtube_video_id VARCHAR(64) NULL |
 | `youtube_enabled` | `TINYINT(1)` | NOT NULL | 0 | youtube_enabled TINYINT(1) NOT NULL DEFAULT 0 |
@@ -89,14 +89,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `audio_asset_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | audio_asset_id BIGINT |
+| `audio_asset_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | audio_asset_id BIGINT UNSIGNED |
 | `clip_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | clip_id VARCHAR(64) NOT NULL |
 | `clip_type` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | clip_type VARCHAR(24) NOT NULL |
 | `object_key` | `VARCHAR(512)` | NOT NULL | UNSPECIFIED | object_key VARCHAR(512) NOT NULL |
 | `mime_type` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | mime_type VARCHAR(100) NOT NULL |
-| `size_bytes` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | size_bytes BIGINT |
+| `size_bytes` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | size_bytes BIGINT UNSIGNED NOT NULL |
 | `sha256` | `CHAR(64)` | NOT NULL | UNSPECIFIED | sha256 CHAR(64) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 | `active` | `TINYINT(1)` | NOT NULL | 1 | active TINYINT(1) NOT NULL DEFAULT 1 |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
 | `updated_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | updated_by_user_id VARCHAR(64) NOT NULL |
@@ -105,7 +105,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `patient_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | patient_id BIGINT |
+| `patient_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | patient_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `full_name` | `VARCHAR(160)` | NOT NULL | UNSPECIFIED | full_name VARCHAR(160) NOT NULL |
@@ -118,20 +118,20 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `created_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | created_by_user_id VARCHAR(64) NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `patient_encounters`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `encounter_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | encounter_id BIGINT |
+| `encounter_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | encounter_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `patient_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | patient_id BIGINT |
+| `patient_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | patient_id BIGINT UNSIGNED NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `service_name_snapshot` | `VARCHAR(120)` | NULL | UNSPECIFIED | service_name_snapshot VARCHAR(120) NULL |
 | `cashier_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | cashier_user_id VARCHAR(64) NOT NULL |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NULL |
 | `status` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | status VARCHAR(24) NOT NULL |
 | `completed_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | completed_at_utc DATETIME(3) NULL |
 | `cancelled_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | cancelled_at_utc DATETIME(3) NULL |
@@ -145,14 +145,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 |---|---|---|---|---|
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `prefix` | `VARCHAR(4)` | NOT NULL | UNSPECIFIED | prefix VARCHAR(4) NOT NULL |
-| `last_sequence` | `INT` | UNSPECIFIED | UNSPECIFIED | last_sequence INT |
+| `last_sequence` | `INT UNSIGNED` | NOT NULL | UNSPECIFIED | last_sequence INT UNSIGNED NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
 
 ### `cashier_queue_assignments`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `assignment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | assignment_id BIGINT |
+| `assignment_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | assignment_id BIGINT UNSIGNED |
 | `user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | user_id VARCHAR(64) NOT NULL |
 | `prefix` | `VARCHAR(4)` | NOT NULL | UNSPECIFIED | prefix VARCHAR(4) NOT NULL |
 | `valid_from` | `DATE` | NOT NULL | UNSPECIFIED | valid_from DATE NOT NULL |
@@ -164,13 +164,13 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `queue_ticket_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | queue_ticket_id BIGINT |
+| `queue_ticket_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | queue_ticket_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `encounter_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | encounter_id BIGINT |
+| `encounter_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | encounter_id BIGINT UNSIGNED NOT NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `prefix` | `VARCHAR(4)` | NOT NULL | UNSPECIFIED | prefix VARCHAR(4) NOT NULL |
-| `sequence_no` | `INT` | UNSPECIFIED | UNSPECIFIED | sequence_no INT |
+| `sequence_no` | `INT UNSIGNED` | NOT NULL | UNSPECIFIED | sequence_no INT UNSIGNED NOT NULL |
 | `display_number` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | display_number VARCHAR(20) NOT NULL |
 | `status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | status VARCHAR(20) NOT NULL |
 | `registered_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | registered_at_utc DATETIME(3) NOT NULL |
@@ -182,8 +182,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `call_event_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | call_event_id BIGINT |
-| `queue_ticket_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | queue_ticket_id BIGINT |
+| `call_event_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | call_event_id BIGINT UNSIGNED |
+| `queue_ticket_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | queue_ticket_id BIGINT UNSIGNED NOT NULL |
 | `event_type` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | event_type VARCHAR(16) NOT NULL |
 | `counter_label` | `VARCHAR(40)` | NULL | UNSPECIFIED | counter_label VARCHAR(40) NULL |
 | `event_idempotency_key` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | event_idempotency_key VARCHAR(100) NOT NULL |
@@ -194,12 +194,12 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `handoff_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | handoff_id BIGINT |
-| `encounter_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | encounter_id BIGINT |
+| `handoff_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | handoff_id BIGINT UNSIGNED |
+| `encounter_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | encounter_id BIGINT UNSIGNED NOT NULL |
 | `from_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | from_user_id VARCHAR(64) NOT NULL |
 | `to_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | to_user_id VARCHAR(64) NOT NULL |
-| `from_shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | from_shift_id BIGINT |
-| `to_shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | to_shift_id BIGINT |
+| `from_shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | from_shift_id BIGINT UNSIGNED NOT NULL |
+| `to_shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | to_shift_id BIGINT UNSIGNED NOT NULL |
 | `reason` | `VARCHAR(255)` | NULL | UNSPECIFIED | reason VARCHAR(255) NULL |
 | `approved_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | approved_at_utc DATETIME(3) NOT NULL |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
@@ -208,7 +208,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `cashier_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | cashier_user_id VARCHAR(64) NOT NULL |
@@ -225,15 +225,15 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
 | `cashier_user_id` | `VARCHAR(64)` | UNSPECIFIED | UNSPECIFIED | cashier_user_id VARCHAR(64) |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NOT NULL |
 | `acquired_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | acquired_at_utc DATETIME(3) NOT NULL |
 
 ### `shift_reconciliations`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `reconciliation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reconciliation_id BIGINT |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `reconciliation_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | reconciliation_id BIGINT UNSIGNED |
+| `shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NOT NULL |
 | `system_cash` | `BIGINT` | NOT NULL | UNSPECIFIED | system_cash BIGINT NOT NULL |
 | `counted_cash` | `BIGINT` | NOT NULL | UNSPECIFIED | counted_cash BIGINT NOT NULL |
 | `variance` | `BIGINT` | NOT NULL | UNSPECIFIED | variance BIGINT NOT NULL |
@@ -247,9 +247,9 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `cash_entry_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | cash_entry_id BIGINT |
+| `cash_entry_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | cash_entry_id BIGINT UNSIGNED |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NULL |
 | `account_code` | `VARCHAR(32)` | NOT NULL | UNSPECIFIED | account_code VARCHAR(32) NOT NULL |
 | `direction` | `VARCHAR(8)` | NOT NULL | UNSPECIFIED | direction VARCHAR(8) NOT NULL |
 | `amount` | `BIGINT` | NOT NULL | UNSPECIFIED | amount BIGINT NOT NULL |
@@ -258,14 +258,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `payment_method` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | payment_method VARCHAR(24) NOT NULL |
 | `occurred_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | occurred_at_utc DATETIME(3) NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
-| `reversal_of_entry_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reversal_of_entry_id BIGINT |
+| `reversal_of_entry_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | reversal_of_entry_id BIGINT UNSIGNED NULL |
 | `idempotency_key` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | idempotency_key VARCHAR(100) NOT NULL |
 
 ### `bank_ledger_entries`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `bank_entry_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | bank_entry_id BIGINT |
+| `bank_entry_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | bank_entry_id BIGINT UNSIGNED |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `bank_account_code` | `VARCHAR(32)` | NOT NULL | UNSPECIFIED | bank_account_code VARCHAR(32) NOT NULL |
 | `direction` | `VARCHAR(8)` | NOT NULL | UNSPECIFIED | direction VARCHAR(8) NOT NULL |
@@ -275,29 +275,29 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `reference_no` | `VARCHAR(100)` | NULL | UNSPECIFIED | reference_no VARCHAR(100) NULL |
 | `occurred_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | occurred_at_utc DATETIME(3) NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
-| `reversal_of_entry_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reversal_of_entry_id BIGINT |
+| `reversal_of_entry_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | reversal_of_entry_id BIGINT UNSIGNED NULL |
 | `idempotency_key` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | idempotency_key VARCHAR(100) NOT NULL |
 
 ### `petty_cash_entries`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `petty_cash_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | petty_cash_id BIGINT |
+| `petty_cash_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | petty_cash_id BIGINT UNSIGNED |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NOT NULL |
 | `cashier_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | cashier_user_id VARCHAR(64) NOT NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `description` | `VARCHAR(255)` | NOT NULL | UNSPECIFIED | description VARCHAR(255) NOT NULL |
 | `amount` | `BIGINT` | NOT NULL | UNSPECIFIED | amount BIGINT NOT NULL |
 | `status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | status VARCHAR(16) NOT NULL |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
-| `reversed_by_entry_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reversed_by_entry_id BIGINT |
+| `reversed_by_entry_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | reversed_by_entry_id BIGINT UNSIGNED NULL |
 
 ### `expenses`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `expense_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | expense_id BIGINT |
+| `expense_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | expense_id BIGINT UNSIGNED |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `category` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | category VARCHAR(80) NOT NULL |
@@ -309,14 +309,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `approved_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | approved_at_utc DATETIME(3) NULL |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `expense_events`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `expense_event_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | expense_event_id BIGINT |
-| `expense_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | expense_id BIGINT |
+| `expense_event_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | expense_event_id BIGINT UNSIGNED |
+| `expense_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | expense_id BIGINT UNSIGNED NOT NULL |
 | `event_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | event_type VARCHAR(20) NOT NULL |
 | `old_status` | `VARCHAR(16)` | NULL | UNSPECIFIED | old_status VARCHAR(16) NULL |
 | `new_status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | new_status VARCHAR(16) NOT NULL |
@@ -328,23 +328,23 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `loss_event_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | loss_event_id BIGINT |
+| `loss_event_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | loss_event_id BIGINT UNSIGNED |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NOT NULL |
+| `batch_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | batch_id BIGINT UNSIGNED NOT NULL |
 | `quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity DECIMAL(18,3) NOT NULL |
 | `value_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | value_amount BIGINT NOT NULL |
 | `reason` | `VARCHAR(255)` | NOT NULL | UNSPECIFIED | reason VARCHAR(255) NOT NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
 | `occurred_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | occurred_at_utc DATETIME(3) NOT NULL |
-| `reversal_of_loss_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reversal_of_loss_id BIGINT |
+| `reversal_of_loss_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | reversal_of_loss_id BIGINT UNSIGNED NULL |
 
 ### `medicines`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `sku` | `VARCHAR(80)` | NULL | UNSPECIFIED | sku VARCHAR(80) NULL |
@@ -357,13 +357,13 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `min_stock` | `DECIMAL(18,3)` | NULL | UNSPECIFIED | min_stock DECIMAL(18,3) NULL |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `tariffs`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `tariff_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | tariff_id BIGINT |
+| `tariff_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | tariff_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `name` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | name VARCHAR(180) NOT NULL |
@@ -372,13 +372,13 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `active` | `TINYINT(1)` | NOT NULL | 1 | active TINYINT(1) NOT NULL DEFAULT 1 |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `service_packages`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `package_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | package_id BIGINT |
+| `package_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | package_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `name` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | name VARCHAR(180) NOT NULL |
@@ -387,17 +387,17 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `active` | `TINYINT(1)` | NOT NULL | 1 | active TINYINT(1) NOT NULL DEFAULT 1 |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `package_components`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `package_component_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | package_component_id BIGINT |
-| `package_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | package_id BIGINT |
+| `package_component_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | package_component_id BIGINT UNSIGNED |
+| `package_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | package_id BIGINT UNSIGNED NOT NULL |
 | `component_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | component_type VARCHAR(20) NOT NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `tariff_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | tariff_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NULL |
+| `tariff_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | tariff_id BIGINT UNSIGNED NULL |
 | `component_name_snapshot` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | component_name_snapshot VARCHAR(180) NOT NULL |
 | `unit_price_snapshot` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_price_snapshot BIGINT NOT NULL |
 | `quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity DECIMAL(18,3) NOT NULL |
@@ -407,7 +407,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_id BIGINT |
+| `supplier_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `name` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | name VARCHAR(180) NOT NULL |
@@ -421,10 +421,10 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT |
+| `supplier_invoice_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `supplier_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_id BIGINT |
+| `supplier_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_id BIGINT UNSIGNED NOT NULL |
 | `invoice_number` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | invoice_number VARCHAR(100) NOT NULL |
 | `invoice_date` | `DATE` | NOT NULL | UNSPECIFIED | invoice_date DATE NOT NULL |
 | `due_date` | `DATE` | NULL | UNSPECIFIED | due_date DATE NULL |
@@ -439,9 +439,9 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_line_id BIGINT |
-| `supplier_invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
+| `supplier_invoice_line_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_line_id BIGINT UNSIGNED |
+| `supplier_invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_invoice_id BIGINT UNSIGNED NOT NULL |
+| `medicine_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NOT NULL |
 | `quantity_received` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity_received DECIMAL(18,3) NOT NULL |
 | `quantity_returned` | `DECIMAL(18,3)` | NOT NULL | 0 | quantity_returned DECIMAL(18,3) NOT NULL DEFAULT 0 |
 | `unit_cost` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_cost BIGINT NOT NULL |
@@ -454,11 +454,11 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `batch_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `supplier_invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_line_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NOT NULL |
+| `supplier_invoice_line_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | supplier_invoice_line_id BIGINT UNSIGNED NULL |
 | `batch_number` | `VARCHAR(100)` | NULL | UNSPECIFIED | batch_number VARCHAR(100) NULL |
 | `expiry_date` | `DATE` | NULL | UNSPECIFIED | expiry_date DATE NULL |
 | `initial_quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | initial_quantity DECIMAL(18,3) NOT NULL |
@@ -471,10 +471,10 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `inventory_movement_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | inventory_movement_id BIGINT |
+| `inventory_movement_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | inventory_movement_id BIGINT UNSIGNED |
 | `movement_key` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | movement_key VARCHAR(100) NOT NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NOT NULL |
+| `batch_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | batch_id BIGINT UNSIGNED NULL |
 | `movement_type` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | movement_type VARCHAR(24) NOT NULL |
 | `quantity_delta` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity_delta DECIMAL(18,3) NOT NULL |
 | `unit_cost` | `BIGINT` | NULL | UNSPECIFIED | unit_cost BIGINT NULL |
@@ -485,22 +485,22 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
 | `occurred_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | occurred_at_utc DATETIME(3) NOT NULL |
-| `reversal_of_movement_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | reversal_of_movement_id BIGINT |
+| `reversal_of_movement_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | reversal_of_movement_id BIGINT UNSIGNED NULL |
 
 ### `stocktakes`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `stocktake_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | stocktake_id BIGINT |
+| `stocktake_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | stocktake_id BIGINT UNSIGNED |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | status VARCHAR(20) NOT NULL |
 | `created_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | created_by_user_id VARCHAR(64) NOT NULL |
 | `approved_by_user_id` | `VARCHAR(64)` | NULL | UNSPECIFIED | approved_by_user_id VARCHAR(64) NULL |
 | `created_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | created_at_utc DATETIME(3) NOT NULL |
 | `approved_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | approved_at_utc DATETIME(3) NULL |
-| `stocktake_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | stocktake_line_id BIGINT |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `stocktake_line_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | stocktake_line_id BIGINT UNSIGNED |
+| `medicine_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NOT NULL |
+| `batch_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | batch_id BIGINT UNSIGNED NULL |
 | `system_quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | system_quantity DECIMAL(18,3) NOT NULL |
 | `counted_quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | counted_quantity DECIMAL(18,3) NOT NULL |
 | `variance_quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | variance_quantity DECIMAL(18,3) NOT NULL |
@@ -510,14 +510,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
+| `invoice_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | public_id VARCHAR(80) NOT NULL |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
 | `invoice_number` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | invoice_number VARCHAR(80) NOT NULL |
-| `encounter_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | encounter_id BIGINT |
-| `patient_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | patient_id BIGINT |
+| `encounter_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | encounter_id BIGINT UNSIGNED NOT NULL |
+| `patient_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | patient_id BIGINT UNSIGNED NULL |
 | `cashier_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | cashier_user_id VARCHAR(64) NOT NULL |
-| `shift_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | shift_id BIGINT |
+| `shift_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | shift_id BIGINT UNSIGNED NOT NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `invoice_status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | invoice_status VARCHAR(20) NOT NULL |
 | `gross_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | gross_amount BIGINT NOT NULL |
@@ -532,13 +532,13 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
-| `line_no` | `INT` | UNSPECIFIED | UNSPECIFIED | line_no INT |
+| `invoice_line_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED |
+| `invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_id BIGINT UNSIGNED NOT NULL |
+| `line_no` | `INT UNSIGNED` | NOT NULL | UNSPECIFIED | line_no INT UNSIGNED NOT NULL |
 | `line_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | line_type VARCHAR(20) NOT NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `tariff_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | tariff_id BIGINT |
-| `package_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | package_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NULL |
+| `tariff_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | tariff_id BIGINT UNSIGNED NULL |
+| `package_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | package_id BIGINT UNSIGNED NULL |
 | `item_name_snapshot` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | item_name_snapshot VARCHAR(180) NOT NULL |
 | `item_type_snapshot` | `VARCHAR(80)` | NOT NULL | UNSPECIFIED | item_type_snapshot VARCHAR(80) NOT NULL |
 | `unit_price` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_price BIGINT NOT NULL |
@@ -554,12 +554,12 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `invoice_component_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_component_id BIGINT |
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
-| `component_no` | `INT` | UNSPECIFIED | UNSPECIFIED | component_no INT |
+| `invoice_component_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | invoice_component_id BIGINT UNSIGNED |
+| `invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED NOT NULL |
+| `component_no` | `INT UNSIGNED` | NOT NULL | UNSPECIFIED | component_no INT UNSIGNED NOT NULL |
 | `component_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | component_type VARCHAR(20) NOT NULL |
-| `medicine_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | medicine_id BIGINT |
-| `tariff_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | tariff_id BIGINT |
+| `medicine_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | medicine_id BIGINT UNSIGNED NULL |
+| `tariff_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | tariff_id BIGINT UNSIGNED NULL |
 | `component_name_snapshot` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | component_name_snapshot VARCHAR(180) NOT NULL |
 | `unit_price_snapshot` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_price_snapshot BIGINT NOT NULL |
 | `quantity_per_parent` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity_per_parent DECIMAL(18,3) NOT NULL |
@@ -569,21 +569,21 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `allocation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | allocation_id BIGINT |
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
-| `invoice_component_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_component_id BIGINT |
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `allocation_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | allocation_id BIGINT UNSIGNED |
+| `invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED NOT NULL |
+| `invoice_component_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | invoice_component_id BIGINT UNSIGNED NULL |
+| `batch_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | batch_id BIGINT UNSIGNED NOT NULL |
 | `quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity DECIMAL(18,3) NOT NULL |
 | `unit_cost_snapshot` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_cost_snapshot BIGINT NOT NULL |
-| `movement_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | movement_id BIGINT |
+| `movement_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | movement_id BIGINT UNSIGNED NOT NULL |
 
 ### `invoice_discount_allocations`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `discount_allocation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | discount_allocation_id BIGINT |
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
+| `discount_allocation_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | discount_allocation_id BIGINT UNSIGNED |
+| `invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_id BIGINT UNSIGNED NOT NULL |
+| `invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED NOT NULL |
 | `discount_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | discount_amount BIGINT NOT NULL |
 | `rounding_remainder_rank` | `INT` | NOT NULL | UNSPECIFIED | rounding_remainder_rank INT NOT NULL |
 
@@ -591,8 +591,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `invoice_payment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_payment_id BIGINT |
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
+| `invoice_payment_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | invoice_payment_id BIGINT UNSIGNED |
+| `invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_id BIGINT UNSIGNED NOT NULL |
 | `payment_method` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | payment_method VARCHAR(24) NOT NULL |
 | `amount_received` | `BIGINT` | NOT NULL | UNSPECIFIED | amount_received BIGINT NOT NULL |
 | `amount_applied` | `BIGINT` | NOT NULL | UNSPECIFIED | amount_applied BIGINT NOT NULL |
@@ -606,10 +606,10 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `sales_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | sales_return_id BIGINT |
+| `sales_return_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | sales_return_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
+| `invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_id BIGINT UNSIGNED NOT NULL |
 | `requested_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | requested_by_user_id VARCHAR(64) NOT NULL |
 | `business_date` | `DATE` | NOT NULL | UNSPECIFIED | business_date DATE NOT NULL |
 | `status` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | status VARCHAR(24) NOT NULL |
@@ -624,11 +624,11 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `sales_return_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | sales_return_line_id BIGINT |
-| `sales_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | sales_return_id BIGINT |
-| `return_quota_subject_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | return_quota_subject_id BIGINT |
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
-| `invoice_component_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_component_id BIGINT |
+| `sales_return_line_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | sales_return_line_id BIGINT UNSIGNED |
+| `sales_return_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | sales_return_id BIGINT UNSIGNED NOT NULL |
+| `return_quota_subject_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | return_quota_subject_id BIGINT UNSIGNED NOT NULL |
+| `invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED NOT NULL |
+| `invoice_component_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | invoice_component_id BIGINT UNSIGNED NULL |
 | `quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity DECIMAL(18,3) NOT NULL |
 | `refund_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | refund_amount BIGINT NOT NULL |
 | `returned_cost_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | returned_cost_amount BIGINT NOT NULL |
@@ -639,23 +639,23 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `return_quota_subject_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | return_quota_subject_id BIGINT |
+| `return_quota_subject_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | return_quota_subject_id BIGINT UNSIGNED |
 | `quota_key` | `VARCHAR(180)` | NOT NULL | UNSPECIFIED | quota_key VARCHAR(180) NOT NULL |
-| `invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_line_id BIGINT |
-| `invoice_component_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_component_id BIGINT |
+| `invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_line_id BIGINT UNSIGNED NOT NULL |
+| `invoice_component_id` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | invoice_component_id BIGINT UNSIGNED NULL |
 | `subject_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | subject_type VARCHAR(20) NOT NULL |
 | `sold_quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | sold_quantity DECIMAL(18,3) NOT NULL |
 | `reserved_quantity` | `DECIMAL(18,3)` | NOT NULL | 0 | reserved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0 |
 | `approved_quantity` | `DECIMAL(18,3)` | NOT NULL | 0 | approved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0 |
 | `updated_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | updated_at_utc DATETIME(3) NOT NULL |
-| `version` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | version BIGINT |
+| `version` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | version BIGINT UNSIGNED NOT NULL |
 
 ### `refund_obligations`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `refund_obligation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | refund_obligation_id BIGINT |
-| `sales_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | sales_return_id BIGINT |
+| `refund_obligation_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | refund_obligation_id BIGINT UNSIGNED |
+| `sales_return_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | sales_return_id BIGINT UNSIGNED NOT NULL |
 | `amount_due` | `BIGINT` | NOT NULL | UNSPECIFIED | amount_due BIGINT NOT NULL |
 | `amount_paid` | `BIGINT` | NOT NULL | 0 | amount_paid BIGINT NOT NULL DEFAULT 0 |
 | `status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | status VARCHAR(16) NOT NULL |
@@ -666,8 +666,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `refund_payment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | refund_payment_id BIGINT |
-| `refund_obligation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | refund_obligation_id BIGINT |
+| `refund_payment_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | refund_payment_id BIGINT UNSIGNED |
+| `refund_obligation_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | refund_obligation_id BIGINT UNSIGNED NOT NULL |
 | `payment_method` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | payment_method VARCHAR(24) NOT NULL |
 | `amount` | `BIGINT` | NOT NULL | UNSPECIFIED | amount BIGINT NOT NULL |
 | `reference_no` | `VARCHAR(100)` | NULL | UNSPECIFIED | reference_no VARCHAR(100) NULL |
@@ -679,8 +679,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `cancellation_request_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | cancellation_request_id BIGINT |
-| `invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | invoice_id BIGINT |
+| `cancellation_request_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | cancellation_request_id BIGINT UNSIGNED |
+| `invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | invoice_id BIGINT UNSIGNED NOT NULL |
 | `requested_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | requested_by_user_id VARCHAR(64) NOT NULL |
 | `reason` | `VARCHAR(255)` | NOT NULL | UNSPECIFIED | reason VARCHAR(255) NOT NULL |
 | `status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | status VARCHAR(16) NOT NULL |
@@ -694,8 +694,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `cancellation_event_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | cancellation_event_id BIGINT |
-| `cancellation_request_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | cancellation_request_id BIGINT |
+| `cancellation_event_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | cancellation_event_id BIGINT UNSIGNED |
+| `cancellation_request_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | cancellation_request_id BIGINT UNSIGNED NOT NULL |
 | `event_type` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | event_type VARCHAR(20) NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
 | `reason` | `VARCHAR(255)` | NULL | UNSPECIFIED | reason VARCHAR(255) NULL |
@@ -705,10 +705,10 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_return_id BIGINT |
+| `supplier_return_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_return_id BIGINT UNSIGNED |
 | `public_id` | `VARCHAR(80)` | UNSPECIFIED | UNSPECIFIED | public_id VARCHAR(80) |
 | `legacy_id` | `VARCHAR(128)` | NULL | UNSPECIFIED | legacy_id VARCHAR(128) NULL |
-| `supplier_invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT |
+| `supplier_invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_invoice_id BIGINT UNSIGNED NOT NULL |
 | `status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | status VARCHAR(20) NOT NULL |
 | `reason` | `VARCHAR(255)` | NOT NULL | UNSPECIFIED | reason VARCHAR(255) NOT NULL |
 | `requested_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | requested_by_user_id VARCHAR(64) NOT NULL |
@@ -720,10 +720,10 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_return_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_return_line_id BIGINT |
-| `supplier_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_return_id BIGINT |
-| `supplier_invoice_line_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_line_id BIGINT |
-| `batch_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | batch_id BIGINT |
+| `supplier_return_line_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_return_line_id BIGINT UNSIGNED |
+| `supplier_return_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_return_id BIGINT UNSIGNED NOT NULL |
+| `supplier_invoice_line_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_invoice_line_id BIGINT UNSIGNED NOT NULL |
+| `batch_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | batch_id BIGINT UNSIGNED NOT NULL |
 | `quantity` | `DECIMAL(18,3)` | NOT NULL | UNSPECIFIED | quantity DECIMAL(18,3) NOT NULL |
 | `unit_cost_snapshot` | `BIGINT` | NOT NULL | UNSPECIFIED | unit_cost_snapshot BIGINT NOT NULL |
 | `credit_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | credit_amount BIGINT NOT NULL |
@@ -732,9 +732,9 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_credit_note_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_credit_note_id BIGINT |
-| `supplier_return_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_return_id BIGINT |
-| `supplier_invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT |
+| `supplier_credit_note_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_credit_note_id BIGINT UNSIGNED |
+| `supplier_return_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_return_id BIGINT UNSIGNED NOT NULL |
+| `supplier_invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_invoice_id BIGINT UNSIGNED NOT NULL |
 | `credit_amount` | `BIGINT` | NOT NULL | UNSPECIFIED | credit_amount BIGINT NOT NULL |
 | `status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | status VARCHAR(16) NOT NULL |
 | `issued_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | issued_at_utc DATETIME(3) NULL |
@@ -745,8 +745,8 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `supplier_payment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_payment_id BIGINT |
-| `supplier_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_id BIGINT |
+| `supplier_payment_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | supplier_payment_id BIGINT UNSIGNED |
+| `supplier_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_id BIGINT UNSIGNED NOT NULL |
 | `payment_date` | `DATE` | NOT NULL | UNSPECIFIED | payment_date DATE NOT NULL |
 | `payment_method` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | payment_method VARCHAR(24) NOT NULL |
 | `amount` | `BIGINT` | NOT NULL | UNSPECIFIED | amount BIGINT NOT NULL |
@@ -760,16 +760,16 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `allocation_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | allocation_id BIGINT |
-| `supplier_payment_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_payment_id BIGINT |
-| `supplier_invoice_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | supplier_invoice_id BIGINT |
+| `allocation_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | allocation_id BIGINT UNSIGNED |
+| `supplier_payment_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_payment_id BIGINT UNSIGNED NOT NULL |
+| `supplier_invoice_id` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | supplier_invoice_id BIGINT UNSIGNED NOT NULL |
 | `amount_allocated` | `BIGINT` | NOT NULL | UNSPECIFIED | amount_allocated BIGINT NOT NULL |
 
 ### `audit_events`
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `audit_event_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | audit_event_id BIGINT |
+| `audit_event_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | audit_event_id BIGINT UNSIGNED |
 | `event_uuid` | `CHAR(36)` | NOT NULL | UNSPECIFIED | event_uuid CHAR(36) NOT NULL |
 | `actor_user_id` | `VARCHAR(64)` | NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NULL |
 | `actor_role_snapshot` | `VARCHAR(24)` | NULL | UNSPECIFIED | actor_role_snapshot VARCHAR(24) NULL |
@@ -787,7 +787,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `idempotency_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | idempotency_id BIGINT |
+| `idempotency_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | idempotency_id BIGINT UNSIGNED |
 | `actor_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | actor_user_id VARCHAR(64) NOT NULL |
 | `command_name` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | command_name VARCHAR(100) NOT NULL |
 | `idempotency_key` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | idempotency_key VARCHAR(100) NOT NULL |
@@ -804,13 +804,13 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `outbox_job_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | outbox_job_id BIGINT |
+| `outbox_job_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | outbox_job_id BIGINT UNSIGNED |
 | `job_type` | `VARCHAR(60)` | NOT NULL | UNSPECIFIED | job_type VARCHAR(60) NOT NULL |
 | `aggregate_type` | `VARCHAR(60)` | NOT NULL | UNSPECIFIED | aggregate_type VARCHAR(60) NOT NULL |
 | `aggregate_id` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | aggregate_id VARCHAR(100) NOT NULL |
 | `payload_json` | `JSON` | NOT NULL | UNSPECIFIED | payload_json JSON NOT NULL |
 | `status` | `VARCHAR(16)` | NOT NULL | UNSPECIFIED | status VARCHAR(16) NOT NULL |
-| `attempts` | `INT` | UNSPECIFIED | UNSPECIFIED | attempts INT |
+| `attempts` | `INT UNSIGNED` | NOT NULL | 0 | attempts INT UNSIGNED NOT NULL DEFAULT 0 |
 | `available_at_utc` | `DATETIME(3)` | NOT NULL | UNSPECIFIED | available_at_utc DATETIME(3) NOT NULL |
 | `locked_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | locked_at_utc DATETIME(3) NULL |
 | `completed_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | completed_at_utc DATETIME(3) NULL |
@@ -822,12 +822,12 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `stored_file_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | stored_file_id BIGINT |
+| `stored_file_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | stored_file_id BIGINT UNSIGNED |
 | `file_type` | `VARCHAR(32)` | NOT NULL | UNSPECIFIED | file_type VARCHAR(32) NOT NULL |
 | `object_key` | `VARCHAR(512)` | NOT NULL | UNSPECIFIED | object_key VARCHAR(512) NOT NULL |
 | `original_name` | `VARCHAR(255)` | NULL | UNSPECIFIED | original_name VARCHAR(255) NULL |
 | `mime_type` | `VARCHAR(100)` | NOT NULL | UNSPECIFIED | mime_type VARCHAR(100) NOT NULL |
-| `size_bytes` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | size_bytes BIGINT |
+| `size_bytes` | `BIGINT UNSIGNED` | NOT NULL | UNSPECIFIED | size_bytes BIGINT UNSIGNED NOT NULL |
 | `sha256` | `CHAR(64)` | NOT NULL | UNSPECIFIED | sha256 CHAR(64) NOT NULL |
 | `access_scope` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | access_scope VARCHAR(24) NOT NULL |
 | `created_by_user_id` | `VARCHAR(64)` | NOT NULL | UNSPECIFIED | created_by_user_id VARCHAR(64) NOT NULL |
@@ -838,14 +838,14 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `backup_job_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | backup_job_id BIGINT |
+| `backup_job_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | backup_job_id BIGINT UNSIGNED |
 | `backup_type` | `VARCHAR(24)` | NOT NULL | UNSPECIFIED | backup_type VARCHAR(24) NOT NULL |
 | `status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | status VARCHAR(20) NOT NULL |
 | `started_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | started_at_utc DATETIME(3) NULL |
 | `completed_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | completed_at_utc DATETIME(3) NULL |
 | `object_key` | `VARCHAR(512)` | NULL | UNSPECIFIED | object_key VARCHAR(512) NULL |
 | `checksum_sha256` | `CHAR(64)` | NULL | UNSPECIFIED | checksum_sha256 CHAR(64) NULL |
-| `size_bytes` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | size_bytes BIGINT |
+| `size_bytes` | `BIGINT UNSIGNED` | NULL | UNSPECIFIED | size_bytes BIGINT UNSIGNED NULL |
 | `initiated_by_user_id` | `VARCHAR(64)` | NULL | UNSPECIFIED | initiated_by_user_id VARCHAR(64) NULL |
 | `verified_restore_at_utc` | `DATETIME(3)` | NULL | UNSPECIFIED | verified_restore_at_utc DATETIME(3) NULL |
 | `notes` | `VARCHAR(255)` | NULL | UNSPECIFIED | notes VARCHAR(255) NULL |
@@ -854,7 +854,7 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 
 | Kolom | Tipe yang tertulis | NULL | DEFAULT | Catatan sumber |
 |---|---|---|---|---|
-| `export_job_id` | `BIGINT` | UNSPECIFIED | UNSPECIFIED | export_job_id BIGINT |
+| `export_job_id` | `BIGINT UNSIGNED` | UNSPECIFIED | UNSPECIFIED | export_job_id BIGINT UNSIGNED |
 | `report_type` | `VARCHAR(60)` | NOT NULL | UNSPECIFIED | report_type VARCHAR(60) NOT NULL |
 | `filter_json` | `JSON` | NOT NULL | UNSPECIFIED | filter_json JSON NOT NULL |
 | `status` | `VARCHAR(20)` | NOT NULL | UNSPECIFIED | status VARCHAR(20) NOT NULL |
@@ -867,15 +867,15 @@ Dokumen ini menormalkan setiap kolom yang secara eksplisit dapat diekstrak dari 
 ## 4. Normalisasi tipe lintas tabel — status
 
 - User/actor identity: proposal menetapkan `VARCHAR(64)`; wajib konsisten pada seluruh kolom user/actor FK. `audit_events.event_uuid CHAR(36)` adalah event UUID, bukan user ID.
-- Internal identifiers: umumnya `BIGINT UNSIGNED`; pastikan pasangan FK identik signedness, width, dan parent key.
-- Money: `BIGINT` signed sebagai kandidat rupiah bulat; batas maksimum belum ditetapkan. Jangan konversi ke FLOAT/DOUBLE.
+- Internal identifiers: konvensi umum proposal adalah `BIGINT UNSIGNED AUTO_INCREMENT`; tetap cocokkan setiap kolom child terhadap parent key dan signedness aktual.
+- Money: `BIGINT` signed sebagai kandidat rupiah bulat; batas maksimum belum ditetapkan. Jangan FLOAT/DOUBLE.
 - Quantity: `DECIMAL(18,3)` kandidat; keputusan unit dasar obat dan pecahan belum ditutup.
 - File sizes: `BIGINT UNSIGNED` pada queue audio, stored files, backup jobs.
 - Timestamps: mayoritas `DATETIME(3)` dengan nama `_utc`; setiap kolom masih perlu definisi sumber waktu, writer, dan konversi Asia/Jakarta.
 
 ## 5. Kolom yang belum memiliki NULL/default final
 
-Untuk setiap field bertanda `UNSPECIFIED`, schema freeze ditahan sampai diputuskan apakah nullability/default eksplisit atau wajib disediakan server. Ini terutama penting pada inline declarations yang hanya menyebut `NOT NULL` tanpa DEFAULT, serta field tanpa kata NULL/NOT NULL. Tidak boleh mengandalkan perilaku implicit default MySQL/TiDB.
+Untuk setiap field bertanda `UNSPECIFIED`, schema freeze ditahan sampai diputuskan apakah nullability/default eksplisit atau wajib disediakan server. Jangan mengandalkan implicit default MySQL/TiDB.
 
 ## 6. Blocker fisik dan integritas yang harus ditutup
 
@@ -901,17 +901,7 @@ Untuk setiap field bertanda `UNSPECIFIED`, schema freeze ditahan sampai diputusk
 
 Pass 4 ini hanya inventory deklarasi fisik yang dapat dibuktikan dari proposal saat ini. Sebelum DDL: review seluruh `UNSPECIFIED`, lengkapkan tabel integrity tambahan, cocokkan seluruh 104 kandidat FK terhadap parent key yang benar-benar didefinisikan, lakukan test positif/negatif TiDB pada preview dengan data sintetis, dan dapatkan persetujuan owner untuk policy gate. Sampai itu selesai, Firebase tetap tidak disentuh dan produksi tetap berjalan pada sistem lama.
 
+## 9. Hasil pemeriksaan signedness deklarasi
 
-## 9. Temuan penting: konflik tipe integer dengan konvensi umum
+Tipe integer dicatat sesuai teks sumber. Jumlah kolom yang tertulis sebagai bare `BIGINT`, `INT`, atau `SMALLINT` tanpa `UNSIGNED`: **50**. Ini perlu diklasifikasikan per semantik: ID/FK dan version/counter harus konsisten dengan parent/konvensi; nominal uang dapat memang memerlukan signed. Jangan mengubah signedness otomatis. Daftar bare declarations: `cashier_shifts.opening_float BIGINT`, `shift_reconciliations.system_cash BIGINT`, `shift_reconciliations.counted_cash BIGINT`, `shift_reconciliations.variance BIGINT`, `cash_ledger_entries.amount BIGINT`, `bank_ledger_entries.amount BIGINT`, `petty_cash_entries.amount BIGINT`, `expenses.amount BIGINT`, `loss_events.value_amount BIGINT`, `medicines.selling_price BIGINT`, `medicines.weighted_avg_cost BIGINT`, `tariffs.price BIGINT`, `service_packages.price BIGINT`, `package_components.unit_price_snapshot BIGINT`, `package_components.sort_order INT`, `supplier_invoices.gross_amount BIGINT`, `supplier_invoices.accepted_credit_amount BIGINT`, `supplier_invoice_lines.unit_cost BIGINT`, `supplier_invoice_lines.line_total BIGINT`, `inventory_batches.unit_cost BIGINT`, `inventory_movements.unit_cost BIGINT`, `inventory_movements.value_delta BIGINT`, `sales_invoices.gross_amount BIGINT`, `sales_invoices.discount_amount BIGINT`, `sales_invoices.net_amount BIGINT`, `sales_invoice_lines.unit_price BIGINT`, `sales_invoice_lines.gross_amount BIGINT`, `sales_invoice_lines.discount_amount BIGINT`, `sales_invoice_lines.net_amount BIGINT`, `sales_invoice_lines.unit_cost_snapshot BIGINT`, `sales_invoice_lines.line_cost_snapshot BIGINT`, `sales_invoice_line_components.unit_price_snapshot BIGINT`, `sales_invoice_line_components.unit_cost_snapshot BIGINT`, `invoice_batch_allocations.unit_cost_snapshot BIGINT`, `invoice_discount_allocations.discount_amount BIGINT`, `invoice_discount_allocations.rounding_remainder_rank INT`, `invoice_payments.amount_received BIGINT`, `invoice_payments.amount_applied BIGINT`, `invoice_payments.change_amount BIGINT`, `sales_return_lines.refund_amount BIGINT`, `sales_return_lines.returned_cost_amount BIGINT`, `refund_obligations.amount_due BIGINT`, `refund_obligations.amount_paid BIGINT`, `refund_payments.amount BIGINT`, `supplier_return_lines.unit_cost_snapshot BIGINT`, `supplier_return_lines.credit_amount BIGINT`, `supplier_credit_notes.credit_amount BIGINT`, `supplier_payments.amount BIGINT`, `supplier_payment_allocations.amount_allocated BIGINT`, `idempotency_requests.response_code SMALLINT`.
 
-Konvensi bagian 1 proposal menyebut internal PK `BIGINT UNSIGNED AUTO_INCREMENT`, tetapi banyak deklarasi tabel inline hanya menulis `BIGINT` tanpa `UNSIGNED`; beberapa counter juga menulis `INT` tanpa signedness. Kamus ini mempertahankan teks deklarasi sumber dan **tidak** menganggap konvensi umum otomatis mengubah deklarasi kolom. Ini adalah mismatch yang harus diselesaikan sebelum DDL.
-
-Jumlah baris kolom yang secara eksplisit tertulis sebagai `BIGINT`, `INT`, atau `SMALLINT` tanpa `UNSIGNED` dalam hasil ekstraksi: **186**. Daftar ini bukan otomatis salah—sebagian nominal uang memang sengaja signed—tetapi setiap ID/FK, version/counter, amount/money, reversal pointer dan ukuran harus diklasifikasikan satu per satu. Semua pasangan FK wajib identik signedness dan lebar dengan parent.
-
-Tindakan wajib:
-1. Tandai seluruh identifier internal (`*_id`) sebagai kandidat `BIGINT UNSIGNED` hanya setelah dibandingkan dengan parent/child dan konvensi canonical; jangan menerapkannya ke kolom uang bertanda.
-2. Tentukan signedness eksplisit untuk semua integer tanpa mengandalkan implicit type.
-3. Pastikan `version`, counters, sequence numbers, attempts dan size metadata memiliki rentang dan signedness yang disengaja.
-4. Jalankan static scan otomatis untuk setiap FK candidate agar child/parent tipe, signedness dan panjang identik.
-
-Temuan ini memperkuat status **NOT READY FOR DDL**. Tidak ada type coercion yang dilakukan pada dokumen sumber.
