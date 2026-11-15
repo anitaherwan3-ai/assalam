@@ -193,6 +193,15 @@ module.exports = async function handler(req, res) {
     );
     pass("session_time_functions", timeRows[0]);
 
+    let cleanupStatus = "PASS";
+    try {
+      await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
+      await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
+    } catch (cleanupError) {
+      cleanupStatus = "FAIL: " + String(cleanupError.message).slice(0, 180);
+      fail("cleanup_test_tables", cleanupError);
+    }
+    if (cleanupStatus === "PASS") pass("cleanup_test_tables", "All compatibility tables dropped");
     const failed = tests.filter((test) => test.status === "FAIL").length;
     return json(res, failed ? 207 : 200, {
       ok: failed === 0,
@@ -200,6 +209,7 @@ module.exports = async function handler(req, res) {
       database: process.env.TIDB_DATABASE,
       metadata: metadata[0],
       tests,
+      cleanup: cleanupStatus,
       note: "This is a compatibility spike only, not application schema validation."
     });
   } catch (error) {
