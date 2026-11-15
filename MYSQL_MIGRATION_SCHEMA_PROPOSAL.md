@@ -88,10 +88,10 @@ PK: user_id. Index: (active), (protected_owner). FK referensi actor memakai REST
 | changed_by_user_id | VARCHAR(64) | YES | Actor |
 | change_reason | VARCHAR(255) | YES | Alasan |
 
-Unique kandidat: (email_normalized); index (user_id, valid_to_utc). Perubahan email mempertahankan user_id, menutup alamat lama dan membuat record baru dalam satu command. Uji strategi unique untuk email historis: bila email lama dapat digunakan ulang, gunakan tabel active_email_claim terpisah atau validasi transaksi; jangan bergantung pada partial unique.
+Index histori: (email_normalized), (user_id, valid_to_utc). Jangan pasang unique global pada email historis. Klaim email aktif ditegakkan melalui active_email_claims(email_normalized PK, user_id UNIQUE, email_id UNIQUE). Perubahan email menutup histori lama dan mengganti klaim aktif secara atomik; user_id tetap immutable dan email baru wajib diverifikasi.
 
 ### 2.3 `role_assignments`
-role_assignment_id BIGINT UNSIGNED PK; user_id VARCHAR(64) FK; role_code VARCHAR(24) NOT NULL (pimpinan/admin/kasir); scope_type VARCHAR(24) NOT NULL DEFAULT 'clinic'; scope_id VARCHAR(64) NULL; valid_from_utc DATETIME(3) NOT NULL; valid_to_utc DATETIME(3) NULL; granted_by_user_id VARCHAR(64) NOT NULL; created_at_utc DATETIME(3) NOT NULL. Index (user_id, valid_to_utc), (role_code, valid_to_utc). Aturan: hanya satu role operasional aktif per user pada scope klinik kecuali policy nanti menyatakan multi-role. Role selalu diputuskan server-side.
+role_assignment_id BIGINT UNSIGNED PK; user_id VARCHAR(64) FK; role_code VARCHAR(24) NOT NULL (pimpinan/admin/kasir); scope_type VARCHAR(24) NOT NULL DEFAULT 'clinic'; scope_id VARCHAR(64) NULL; valid_from_utc DATETIME(3) NOT NULL; valid_to_utc DATETIME(3) NULL; granted_by_user_id VARCHAR(64) NOT NULL; created_at_utc DATETIME(3) NOT NULL. Index (user_id, valid_to_utc), (role_code, valid_to_utc). Tambahkan active_role_slots(user_id PK, role_assignment_id UNIQUE) sebagai penegak satu role aktif, kecuali keputusan owner mengubah kebijakan single-role. Aktivasi/perubahan role mengunci slot dan menulis histori dalam satu transaksi. Role selalu diputuskan server-side.
 
 ### 2.4 `clinic_settings`
 setting_key VARCHAR(80) PK; setting_value TEXT NOT NULL; value_type VARCHAR(20) NOT NULL; editable_by_admin TINYINT(1) NOT NULL DEFAULT 0; version BIGINT UNSIGNED NOT NULL; updated_at_utc DATETIME(3) NOT NULL; updated_by_user_id VARCHAR(64) NOT NULL. Fixed clinic name disimpan sebagai protected constant/config yang tidak bisa diubah lewat endpoint settings. Setting sensitif tidak boleh dibaca Display TV.
@@ -114,7 +114,7 @@ encounter_id BIGINT UNSIGNED PK; public_id VARCHAR(80) NOT NULL UNIQUE; legacy_i
 business_date DATE NOT NULL; prefix VARCHAR(4) NOT NULL; last_sequence INT UNSIGNED NOT NULL; updated_at_utc DATETIME(3) NOT NULL. Composite PK (business_date,prefix). Allocate inside transaction with row lock; sequence formatted A-001 etc. Must handle concurrency and rollover.
 
 ### 3.4 `cashier_queue_assignments`
-assignment_id BIGINT UNSIGNED PK; user_id VARCHAR(64) NOT NULL; prefix VARCHAR(4) NOT NULL; valid_from DATE NOT NULL; valid_to DATE NULL; assigned_by_user_id VARCHAR(64) NOT NULL; created_at_utc DATETIME(3) NOT NULL. Index (user_id,valid_to), (prefix,valid_to). Defaults: stable cashier ID kasir → A; kasir2 → B. Only Pimpinan changes mapping. If PR13 is not accepted, main baseline remains A-only until approved.
+assignment_id BIGINT UNSIGNED PK; user_id VARCHAR(64) NOT NULL; prefix VARCHAR(4) NOT NULL; valid_from DATE NOT NULL; valid_to DATE NULL; assigned_by_user_id VARCHAR(64) NOT NULL; created_at_utc DATETIME(3) NOT NULL. Index (user_id,valid_to), (prefix,valid_to). Defaults: stable cashier ID kasir → A; kasir2 → B. Only Pimpinan changes mapping. Perubahan assignment wajib mengunci user dan prefix terkait, menolak rentang validitas yang tumpang tindih, serta mencatat event. If PR13 is not accepted, main baseline remains A-only until approved.
 
 ### 3.5 `queue_tickets`
 queue_ticket_id BIGINT UNSIGNED PK; public_id VARCHAR(80) NOT NULL UNIQUE; legacy_id VARCHAR(128) NULL UNIQUE; encounter_id BIGINT UNSIGNED NOT NULL; business_date DATE NOT NULL; prefix VARCHAR(4) NOT NULL; sequence_no INT UNSIGNED NOT NULL; display_number VARCHAR(20) NOT NULL; status VARCHAR(20) NOT NULL; registered_at_utc DATETIME(3) NOT NULL; registered_by_user_id VARCHAR(64) NOT NULL; called_at_utc DATETIME(3) NULL; completed_at_utc DATETIME(3) NULL. Unique (business_date,prefix,sequence_no); unique encounter_id if one ticket per encounter is confirmed. Index (business_date,status,prefix,sequence_no). Queue ticket lifecycle separate from patient and encounter.
@@ -131,7 +131,7 @@ handoff_id BIGINT UNSIGNED PK; encounter_id BIGINT UNSIGNED NOT NULL; from_user_
 shift_id BIGINT UNSIGNED PK; public_id VARCHAR(80) NOT NULL UNIQUE; legacy_id VARCHAR(128) NULL UNIQUE; cashier_user_id VARCHAR(64) NOT NULL; business_date DATE NOT NULL; opened_at_utc DATETIME(3) NOT NULL; opening_float BIGINT NOT NULL DEFAULT 0; status VARCHAR(16) NOT NULL; closed_at_utc DATETIME(3) NULL; closed_by_user_id VARCHAR(64) NULL; created_at_utc DATETIME(3) NOT NULL. Index (cashier_user_id,business_date,status), (business_date,status). Satu shift aktif per kasir ditegakkan lewat active_shift_slots atau lock row; bukan partial unique index.
 
 ### 4.2 `active_shift_slots`
-cashier_user_id VARCHAR(64) PK; shift_id BIGINT UNSIGNED NOT NULL UNIQUE; acquired_at_utc DATETIME(3) NOT NULL. Dibuat/dihapus dalam transaksi buka/tutup shift. FK ke user dan shift RESTRICT. Ini mekanisme kandidat untuk mencegah dua shift terbuka; harus diuji crash/retry dan konsistensi dengan status shift.
+cashier_user_id VARCHAR(64) PK; shift_id BIGINT UNSIGNED NOT NULL UNIQUE; acquired_at_utc DATETIME(3) NOT NULL. Dibuat/dihapus dalam transaksi buka/tutup shift. FK ke user dan shift RESTRICT. Tambahkan unique key pada cashier_shifts(shift_id,cashier_user_id) dan composite FK active_shift_slots(shift_id,cashier_user_id) agar shift yang dikunci pasti milik kasir yang sama. Mekanisme ini mencegah dua shift terbuka; uji crash/retry dan konsistensi status shift.
 
 ### 4.3 `shift_reconciliations`
 reconciliation_id BIGINT UNSIGNED PK; shift_id BIGINT UNSIGNED NOT NULL UNIQUE; system_cash BIGINT NOT NULL; counted_cash BIGINT NOT NULL; variance BIGINT NOT NULL; verified_by_user_id VARCHAR(64) NULL; verified_at_utc DATETIME(3) NULL; verification_status VARCHAR(16) NOT NULL; snapshot_json JSON NULL; created_at_utc DATETIME(3) NOT NULL. Store snapshot of formula inputs and version; Admin/Pimpinan verifier according to approved policy. Variance = counted - system. No overwrite after verified; correction event instead.
@@ -280,7 +280,7 @@ export_job_id BIGINT UNSIGNED PK; report_type VARCHAR(60) NOT NULL; filter_json 
 | suppliers | supplier invoices | 1:N | RESTRICT |
 | supplier invoices | lines / payments / returns | 1:N | RESTRICT |
 | invoices | lines / payments / returns / cancellation requests | 1:N | RESTRICT |
-| invoice lines | components / allocations / return quotas / return lines | 1:N / 1:1 | RESTRICT |
+| invoice lines | components / allocations / return quota subjects / return lines | 1:N | RESTRICT |
 | returns | return lines / refund obligation | 1:N / 1:1 | RESTRICT |
 | refund obligation | refund payments | 1:N | RESTRICT |
 | expenses | expense events | 1:N | RESTRICT |
@@ -298,9 +298,9 @@ Physical DELETE reserved for unreferenced drafts and temporary artifacts under p
 | Checkout | encounter, shift, invoice idempotency, medicine balances, FEFO batches, return quota if needed | invoice/header/lines/components/discounts/payments, inventory movements and balances, encounter done, cash/bank ledger, audit |
 | Purchase receive | supplier invoice, medicine, weighted-average balance | invoice/lines, batches, movements, stock/HPP projection, payable, audit |
 | Supplier return | invoice line, batch, return remainder, payable | return + lines, negative movements, credit note/credit balance, audit |
-| Submit return | invoice, invoice lines, quota rows | return + lines, reserved quota, audit |
-| Admin review return | return | review event/status only; no stock or cash movement |
-| Finalize return | return, invoice, quota, batch allocations | approved status, quota, stock movement/restock/quarantine, refund obligation, revenue/COGS projection, audit |
+| Submit return | invoice, invoice lines, component-aware quota subject rows | return + lines, reserved quota, append-only return event, audit |
+| Admin review return | return | review event/status only; append-only sales_return_events + audit; no stock or cash movement |
+| Finalize return | return, invoice, component-aware quota subjects, batch allocations | approved status, quota, append-only sales_return_events, stock movement/restock/quarantine, refund obligation, revenue/COGS projection, audit |
 | Pay refund | refund obligation, idempotency | refund payment, cash/bank ledger, obligation balance, audit |
 | Approve cancellation | invoice, cancellation request, return quotas, batches | cancel event/status, inventory reversals, cash/revenue reversals as policy, encounter state, audit |
 | Expense approval | expense, approval policy | event/status, expense ledger, audit |
@@ -364,7 +364,7 @@ This list is provisional; validate with EXPLAIN and realistic synthetic volume a
 - invoice lines: UNIQUE (invoice_id,line_no); (medicine_id).
 - inventory batches: (medicine_id,expiry_date,remaining_quantity).
 - inventory movements: (medicine_id,occurred_at_utc), (batch_id,occurred_at_utc), (source_type,source_id).
-- returns: (invoice_id,status), return quotas UNIQUE invoice_line_id.
+- returns: (invoice_id,status), return_quota_subjects UNIQUE quota_key; quota subject granular per invoice line atau komponen paket. Kunci seluruh quota subject terkait saat reservasi, persetujuan final, dan pembatalan.
 - refund: UNIQUE sales_return_id; (refund_obligation_id,paid_at_utc).
 - supplier AP: (supplier_id,invoice_date), (status,due_date).
 - audit: (entity_type,entity_id,occurred_at_utc), (actor_user_id,occurred_at_utc).
@@ -465,3 +465,19 @@ Mandatory corrections for schema v1:
 10. Confirm batch splitting policy before choosing one-batch-per-purchase-line.
 
 No DDL or application tables have been created by this amendment.
+
+
+## 20. Consistency resolution — 2026-11-15
+
+This section is the canonical interpretation where older draft paragraphs conflict with the schema review:
+
+- Email history is non-unique; only active claims are globally unique in `active_email_claims`.
+- One active role is enforced through `active_role_slots` (unless an explicit owner decision changes the single-role policy).
+- Return limits are component-aware through `return_quota_subjects`; do not create or query a line-only unique quota.
+- Active shift ownership is enforced by the composite (shift_id, cashier_user_id) relationship.
+- Return state changes always append `sales_return_events`; status columns are current-state projections, not the full history.
+- Cashier queue assignment overlap is prevented by a serialized domain command, not by an ordinary index.
+- Supplier invoice line ↔ inventory batch is one-directional for the one-batch case; use an allocation bridge if split receipts are allowed.
+- The detailed review in `MYSQL_MIGRATION_SCHEMA_REVIEW.md` supersedes every older conflicting draft paragraph. Any unresolved owner decision remains a release blocker and must not be silently defaulted.
+
+The earlier sections are retained as audit history; this consistency section and section 19 govern schema v1 generation. No DDL is authorized by this document.
