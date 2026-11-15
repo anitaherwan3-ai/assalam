@@ -486,3 +486,9 @@ See [MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_KE
 - [MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md](./MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md)
 
 The static pass documents type-family rules, unresolved nullability/collation/quantity/timestamp decisions, synthetic orphan/duplicate scenarios and a candidate FK/index catalogue. It does not represent a TiDB runtime test, historical data profile, DDL approval or application table creation. See schema review section K for blockers.
+
+## Schema contradiction and source-identity closure audit
+
+- [MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md)
+
+This audit records 30 design contradictions/omissions, source-scoped migration identity requirements and synthetic negative tests. It is a static review only; schema v1 remains blocked and no DDL has been applied.
