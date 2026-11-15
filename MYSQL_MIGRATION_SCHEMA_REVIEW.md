@@ -231,3 +231,8 @@ See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATIO
 ## R. Schema scope control and anti-overfitting — pass 8
 
 See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md). The pass establishes evidence-first inclusion rules: core clinic workflows and essential integrity constraints remain in scope; speculative support tables (quota event ledger, outbox, guards, generic registries, partial-receipt bridge, file/export/backup orchestration) are conditional or deferred until source/owner evidence justifies them. It also records concrete Pass 4 dictionary anomalies and prioritizes ownership, stock, money, returns and concurrency over hypothetical feature coverage. This is documentation-only; no DDL or data mutation.
+
+
+## S. Critical ownership chain matrix — pass 9
+
+See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). Five high-risk ownership chains have targeted positive/negative test cases. Key blockers are partial-null encounter/shift identity, invoice patient snapshot policy, batch-bound movement semantics, quota component identity, and same-supplier purchase/return/payment relationships. This is static review only.
