@@ -183,7 +183,7 @@ Fixture IDs must be deterministic, names clearly synthetic, dates fixed in fixtu
 
 ## 8. Current status
 
-- Technical amendments T01–T10: proposed, not yet applied to canonical schema proposal.
+- Technical amendments T01–T10: recorded in the canonical schema proposal as a review addendum; not yet converted into DDL and not owner sign-off.
 - Five protected account emails: owner-confirmed; actual UID/profile/role verification pending.
 - Old Firebase operational data dummy classification: owner-confirmed; no snapshot or cleanup performed.
 - D01–D20: unresolved gates listed above; do not invent policy.
@@ -196,7 +196,7 @@ Fixture IDs must be deterministic, names clearly synthetic, dates fixed in fixtu
 
 ## 9. Acceptance criteria for the next pass
 
-1. Apply T01–T10 to the canonical proposal without contradicting existing business behavior.
+1. Reconcile the T01–T10 addendum against every earlier table definition and remove any residual contradictory wording.
 2. Build complete exact FK/type/index manifest and reconcile every table/column against the column dictionary.
 3. Resolve split supplier receipt, D01 and remaining owner decisions or keep affected domains blocked.
 4. Extend source-level tests for queue guards/counter initialization, quota events, composite same-parent constraints and actor provenance.
