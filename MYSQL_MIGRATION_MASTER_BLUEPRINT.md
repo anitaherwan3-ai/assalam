@@ -444,3 +444,8 @@ See [MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md](./MYSQL_MIGRAT
 ## Screen, role and end-to-end acceptance test plan
 
 See [MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md](./MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md). It expands the current screen specification into role-specific UI/API/database/business-result tests, concurrency and failure tests, isolated PR #13 tests, evidence requirements and release gates. Test cases are specified but have NOT been executed; no schema DDL or production migration is authorized by this document.
+
+
+## Relational schema proposal (review-only)
+
+See [MYSQL_MIGRATION_SCHEMA_PROPOSAL.md](./MYSQL_MIGRATION_SCHEMA_PROPOSAL.md). It proposes the relational domains, table/column catalogue, keys and relationships, source collection mapping, role/security boundaries, command transaction locks, financial/inventory reconciliation definitions, TiDB compatibility spike, migration quarantine rules and 20 owner decisions. It is a design artifact only: no DDL, schema creation, production change or real-data migration has occurred.
