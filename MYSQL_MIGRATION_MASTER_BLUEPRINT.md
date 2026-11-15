@@ -526,3 +526,14 @@ The approved migration direction is staged and controlled:
 The runbook defines source-of-truth boundaries, domain mapping, structural/referential/inventory/financial/event reconciliation, discrepancy classes, mandatory repair approvals, rollback evidence and synthetic replay/concurrency tests.
 
 **No live Firebase snapshot, data correction, production write, TiDB application data load or bidirectional sync was performed.** Legacy repair and migration remain blocked until backup/restore, source field completeness, schema/decision closure, TiDB runtime tests, reconciliation and explicit owner sign-off.
+
+
+## N. Legacy field crosswalk and repair candidate register — 2026-11-15
+
+Added [MYSQL_MIGRATION_FIELD_CROSSWALK_AND_REPAIR_CANDIDATES_V0_1.md](./MYSQL_MIGRATION_FIELD_CROSSWALK_AND_REPAIR_CANDIDATES_V0_1.md).
+
+This draft maps observed legacy fields from identity/configuration, audio, audit logs, patient/queue, medicine/tariff/package/batch, invoices and line snapshots, returns/quotas/cancellation, purchases/supplier returns, expenses, petty cash, loss and shifts to candidate relational entities. It distinguishes OBSERVED, CONDITIONAL, DERIVED, SYSTEM, UNKNOWN-UNION, QUARANTINE and POLICY fields, and requires source-scoped identity plus immutable raw payload/hash before normalization.
+
+The document also defines read-only repair detection patterns for stock-vs-batch variance, invoice math, missing references, absent batch lineage, duplicate candidates, return/cancellation conflicts, supplier-return ambiguity, paid-boolean evidence gaps, shift cash differences, timestamp conflicts, identity conflicts, seed provenance and unknown fields. None are auto-repairable. It includes a synthetic-only reconciliation fixture pack and ETL/repair gates.
+
+**Important limitation:** this is a static source crosswalk, not a complete historical Firestore schema export. Actual key/type union, record counts, hashes, real discrepancy candidates and repair patches remain unknown until a protected owner-controlled snapshot is profiled. No production database was read or changed, no real data was exported/imported, no repair was executed, no TiDB application DDL was run, and no deployment occurred.
