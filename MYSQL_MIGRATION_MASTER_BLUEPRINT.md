@@ -373,3 +373,8 @@ The detailed Firebase write-path and role-permission crosswalk is maintained sep
 PR13 remains open and unmerged. Its logout guard, patient handoff, queue A/B prefixing, display selector, calling synchronization and Firestore Rules changes have been reviewed as reference behavior only. Do not merge it automatically. Any future adoption must pass the PR13-specific regression checklist in the crosswalk and must not regress existing patient, POS, stock/batch, shift, returns, cancellation, finance, authentication or multi-device behavior.
 
 The latest read-only source fingerprints and PR13 review are recorded in the crosswalk. This is still an inventory/design phase: no SQL DDL, production code replacement, Firebase mutation or real patient-data migration is authorized by this document.
+
+
+## App UI callsite audit
+
+The read-only UI/business-command inventory is available in [MYSQL_MIGRATION_APP_UI_CALLSITE_AUDIT.md](./MYSQL_MIGRATION_APP_UI_CALLSITE_AUDIT.md). It covers patient lifecycle, shifts/cash, petty cash, medicine/tariff/package master data, purchases/supplier returns, expenses/loss, return/cancellation UI, staff management, clinic settings, Display TV/audio, exports and stock card. It records legacy local-mutation risks and the MySQL command boundaries and regression tests required to preserve behavior safely.
