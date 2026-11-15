@@ -596,3 +596,10 @@ Do not freeze physical schema until D01–D20 decisions in the schema review are
 
 ### 11.7 Current status
 No TiDB application DDL has been generated or applied. No compatibility runtime result is claimed. No real data import, Firebase mutation, Auth mutation, production deployment or PR #13 merge occurred.
+
+
+## 27. FK/index reconciliation pass 2 — 2026-11-15
+
+See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md). The pass cross-checked the proposal's documented table definitions against the canonical FK/index candidate catalogue and prior type, nullability, source-identity and concurrency audits. It confirms that schema v1 remains blocked: the physical per-FK manifest is incomplete; encounter/patient/shift and invoice ownership chains are not fully constrained; invoice-component/batch/return-quota/supplier-finance same-parent relationships remain partly prose-only; queue guard/event tables are not integrated into the base table list; reversal/source idempotency and reconciliation versioning need exact rules; and the one-batch-per-receipt-line uniqueness is not approved while split/partial receipt behavior is unresolved.
+
+The reconciliation also requires one canonical user ID type (`VARCHAR(64)`), complete actor provenance, ordered child indexes for every composite FK, explicit nullable tuple semantics, and `BIGINT UNSIGNED` for shared file-size metadata. The report enumerates candidate relationships by domain and exact correction gates. This is static document review only: no live metadata, orphan query, TiDB runtime test, DDL, data import, or deployment was performed. Do not generate or apply schema DDL until the exact normalized column/FK manifest and owner policy gates are closed.
