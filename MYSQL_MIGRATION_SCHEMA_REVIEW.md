@@ -216,3 +216,8 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 ## O. Normalized dictionary and FK manifest — pass 3
 
 See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The document enumerates 104 candidate FK relationships, table/PK type families, composite parent keys, child-index candidates and unresolved nullability/ownership blockers. It supersedes the stale pass-2 note that appeared to imply CHAR(36) was still a user identity type: only audit_events.event_uuid uses CHAR(36); user_id is VARCHAR(64). No DDL or runtime test is claimed.
+
+
+## P. Exact physical column dictionary — pass 4
+
+See [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md). Static extraction enumerates 56 base tables / 566 columns, with unspecified NULL/default retained as blockers. It exposes an important signedness conflict between the global `BIGINT UNSIGNED` internal-key convention and numerous inline `BIGINT` declarations that omit `UNSIGNED`. No automatic normalization was applied. Before DDL, reconcile identifier/FK signedness separately from signed financial amounts, complete charset/collation and constraint actions, and define all supplemental integrity tables. No TiDB runtime test or DDL has been performed.
