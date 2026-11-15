@@ -455,5 +455,16 @@ See [MYSQL_MIGRATION_SCHEMA_PROPOSAL.md](./MYSQL_MIGRATION_SCHEMA_PROPOSAL.md). 
 - The schema proposal has an amendment listing mandatory corrections A1–A10. These corrections and the actual TiDB compatibility spike must pass before DDL v1 is generated.
 - Latest review pass also cross-checks D01–D20 against existing clinic instructions, records which preferences are already known, and keeps unresolved clinical/accounting/security policy as explicit blockers.
 - The preview compatibility endpoint is token-protected and its source test suite now covers FK/unique, commit/rollback, DECIMAL/BIGINT, EXPLAIN, explicit UTC session, row-lock blocking, concurrent last-stock guard, and cleanup failure reporting.
-- Endpoint changes are source-reviewed only. They have not been syntax-checked after the latest edits, deployed, or run against TiDB. Do not treat source coverage as a passed compatibility test.
+- Latest endpoint source changes were reviewed and Node 22 syntax-checked successfully in an isolated ephemeral sandbox. They have NOT been deployed or run against TiDB; syntax validity is not a compatibility pass.
 - Deployment remains intentionally deferred until the complete source package is reviewed and Vercel deployment quota is available. No application schema DDL has been created.
+
+
+## Identity and authentication authority audit
+
+See [MYSQL_MIGRATION_IDENTITY_AUTHORITY_AUDIT.md](./MYSQL_MIGRATION_IDENTITY_AUTHORITY_AUDIT.md). Static review of the target branch's Firebase login, profile resolution, provisioning UI, Firestore Rules, Firebase config and documented bootstrap flow found an important provenance blocker: `firebase.json` and `AUTH_MIGRATION.md` refer to Cloud Functions and a bootstrap script, but the tracked branch contains no `functions/` or `scripts/` source. Deployed Functions may still exist; their source, region, service account, IAM, secrets and deployment provenance must be recovered before auth cutover. The audit also records the missing staff UID comparison in browser profile resolution, the unverified-email policy gap, the required immutable owner identity protection and the server-side token/role verification sequence.
+
+## Application concurrency and idempotency test matrix
+
+See [MYSQL_MIGRATION_APPLICATION_CONCURRENCY_TEST_MATRIX.md](./MYSQL_MIGRATION_APPLICATION_CONCURRENCY_TEST_MATRIX.md). It specifies 22 synthetic race/replay scenarios spanning shift opening, queue counters, checkout/FEFO, shift close, return quotas, cancellation, refund payout, supplier receiving/returns, expense approvals, petty cash, role suspension, email claims, restore protection and reversals. These are future integration tests, not executed tests. No application DDL or business API is authorized by the matrix.
+
+Both documents are design/audit artifacts only. No Firebase rules/functions were deployed or changed, no TiDB schema DDL was run, no production data was accessed, and production `main`/Vercel remain untouched.
