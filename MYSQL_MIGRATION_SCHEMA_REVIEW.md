@@ -221,3 +221,8 @@ See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_
 ## P. Exact physical column dictionary — pass 4
 
 See [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md). Corrected static extraction enumerates 56 base tables / 566 columns, with unspecified NULL/default retained as blockers and source `UNSIGNED` modifiers preserved. The earlier apparent widespread ID signedness conflict was caused by an extraction-regex issue and is withdrawn. Remaining bare signed integer fields must be reviewed by semantic role and range (notably monetary amounts); all FK pairs still require exact type matching. Charset/collation, constraint actions, supplemental integrity tables and TiDB runtime tests remain open. No DDL has been performed.
+
+
+## Q. NULL/default completeness matrix — pass 5
+
+See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md). Across 56 tables / 566 extracted columns, 65 nullability declarations and 535 default declarations remain unspecified in the proposal. This is a specification completeness measure, not a runtime error count. Do not fill these with generic defaults. Resolve lifecycle and ownership semantics first, then synchronize SQL, API validation and synthetic negative tests. No DDL or TiDB runtime validation has occurred.
