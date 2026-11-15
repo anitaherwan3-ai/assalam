@@ -164,8 +164,8 @@ The preview compatibility endpoint now includes source-level checks for:
 - concurrent conditional last-stock decrement using two independent connections;
 - row-lock blocking with `SELECT ... FOR UPDATE`;
 - explicit session UTC timezone;
-- FK enforcement, ON DELETE RESTRICT, nullable and non-null unique behavior;
-- DECIMAL/BIGINT round-trip, EXPLAIN, and synthetic table cleanup;
+- FK enforcement, ON DELETE RESTRICT, composite unique behavior including multiple NULL values;
+- DECIMAL(18,3), BIGINT above JavaScript's safe-integer boundary, EXPLAIN, and synthetic table cleanup;
 - cleanup outcome surfaced in the error response, with `stopSchemaV1: true` when cleanup fails.
 
-Static source inspection confirms these test paths are present and delimiter counts are balanced. **This is not a Node syntax check and not a TiDB runtime test.** The endpoint remains undeployed/unexecuted; no compatibility result is claimed. The suite still does not replace the application-level concurrency tests for queue counters, duplicate open shifts, return reservations, cancellation-vs-return, or duplicate refund payout.
+Node.js `node --check` passed for the latest endpoint source using an isolated Node 22 sandbox. Static inspection also confirms these test paths are present. **This is not a TiDB runtime test.** The endpoint remains undeployed/unexecuted; no database compatibility result is claimed. The suite still does not replace the application-level concurrency tests for queue counters, duplicate open shifts, return reservations, cancellation-vs-return, or duplicate refund payout.
