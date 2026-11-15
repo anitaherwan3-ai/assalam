@@ -453,3 +453,7 @@ See [MYSQL_MIGRATION_SCHEMA_PROPOSAL.md](./MYSQL_MIGRATION_SCHEMA_PROPOSAL.md). 
 ## Schema review gate
 - [Schema v1 review findings](MYSQL_MIGRATION_SCHEMA_REVIEW.md)
 - The schema proposal has an amendment listing mandatory corrections A1–A10. These corrections and the actual TiDB compatibility spike must pass before DDL v1 is generated.
+- Latest review pass also cross-checks D01–D20 against existing clinic instructions, records which preferences are already known, and keeps unresolved clinical/accounting/security policy as explicit blockers.
+- The preview compatibility endpoint is token-protected and its source test suite now covers FK/unique, commit/rollback, DECIMAL/BIGINT, EXPLAIN, explicit UTC session, row-lock blocking, concurrent last-stock guard, and cleanup failure reporting.
+- Endpoint changes are source-reviewed only. They have not been syntax-checked after the latest edits, deployed, or run against TiDB. Do not treat source coverage as a passed compatibility test.
+- Deployment remains intentionally deferred until the complete source package is reviewed and Vercel deployment quota is available. No application schema DDL has been created.
