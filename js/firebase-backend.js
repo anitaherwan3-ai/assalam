@@ -1506,23 +1506,33 @@ class FirebaseBackend {
               if (localTime <= remoteTime) continue;
 
               const identityPatch = {};
-              ['nama', 'hp'].forEach(key => {
-                if (Object.prototype.hasOwnProperty.call(item, key) &&
-                    JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
-                  identityPatch[key] = item[key];
-                }
-              });
+              if (item._pendingCashierPatientEdit === true) {
+                ['nama', 'hp'].forEach(key => {
+                  if (Object.prototype.hasOwnProperty.call(item, key) &&
+                      JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
+                    identityPatch[key] = item[key];
+                  }
+                });
+              }
               let nextTime = Math.max(Date.now(), remoteTime + 1);
               try {
-                if (Object.keys(identityPatch).length) {
-                  await patientRef.update(Object.assign({}, identityPatch, { _t: nextTime }));
-                  nextTime++;
+                if (item._pendingCashierPatientEdit === true) {
+                  if (Object.keys(identityPatch).length && localTime > remoteTime) {
+                    await patientRef.update(Object.assign({}, identityPatch, { _t: nextTime }));
+                    nextTime++;
+                  }
+                  delete item._pendingCashierPatientEdit;
+                  this.store.saveLocal(false);
                 }
+                const remotePatientActive = remote.done !== true && remote.deletedAt == null &&
+                  remote.status !== 'dihapus' && remote.status !== 'batal_berobat';
                 if (item._pendingCallingSync === true &&
+                    (localTime <= remoteTime || !remotePatientActive || item.calling === remote.calling)) {
+                  delete item._pendingCallingSync;
+                  this.store.saveLocal(false);
+                } else if (item._pendingCallingSync === true &&
                     Object.prototype.hasOwnProperty.call(item, 'calling') &&
-                    item.calling !== remote.calling &&
-                    remote.done !== true && remote.deletedAt == null &&
-                    remote.status !== 'dihapus' && remote.status !== 'batal_berobat') {
+                    remotePatientActive) {
                   await patientRef.update({ calling: item.calling === true, _t: nextTime });
                   delete item._pendingCallingSync;
                   this.store.saveLocal(false);
