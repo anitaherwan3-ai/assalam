@@ -244,3 +244,7 @@ See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRAT
 
 ## S. Source-verified workflow findings — pass 11
 See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md). Source review verifies the local purchase/FEFO/return/HPP behaviors and identifies specific target requirements: reject over-limit supplier returns rather than silently cap, use WIB business date, preserve invoice line/component snapshots, enforce staged return authority and separate payout, and do not rely on local demo seeding or 1,000-row audit truncation. Stale Firebase adapter email defaults are a high-priority identity crosswalk discrepancy. Static only; no runtime test or data mutation.
+
+
+## T. Return/refund/cancellation state-machine audit — pass 12
+See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md). This pass details the observed cloud state machine and target invariants: atomic quota reserve/release, Admin forward, Pimpinan final approval/stock restore, separate one-time payout, line-level package quota, and invoice-level serialization against cancellation. It identifies the out-of-transaction query race pattern in legacy Firestore code and specifies independent-connection TiDB race tests. Static only; no runtime or DDL claim.
