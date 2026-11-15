@@ -609,3 +609,7 @@ See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL
 
 ## Z. Inventory movement source matrix — pass 13
 See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). The pass establishes a minimal source-backed movement vocabulary and reconciliation equations for medicine and batch balances. It preserves one ledger rather than separate event tables, identifies stock-card projection gaps and loss deletion behavior, and defers unsupported positive stocktake adjustment. No database or production data was changed.
+
+
+## AA. Inventory ledger FK lineage closure — pass 14
+See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). This pass reconciles signed movement quantity semantics and traces stock ownership from source documents through invoice lines, batch allocations and reversals. It records unresolved exact composite FK tuples and source provenance, and defines focused TiDB tests. No DDL or live data changes were made.
