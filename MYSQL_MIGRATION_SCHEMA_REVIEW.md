@@ -252,3 +252,7 @@ See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL
 
 ## U. Inventory movement source matrix — pass 13
 See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). Source evidence supports one stock movement ledger for opening/seed, purchase, sale, return, cancellation, supplier return and loss/expiry. It also records projection mismatches and append-only reversal requirements. Batch lineage is mandatory for the observed stock-affecting workflows; batchless movement types remain narrowly defined and must be proven. No DDL or runtime reconciliation was performed.
+
+
+## V. Inventory ledger FK lineage closure — pass 14
+See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). The signed `quantity_delta` convention is selected over a duplicate direction column; movement type constrains sign. The review identifies critical cross-row ownership constraints that ordinary scalar FKs cannot prove, including sale movement/allocation identity, supplier invoice/line/batch chain, return/cancellation restoration lineage, reversal bounds and polymorphic source references. These remain service/tuple/runtime gates, not claimed-enforced constraints.
