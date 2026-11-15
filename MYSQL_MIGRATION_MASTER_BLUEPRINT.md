@@ -605,3 +605,7 @@ See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRAT
 
 ## Y. Return/refund/cancellation state-machine audit — pass 12
 See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md). The source audit traces return quota reservation/release, Admin/Pimpinan stages, stock restoration, payout, cancellation conflict checks and invoice-time quota initialization. It records the current whole-package return granularity and the need for a shared invoice lock in SQL. It does not authorize any Firebase/Auth or production change.
+
+
+## Z. Inventory movement source matrix — pass 13
+See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). The pass establishes a minimal source-backed movement vocabulary and reconciliation equations for medicine and batch balances. It preserves one ledger rather than separate event tables, identifies stock-card projection gaps and loss deletion behavior, and defers unsupported positive stocktake adjustment. No database or production data was changed.
