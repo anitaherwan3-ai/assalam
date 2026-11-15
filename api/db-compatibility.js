@@ -66,6 +66,7 @@ module.exports = async function handler(req, res) {
   const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const parentTable = `compat_${suffix}_parent`;
   const childTable = `compat_${suffix}_child`;
+  const stockTable = `compat_${suffix}_stock`;
   const quote = (name) => "`" + name + "`";
   const tests = [];
   let cleanupStatus = "NOT_STARTED";
@@ -123,7 +124,14 @@ module.exports = async function handler(req, res) {
           ON DELETE RESTRICT ON UPDATE RESTRICT
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
     );
-    pass("create_innodb_foreign_key_and_indexes", "Both isolated test tables created");
+    await connectionA.query(
+      `CREATE TABLE ${quote(stockTable)} (
+        id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        qty BIGINT NOT NULL,
+        INDEX idx_stock_qty (qty)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    pass("create_innodb_foreign_key_and_indexes", "Synthetic parent, child and stock tables created");
 
     await connectionA.query(`INSERT INTO ${quote(parentTable)} (id, marker) VALUES (1, 0)`);
     await connectionA.query(
@@ -193,12 +201,37 @@ module.exports = async function handler(req, res) {
       fail("transaction_rollback", new Error("Rollback did not restore the original value"));
     }
 
+    await connectionA.beginTransaction();
+    await connectionA.query(`UPDATE ${quote(parentTable)} SET marker=2 WHERE id=1`);
+    await connectionA.commit();
+    const [committed] = await connectionA.query(
+      `SELECT marker FROM ${quote(parentTable)} WHERE id=1`
+    );
+    if (Number(committed[0].marker) === 2) {
+      pass("transaction_commit", "Committed update persisted");
+    } else {
+      fail("transaction_commit", new Error("Committed update was not visible"));
+    }
+
     const [plan] = await connectionA.query(
       `EXPLAIN SELECT * FROM ${quote(childTable)} FORCE INDEX (idx_parent) WHERE parent_id=1`
     );
     pass("index_explain", plan[0]);
 
     connectionB = await mysql.createConnection(config);
+    await connectionA.query(`INSERT INTO ${quote(stockTable)} (id,qty) VALUES (1,1)`);
+    const stockUpdates = await Promise.all([
+      connectionA.query(`UPDATE ${quote(stockTable)} SET qty=qty-1 WHERE id=1 AND qty>=1`),
+      connectionB.query(`UPDATE ${quote(stockTable)} SET qty=qty-1 WHERE id=1 AND qty>=1`)
+    ]);
+    const affected = stockUpdates.reduce((sum, result) => sum + result[0].affectedRows, 0);
+    const [stockAfter] = await connectionA.query(`SELECT qty FROM ${quote(stockTable)} WHERE id=1`);
+    if (affected === 1 && Number(stockAfter[0].qty) === 0) {
+      pass("concurrent_last_stock_guard", "Two concurrent sale attempts consumed only the single available unit");
+    } else {
+      fail("concurrent_last_stock_guard", new Error(`Expected one successful decrement; affected=${affected}, qty=${stockAfter[0].qty}`));
+    }
+
     await connectionA.beginTransaction();
     await connectionA.query(`SELECT id FROM ${quote(parentTable)} WHERE id=1 FOR UPDATE`);
     let updateFinished = false;
@@ -215,13 +248,20 @@ module.exports = async function handler(req, res) {
       fail("row_lock_wait", new Error("Concurrent UPDATE did not wait; inspect TiDB transaction mode and isolation"));
     }
 
+    await connectionA.query("SET time_zone = '+00:00'");
     const [timeRows] = await connectionA.query(
       "SELECT @@time_zone AS session_time_zone, NOW(3) AS session_now, UTC_TIMESTAMP(3) AS utc_now"
     );
-    pass("session_time_functions", timeRows[0]);
+    const timeDifferenceMs = Math.abs(new Date(timeRows[0].session_now).getTime() - new Date(timeRows[0].utc_now).getTime());
+    if (timeRows[0].session_time_zone === "+00:00" && timeDifferenceMs < 1500) {
+      pass("explicit_utc_session_time", timeRows[0]);
+    } else {
+      fail("explicit_utc_session_time", new Error(JSON.stringify({ ...timeRows[0], timeDifferenceMs })));
+    }
 
     cleanupStatus = "PASS";
     try {
+      await connectionA.query(`DROP TABLE IF EXISTS ${quote(stockTable)}`);
       await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
       await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
     } catch (cleanupError) {
@@ -245,6 +285,7 @@ module.exports = async function handler(req, res) {
     // cleanup block. A cleanup failure is a hard stop for schema-v1 work.
     if (tablesMayExist && connectionA) {
       try {
+        await connectionA.query(`DROP TABLE IF EXISTS ${quote(stockTable)}`);
         await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
         await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
         cleanupStatus = "PASS_AFTER_ERROR";
@@ -267,6 +308,7 @@ module.exports = async function handler(req, res) {
       try { await connectionB.end(); } catch (_) {}
     }
     if (connectionA) {
+      try { await connectionA.query(`DROP TABLE IF EXISTS ${quote(stockTable)}`); } catch (_) {}
       try { await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`); } catch (_) {}
       try { await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`); } catch (_) {}
       try { await connectionA.end(); } catch (_) {}
