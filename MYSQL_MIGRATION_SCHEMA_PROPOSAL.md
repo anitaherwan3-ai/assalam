@@ -550,3 +550,9 @@ These are design gates only. No TiDB runtime compatibility is claimed and no DDL
 See [MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md) and [MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md](./MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md). The type/nullability pass records that a complete physical column manifest is still missing; user ID representation, quantity base units/scale, legacy ID source scoping, collations, lifecycle nullability, timestamp provenance and several composite same-parent invariants are not frozen. The FK catalogue is a candidate review matrix, not approved DDL. Orphan/duplicate checks are specified but have not been run against historical clinic data.
 
 DDL remains blocked pending owner policy decisions, exact source-field profiling, full column/FK type manifest, and actual TiDB compatibility testing.
+
+## 26. Contradiction and source-identity closure — 2026-11-15
+
+See [MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md). The detailed cross-check identified unresolved source-scoped legacy IDs, same-parent FK gaps in encounters/invoices/stock allocations/returns/supplier finance, queue first-use/overlap races, polymorphic ledger references, mutable projection controls, timestamp provenance and reconciliation versioning. A candidate `migration_source_records` mapping table is proposed to preserve source collection/path identity and idempotency. This is design review only; it is not DDL.
+
+The proposal remains blocked until these corrections, owner decisions, full source-field profiling and TiDB compatibility tests are completed.
