@@ -172,3 +172,40 @@ This is a broader source inventory, not yet a complete relational field dictiona
 2. Map each endpoint operation to actor, allowed fields, invariants and transaction boundary.
 3. Review full PR #13 patch, particularly every workflow transition and its interaction with current main.
 4. Create a user-reviewable permission matrix and data dictionary before proposing tables.
+
+
+## 12. PR #13 deeper workflow review (branch-only, not merged)
+
+Additional functions and constraints confirmed from the PR branch:
+
+### UI workflow
+- `getPendingPatientsForLogout` counts today's unfinished patients assigned to the currently logged-in cashier.
+- `showPendingPatientsBeforeLogout` blocks logout until each pending patient is continued, marked Batal Berobat, or handed over.
+- `continuePatientService` calls the existing patient and opens the transaction tab for that same patient.
+- `savePatientHandoff` and `actionLimpahkanPasien` provide direct handover from the patient list.
+- `finishLogout` rechecks pending patients before signing out; this prevents a stale modal decision from bypassing the check.
+- `getQueuePrefixForCashier`, `getShiftQueuePrefix`, and `isShiftQueuePrefixCurrent` map stable internal cashier IDs to A/B and prevent use of a legacy shift with a mismatched prefix.
+- New shift opening stores `queuePrefix`; patient registration stores both `queuePrefix` and `queueDisplayPrefix`.
+- The patient list shows handover reason and source/destination cashier.
+- TV mode selection exposes A and B options and persists the selected mode.
+
+### Backend atomic operations
+- `_assertPatientWorkflowAccess`: only authenticated Kasir/Pimpinan can invoke patient workflow transitions.
+- `cancelPatientVisit`: reads current patient inside a Firestore transaction, checks cashier ownership and active/unserved state, then changes only Batal Berobat metadata/calling status.
+- `restorePatientVisit`: restores only today's Batal Berobat patient, only if not completed; cashier must own patient.
+- `handoffPatient`: transaction reads both patient and target shift before writes; checks ownership, patient active state, target shift open, different cashier, same operational date, and target A/B prefix. It preserves patient ID/number and updates cashier/shift plus handover audit fields and display prefix.
+- `registerPatientWithQueueNumber`: allocates a separate sequence for A and B, uses prefix-specific candidate document IDs and handles legacy A sequence compatibility.
+- `saveQueueDisplayMode`: only Kasir/Pimpinan and only A/B; persists selected mode in clinic config.
+
+### PR #13 Rules additions
+- Derives expected queue prefix from stable internal user ID (`kasir` → A; `kasir2` → B), not editable email.
+- Restricts patient calling updates to active patients and owner/Pimpinan.
+- Separates Batal Berobat, restore, archive, unarchive and handover into distinct allowlisted transitions.
+- Handover requires source owner to match current patient owner, target cashier to differ, reason length at least five, timestamp, target shift open and same date, and target shift prefix to match recipient.
+- Kasir cannot hand over another cashier's patient; Pimpinan can hand over across users.
+- Queue mode config update is restricted to A/B and to authorized Kasir/Pimpinan.
+
+### Migration design consequence
+These are multiple separate state transitions and should not become a generic patient update endpoint. The API should expose distinct operations with transactional checks, and retain a handover history table (not only overwrite the current patient owner). The current PR stores latest handover metadata on the patient; a relational migration should consider an append-only handover event table so multiple handovers remain auditable.
+
+PR #13 also has explicit regression requirements for old workflows. Its branch is not a passing test report; these functions and Rules were source-reviewed only.
