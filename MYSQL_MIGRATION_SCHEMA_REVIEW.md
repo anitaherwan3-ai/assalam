@@ -256,3 +256,8 @@ See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATI
 
 ## V. Inventory ledger FK lineage closure — pass 14
 See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). The signed `quantity_delta` convention is selected over a duplicate direction column; movement type constrains sign. The review identifies critical cross-row ownership constraints that ordinary scalar FKs cannot prove, including sale movement/allocation identity, supplier invoice/line/batch chain, return/cancellation restoration lineage, reversal bounds and polymorphic source references. These remain service/tuple/runtime gates, not claimed-enforced constraints.
+
+
+## Financial and cash ownership closure — pass 15
+
+[Pass 15 financial/cash audit](./MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md) traces the current source formulas and workflow ownership. It separates revenue adjustment (return approval date) from cash payout date, confirms opening float is not income, and flags report/cash-custody projection risks, petty/expense double-counting, one-method-per-invoice, supplier boolean settlement, and missing supplier credit/partial payment evidence. Schema v1 remains blocked on the listed owner/accounting decisions and synthetic reconciliation tests. No DDL or runtime test was performed.
