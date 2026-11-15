@@ -127,3 +127,45 @@ Before the compatibility endpoint is deployed:
 5. After the test window, rotate/remove the token and verify synthetic test-table cleanup.
 
 This is a source-level security improvement only. It has not yet been deployed or runtime-tested. It does not change the production project or database.
+
+
+## G. Decision register cross-check against existing clinic instructions — 2026-11-15
+
+This cross-check records already-stated operating preferences to avoid asking the clinic to repeat decisions. It does not silently convert incomplete preferences into a final accounting/legal policy.
+
+| Decision | Existing instruction/evidence | What remains unresolved before DDL or workflow acceptance |
+|---|---|---|
+| D01 medicine unit/fraction | Existing app stock and batch flows use medicine units such as strip; quantities must reconcile exactly. | Canonical unit per medicine, whether fractional strip/tablet quantities are permitted, and rounding policy. |
+| D02/D03 patient/encounter legacy | Patient and visit history must be preserved; never invent a patient/visit to satisfy a foreign key. | Exact treatment for historical invoices with missing or conflicting patient/encounter links. |
+| D04 historical sales without batch | Stock/batch accuracy is a hard requirement; never fabricate a batch allocation. | Reconciliation evidence and quarantine approval for each legacy exception. |
+| D05 returned medicine disposition | Return quantity and value must match what was charged; stock must not be inflated. | Who certifies unopened/resalable condition and when a returned item is quarantined. |
+| D06 package component allocation | Return must support medicine and service components and prevent duplicate/over-return. | Approved proportional allocation/rounding method for package discount and refund. |
+| D07 service/fee return | User explicitly requires return of medicine and service/fee where eligible; service return must not create stock movement. | Eligibility windows, partial service return rules and approval matrix. |
+| D08 expense self-approval | No final policy found. | Thresholds and separation-of-duty rules. |
+| D09 petty cash | Cash on hand must remain distinct from omzet and modal awal; no double-counting in reports. | Category mapping for advances, reimbursements and expense recognition. |
+| D10 supplier credit | Supplier return/credit must be traceable and must not silently alter purchase history. | Exact accounting recognition event and evidence required for credit note acceptance. |
+| D11 partial supplier payment | Support allocation-based accounting; do not infer historical payment allocation from a boolean paid flag. | Approval and reconciliation of legacy payment allocations. |
+| D12 shift verifier | Shift closing and verification must be role-controlled and auditable. | Whether Admin, Pimpinan, or both may verify each shift type and exception. |
+| D13 refund payout | Existing instruction requires approval before refund, separate payout recording, and clear “uang kembali” evidence; refund cannot be implied merely from approval. | Final authority and accepted payout methods/reference evidence. |
+| D14 non-cash revenue date | Omzet, cash-in-hand and settlement are separate concepts. | Exact recognition timestamp for pending/failed/settled payment instruments. |
+| D15 opening stock/HPP | Stock and HPP must reconcile; no invented opening balance. | Signed opening-stock evidence and valuation method. |
+| D16 queue A/B and handoff | Existing instruction: display may switch between separate A/B views; cashier may select queue mode; PR13 remains unmerged. | Final role/override policy and full PR13 review before any adoption. |
+| D17 legacy timestamps | Preserve original timestamp evidence; normalize only when unambiguous. | Per-source rules for malformed, local-time and missing offsets. |
+| D18 patient archive/retention | User prefers “Batal Berobat” for cancelled/no-treatment visits rather than treating them as ordinary archive. | Retention duration, deletion/legal hold, and which records remain searchable. |
+| D19 audit retention | Audit must be append-only and not truncated by a UI row limit. | Formal retention period and export/legal hold policy. |
+| D20 authentication/Cloud Functions | Firebase Auth is the temporary identity provider candidate; master Pimpinan must remain protected. | Locate authoritative deployed Cloud Functions source, verify token claims and service account ownership, then approve long-term identity architecture. |
+
+**Interpretation:** Existing preferences above can guide domain modelling and test cases, but any unresolved accounting, clinical retention, regulatory, or authorization detail remains a release blocker. No owner decision is treated as approved merely because a schema can technically represent it.
+
+## H. Compatibility test coverage update — source review only
+
+The preview compatibility endpoint now includes source-level checks for:
+- explicit transaction rollback and commit;
+- concurrent conditional last-stock decrement using two independent connections;
+- row-lock blocking with `SELECT ... FOR UPDATE`;
+- explicit session UTC timezone;
+- FK enforcement, ON DELETE RESTRICT, nullable and non-null unique behavior;
+- DECIMAL/BIGINT round-trip, EXPLAIN, and synthetic table cleanup;
+- cleanup outcome surfaced in the error response, with `stopSchemaV1: true` when cleanup fails.
+
+Static source inspection confirms these test paths are present and delimiter counts are balanced. **This is not a Node syntax check and not a TiDB runtime test.** The endpoint remains undeployed/unexecuted; no compatibility result is claimed. The suite still does not replace the application-level concurrency tests for queue counters, duplicate open shifts, return reservations, cancellation-vs-return, or duplicate refund payout.
