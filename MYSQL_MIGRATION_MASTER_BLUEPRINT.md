@@ -597,3 +597,7 @@ See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION
 
 ## W. Decision and requirement traceability closure — pass 10
 See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). The pass maps confirmed clinic workflows to domains, invariants and acceptance proofs; separates engineering closure from owner policy and source-verification gates; and applies anti-overfitting rules to conditional tables. It does not authorize DDL, Firebase/Auth changes, cleanup, production deployment, main merge or PR13 merge.
+
+
+## X. Source-verified workflow findings — pass 11
+See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md). This source pass adds evidence for mixed medicine units, local purchase-to-batch creation, FEFO date handling, supplier-return capping, sales-return quota and batch restore logic, weighted-average HPP, local audit truncation, demo seed behavior and stale hard-coded account defaults. It records required backend behavior and unresolved source gates without changing Firebase/Auth, production or application code.
