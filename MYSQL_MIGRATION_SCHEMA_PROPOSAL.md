@@ -102,6 +102,15 @@ display_config_id BIGINT UNSIGNED PK; config_key VARCHAR(80) UNIQUE; youtube_vid
 ### 2.6 `queue_audio_assets`
 audio_asset_id BIGINT UNSIGNED PK; clip_id VARCHAR(64) NOT NULL UNIQUE; clip_type VARCHAR(24) NOT NULL; object_key VARCHAR(512) NOT NULL; mime_type VARCHAR(100) NOT NULL; size_bytes INT UNSIGNED NOT NULL; sha256 CHAR(64) NOT NULL; version BIGINT UNSIGNED NOT NULL; active TINYINT(1) NOT NULL DEFAULT 1; updated_at_utc DATETIME(3) NOT NULL; updated_by_user_id VARCHAR(64) NOT NULL. Audio binary stored in private object storage, not SQL/base64. Validate allowed clip IDs, MP3 type, size limit, checksum, access and cache behavior.
 
+
+
+### 2.7 Explicit integrity tables and invariants (schema v1 candidates)
+
+- `active_email_claims`: `email_normalized VARCHAR(254) PRIMARY KEY`, `user_id VARCHAR(64) NOT NULL UNIQUE`, `email_id BIGINT UNSIGNED NOT NULL UNIQUE`. FK to users and user_emails with RESTRICT. Only verified active email may be claimed. Email replacement closes the old history row and changes this claim in one transaction.
+- `active_role_slots`: `user_id VARCHAR(64) PRIMARY KEY`, `role_assignment_id BIGINT UNSIGNED NOT NULL UNIQUE`, `activated_at_utc DATETIME(3) NOT NULL`. Composite identity must ensure the assignment belongs to the same user; role changes lock this slot and preserve role_assignments history.
+- `sales_return_events`: `sales_return_event_id BIGINT UNSIGNED PRIMARY KEY`, `sales_return_id BIGINT UNSIGNED NOT NULL`, `event_type VARCHAR(24) NOT NULL`, `old_status VARCHAR(24) NULL`, `new_status VARCHAR(24) NOT NULL`, `actor_user_id VARCHAR(64) NOT NULL`, `reason VARCHAR(255) NULL`, `occurred_at_utc DATETIME(3) NOT NULL`. Append-only; index (`sales_return_id`,`occurred_at_utc`). Every submit/review/forward/approve/reject/finalize transition writes an event in the same transaction as the current status.
+- `active_shift_slots` must use composite FK (`shift_id`,`cashier_user_id`) to `cashier_shifts(shift_id,cashier_user_id)`; parent needs UNIQUE (`shift_id`,`cashier_user_id`). A single-column FK to each field is insufficient to prove ownership consistency.
+
 ## 3. Domain patient, encounter dan queue
 
 ### 3.1 `patients`
@@ -175,7 +184,7 @@ supplier_id BIGINT UNSIGNED PK; public_id VARCHAR(80) UNIQUE; legacy_id VARCHAR(
 supplier_invoice_id BIGINT UNSIGNED PK; public_id VARCHAR(80) UNIQUE; legacy_id VARCHAR(128) NULL UNIQUE; supplier_id BIGINT UNSIGNED NOT NULL; invoice_number VARCHAR(100) NOT NULL; invoice_date DATE NOT NULL; due_date DATE NULL; status VARCHAR(20) NOT NULL; gross_amount BIGINT NOT NULL; accepted_credit_amount BIGINT NOT NULL DEFAULT 0; created_by_user_id VARCHAR(64) NOT NULL; created_at_utc DATETIME(3) NOT NULL; updated_at_utc DATETIME(3) NOT NULL. Index (supplier_id,invoice_date), (status,due_date). Unique supplier+invoice number only if business confirms no duplicate supplier invoice numbers.
 
 ### 5.7 `supplier_invoice_lines`
-supplier_invoice_line_id BIGINT UNSIGNED PK; supplier_invoice_id BIGINT UNSIGNED NOT NULL; medicine_id BIGINT UNSIGNED NOT NULL; batch_id BIGINT UNSIGNED NULL; quantity_received DECIMAL(18,3) NOT NULL; quantity_returned DECIMAL(18,3) NOT NULL DEFAULT 0; unit_cost BIGINT NOT NULL; line_total BIGINT NOT NULL; expiry_date DATE NULL; batch_number VARCHAR(100) NULL. Index (supplier_invoice_id), (medicine_id). Each receipt line links to its batch; one purchase line may be split across multiple batches only after policy/schema expansion. Current source path commonly creates one batch per purchase line.
+supplier_invoice_line_id BIGINT UNSIGNED PK; supplier_invoice_id BIGINT UNSIGNED NOT NULL; medicine_id BIGINT UNSIGNED NOT NULL; quantity_received DECIMAL(18,3) NOT NULL; quantity_returned DECIMAL(18,3) NOT NULL DEFAULT 0; unit_cost BIGINT NOT NULL; line_total BIGINT NOT NULL; expiry_date DATE NULL; batch_number VARCHAR(100) NULL. Index (supplier_invoice_id), (medicine_id). Do not store batch_id on this line: the sole one-to-one link is inventory_batches.supplier_invoice_line_id. One receipt line → one batch is the v1 candidate; if split receipt is confirmed, replace with supplier_invoice_line_batch_allocations before DDL freeze.
 
 ### 5.8 `inventory_batches`
 batch_id BIGINT UNSIGNED PK; public_id VARCHAR(80) UNIQUE; legacy_id VARCHAR(128) NULL UNIQUE; medicine_id BIGINT UNSIGNED NOT NULL; supplier_invoice_line_id BIGINT UNSIGNED NULL; batch_number VARCHAR(100) NULL; expiry_date DATE NULL; initial_quantity DECIMAL(18,3) NOT NULL; remaining_quantity DECIMAL(18,3) NOT NULL; unit_cost BIGINT NOT NULL; received_at_utc DATETIME(3) NOT NULL; status VARCHAR(20) NOT NULL DEFAULT 'active'. Index (medicine_id,expiry_date,remaining_quantity), (supplier_invoice_line_id). Preserve seed/opening stock provenance. Never silently assign a missing historical batch.
@@ -213,8 +222,8 @@ sales_return_id BIGINT UNSIGNED PK; public_id VARCHAR(80) UNIQUE; legacy_id VARC
 ### 6.8 `sales_return_lines`
 sales_return_line_id BIGINT UNSIGNED PK; sales_return_id BIGINT UNSIGNED NOT NULL; invoice_line_id BIGINT UNSIGNED NOT NULL; invoice_component_id BIGINT UNSIGNED NULL; quantity DECIMAL(18,3) NOT NULL; refund_amount BIGINT NOT NULL; returned_cost_amount BIGINT NOT NULL; restock_disposition VARCHAR(20) NOT NULL; reason VARCHAR(255) NULL. Index (invoice_line_id). Refund derived server-side from immutable invoice and discount allocation; service line has no inventory restore. Returned goods may be restockable or quarantined; policy required.
 
-### 6.9 `return_quotas`
-return_quota_id BIGINT UNSIGNED PK; invoice_line_id BIGINT UNSIGNED NOT NULL UNIQUE; sold_quantity DECIMAL(18,3) NOT NULL; reserved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0; approved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0; updated_at_utc DATETIME(3) NOT NULL; version BIGINT UNSIGNED NOT NULL. Lock quota row in return submit/approve/reject transaction. Ensure sum active reservations + approved qty never exceeds sold qty. If legacy quota is per item index, map to stable invoice_line_id only after deterministic line mapping.
+### 6.9 `return_quota_subjects`
+return_quota_subject_id BIGINT UNSIGNED PK; quota_key VARCHAR(180) NOT NULL UNIQUE; invoice_line_id BIGINT UNSIGNED NOT NULL; invoice_component_id BIGINT UNSIGNED NULL; subject_type VARCHAR(20) NOT NULL; sold_quantity DECIMAL(18,3) NOT NULL; reserved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0; approved_quantity DECIMAL(18,3) NOT NULL DEFAULT 0; updated_at_utc DATETIME(3) NOT NULL; version BIGINT UNSIGNED NOT NULL. One subject represents one returnable unit: service/non-package line uses the line; medicine component in a package uses the component. quota_key is deterministic (for example line:<line_id> or component:<component_id>). Lock all relevant subject rows in a stable order for submit/finalize/cancel. Enforce active reservations + approved quantity ≤ sold quantity in the domain transaction.
 
 ### 6.10 `refund_obligations`
 refund_obligation_id BIGINT UNSIGNED PK; sales_return_id BIGINT UNSIGNED NOT NULL UNIQUE; amount_due BIGINT NOT NULL; amount_paid BIGINT NOT NULL DEFAULT 0; status VARCHAR(16) NOT NULL; approved_at_utc DATETIME(3) NOT NULL; approved_by_user_id VARCHAR(64) NOT NULL. Refund liability created on Pimpinan final approval, not on cashier proposal.
@@ -481,3 +490,14 @@ This section is the canonical interpretation where older draft paragraphs confli
 - The detailed review in `MYSQL_MIGRATION_SCHEMA_REVIEW.md` supersedes every older conflicting draft paragraph. Any unresolved owner decision remains a release blocker and must not be silently defaulted.
 
 The earlier sections are retained as audit history; this consistency section and section 19 govern schema v1 generation. No DDL is authorized by this document.
+
+
+## 21. Legacy-draft conflict closure — 2026-11-15
+
+The following older draft definitions are superseded and must not be copied into DDL:
+- `supplier_invoice_lines.batch_id` is removed; the batch stores the receipt-line reference in `inventory_batches.supplier_invoice_line_id`.
+- The old `return_quotas` table with unique `invoice_line_id` is removed; use `return_quota_subjects`.
+- Active email and active role invariants are represented by explicit slot/claim tables in section 2.7.
+- Return status history is represented by append-only `sales_return_events` in section 2.7.
+
+This amendment is a design-document correction only. It does not authorize DDL and does not claim TiDB compatibility tests have passed.
