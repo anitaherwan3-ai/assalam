@@ -637,3 +637,7 @@ See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION
 
 ## 30. Decision and requirement traceability closure — pass 10
 See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). Pass 10 maps clinic workflows to candidate domains, invariants and acceptance evidence; separates confirmed requirements, engineering closure, owner policy gates, source-verification gates and deferred scope; and prevents conditional support tables from silently entering v1. It does not approve DDL or close unresolved policy/source gates. Schema remains blocked pending exact physical FK/nullability/index closure and isolated TiDB compatibility tests.
+
+
+## 31. Source-verified workflow findings — pass 11
+See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md). Static source inspection confirms mixed medicine units, one batch created per local purchase command (not proof of universal one-to-one receipt), UTC-based local FEFO, supplier-return quantity capping/first-batch selection, original-line return quota checks, a local return-approval role divergence, weighted-average HPP path and local audit truncation. It also records stale hard-coded Firebase account defaults that conflict with the current owner-confirmed protected account set. These findings do not authorize account changes or DDL; source and identity gates remain open.
