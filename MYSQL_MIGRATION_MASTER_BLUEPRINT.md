@@ -422,3 +422,10 @@ This remains static source review only. No DDL, Firebase changes, real-data migr
 See [MYSQL_MIGRATION_CANCELLATION_SUPPLIER_RETURN_DISPLAY_AUDIT.md](./MYSQL_MIGRATION_CANCELLATION_SUPPLIER_RETURN_DISPLAY_AUDIT.md). It records the exact `batalTrx` document shape and invoice/batch reversal behavior, the supplier-return local-only mutation and its silent quantity cap, and queue audio/Display TV storage and permission behavior. Key design gates: SQL must lock cancellation and return state together, quarantine legacy invoices missing batch allocations, preserve original purchase snapshots and create supplier credit/payment records, move MP3 binaries to object storage, and expose a least-privilege TV projection.
 
 Static review only; no SQL DDL, Firebase mutation, real-data migration or production deployment.
+
+
+## Screen-by-screen UI and workflow specification
+
+See [MYSQL_MIGRATION_SCREEN_BY_SCREEN_UI_SPECIFICATION.md](./MYSQL_MIGRATION_SCREEN_BY_SCREEN_UI_SPECIFICATION.md). This document maps the actual `main` navigation for Kasir, Admin and Pimpinan to visible forms, buttons, table columns, user journeys, proposed API commands, authorization and acceptance tests. It separately describes the TV display page and flags the legacy Firebase settings/JSON backup controls, supplier-return local-only path, destructive correction buttons, patient PII, and unmerged PR13 A/B/handoff behavior. It explicitly distinguishes visible UI presence from tested behavior and requires desktop/tablet/phone parity plus database/ledger verification before sign-off.
+
+No DDL, production change, Firebase mutation or real-data migration was performed.
