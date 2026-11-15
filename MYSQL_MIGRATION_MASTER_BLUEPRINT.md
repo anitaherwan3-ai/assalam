@@ -468,3 +468,8 @@ See [MYSQL_MIGRATION_IDENTITY_AUTHORITY_AUDIT.md](./MYSQL_MIGRATION_IDENTITY_AUT
 See [MYSQL_MIGRATION_APPLICATION_CONCURRENCY_TEST_MATRIX.md](./MYSQL_MIGRATION_APPLICATION_CONCURRENCY_TEST_MATRIX.md). It specifies 22 synthetic race/replay scenarios spanning shift opening, queue counters, checkout/FEFO, shift close, return quotas, cancellation, refund payout, supplier receiving/returns, expense approvals, petty cash, role suspension, email claims, restore protection and reversals. These are future integration tests, not executed tests. No application DDL or business API is authorized by the matrix.
 
 Both documents are design/audit artifacts only. No Firebase rules/functions were deployed or changed, no TiDB schema DDL was run, no production data was accessed, and production `main`/Vercel remain untouched.
+
+
+## Foreign-key and index closure audit
+
+See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md). Static review found the proposal's relationship section is not yet a complete column-level FK catalogue. Additional same-parent composite integrity is required for cashier/shift, medicine/batch, invoice/line/component/quota, and supplier/payment allocations. Every FK needs exact parent unique key, child supporting index, matching types/nullability and explicit delete/update policy. Polymorphic source references need typed service validation/reconciliation. `sales_return_events` must be added to relationship/index catalogues. DDL remains blocked; no TiDB FK/index runtime test or schema creation has occurred.
