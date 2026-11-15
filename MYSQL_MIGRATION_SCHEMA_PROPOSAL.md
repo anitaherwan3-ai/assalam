@@ -658,3 +658,8 @@ See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGR
 ## Financial and cash ownership audit — pass 15
 
 See [MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md](./MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md). The source audit confirms opening float is drawer custody, not omzet/income; traces invoice tender/change, shift cash reconciliation, petty cash, operating-expense approval, supplier full-settlement boolean, return obligation vs payout, cancellation exclusivity and report date bases. It identifies material gaps around split tender, non-cash settlement evidence, partial supplier payments/credits, petty-cash double counting, cash refund shift ownership and package COGS. It proposes focused synthetic tests and keeps all unresolved owner/accounting policies explicit. Static review only; no DDL, live data, Firebase/Auth, deployment or production changes.
+
+
+## Financial reconciliation and source-of-truth audit — pass 16
+
+See [MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md](./MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md). Pass 16 maps every major report aggregate to its source rows/date basis and identifies the cash-on-hand projection as non-reconciled/unused, a return payout-method filter contradiction, missing shift attribution for cash refunds, supplier paid-flag and post-payment supplier-return gaps, and expense/petty double-counting risk. It defines a minimal source-of-truth model and synthetic reconciliation suite. Accounting decisions remain open; no DDL/runtime/live-data/deployment/production change.
