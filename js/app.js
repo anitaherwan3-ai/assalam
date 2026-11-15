@@ -1075,6 +1075,7 @@ function editPasien(id) {
     p.hp = res.hp;
     p._t = Date.now();
     if (currentRole === 'admin') p._pendingAdminPatientEdit = true;
+    else if (currentRole === 'kasir') p._pendingCashierPatientEdit = true;
     store.logActivity('Ubah', 'Pasien', `${p.no} - ${p.nama}`);
     store.saveLocal();
   });
