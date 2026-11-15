@@ -601,3 +601,7 @@ See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRAT
 
 ## X. Source-verified workflow findings — pass 11
 See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md). This source pass adds evidence for mixed medicine units, local purchase-to-batch creation, FEFO date handling, supplier-return capping, sales-return quota and batch restore logic, weighted-average HPP, local audit truncation, demo seed behavior and stale hard-coded account defaults. It records required backend behavior and unresolved source gates without changing Firebase/Auth, production or application code.
+
+
+## Y. Return/refund/cancellation state-machine audit — pass 12
+See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md). The source audit traces return quota reservation/release, Admin/Pimpinan stages, stock restoration, payout, cancellation conflict checks and invoice-time quota initialization. It records the current whole-package return granularity and the need for a shared invoice lock in SQL. It does not authorize any Firebase/Auth or production change.
