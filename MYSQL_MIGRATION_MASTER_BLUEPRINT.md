@@ -340,3 +340,27 @@ js/store.js; js/app.js; js/firebase-backend.js; firestore.rules; MYSQL_MIGRATION
 
 ## Status
 Blueprint saved to migration branch. This is a static-source-based draft, not exhaustive legacy-field proof or runtime test report. No SQL DDL, production change, Firebase write or real patient-data migration.
+
+
+## J. Addendum — exact ClinicStore source verification (js/store.js)
+
+Source fingerprint: main/js/store.js SHA `99e74acf8caec9c70d82be1d5f6efc5bfa6bc4fb`, inspected lines 130–553.
+
+### J1. Definitive local collection registry
+The ClinicStore constructor explicitly initializes exactly these 16 arrays:
+`obat, tarif, paket, pasien, trx, petty, beli, biaya, loss, shift, batch, log, users, returJual, returBeli, batalTrx`.
+Firestore naming in the sync layer prefixes these as `k_<collection>`. Additional Firestore documents/configs are outside this ClinicStore array and must be separately inventoried.
+
+### J2. Additional verified fields and behavior
+- `log`: `id,_t,_pendingSync,tgl,jam,u,aksi,kol,rinci`. Local log prepends and truncates to 1,000; MySQL audit must not truncate authoritative history.
+- `batch`: `id,oid,no,ed,qty,sisa,beli,_t`. FEFO filters same medicine, positive `sisa`, `ed >= today`, sorts ascending expiry. The local code uses UTC `toISOString()` for this date; server design must explicitly use WIB business date to avoid midnight drift.
+- `beli`: verified purchase write includes `id,tgl,supplier,faktur,oid,qty,total,tempo,lunas,tglBayar,qtyAwal,totalAwal,hargaBeliSatuan,batchId,_t`. Purchase creates one batch per invoice line call and computes weighted average HPP from aggregate stock/HPP.
+- `returJual` local proposal includes `id,status,tgl,trxId,itemIndex,quotaId,priorQty,noNota,namaPasien,namaItem,oid,jenis,hpp,metode,qty,harga,total,batchRestores,alasan,kasir,_t`; `batchRestores[]` entries include `oid,bid,qty,batchNo,ed`. Approval adds `diverifikasiOleh,diverifikasiPada`; rejection adds `alasanPenolakan`.
+- `returBeli`: exact write fields `id,tgl,beliId,supplier,faktur,namaObat,qty,nilai,alasan,_t`.
+- `returKuota` is not a ClinicStore collection; it is a separate cloud-side guard structure documented in the backend audit.
+- `batalTrx` is initialized but this local source section does not expose its complete schema; keep field status unknown until backend and app call sites are exhausted.
+
+### J3. Important local/cloud semantic divergence
+The local `approveReturJual()` accepts both Admin and Pimpinan, then immediately restores stock and marks return `disetujui`. The previously audited cloud workflow is staged: Cashier submits, Admin reviews/forwards, Pimpinan final-approves, stock is restored at final approval, and refund payment is a separate event. Do not blindly port local behavior. The secure cloud workflow and user's stated concern about refund abuse take precedence, subject to final owner policy.
+Local supplier return currently caps qty with `Math.min(requested, purchase remaining, batch remaining, aggregate stock)`, then mutates stock/batch/HPP and reduces unpaid invoice total. This silent cap can hide an over-return request; the new API should reject over-limit quantities and retain separate supplier credit/payment records.
+Local FEFO and return allocation are client-side state mutations. In MySQL the server must lock rows and derive batch allocation itself; client `batchDeductions`/`batchRestores` are reference snapshots only, never authority.
