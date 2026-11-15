@@ -593,3 +593,7 @@ See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCO
 ## V. Critical ownership chain matrix — pass 9
 
 See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). Preserve exact ownership across cashier/shift, invoice/encounter, medicine/batch/movement, return quota and supplier finance. Tests are targeted to real business invariants rather than exhaustive hypothetical combinations. No schema/data mutation.
+
+
+## W. Decision and requirement traceability closure — pass 10
+See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). The pass maps confirmed clinic workflows to domains, invariants and acceptance proofs; separates engineering closure from owner policy and source-verification gates; and applies anti-overfitting rules to conditional tables. It does not authorize DDL, Firebase/Auth changes, cleanup, production deployment, main merge or PR13 merge.
