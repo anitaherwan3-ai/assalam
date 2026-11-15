@@ -271,3 +271,8 @@ See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGR
 ## Date and report-export consistency review — pass 17
 
 [Pass 17 audit](./MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md) records report parity blockers across UI, CSV and PDF, including ignored cashier/method filters, cancelled invoice leakage, discount allocation mismatch, undated legacy rows, UTC/WIB date inconsistency and snapshot-vs-period confusion. The target MySQL report contract must make date basis, timezone, filters, generated time and snapshot cutoff explicit and shared across screen/CSV/PDF.
+
+
+## Role authorization and security review — pass 18
+
+[Pass 18 audit](./MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md) identifies identity and authorization blockers. The branch's hard-coded Admin and second-owner emails do not match the latest protected account list; do not run staff provisioning until all five accounts are mapped read-only to UID/profile/role. The current client-side role checks and collection listeners are not proof of deployed Firestore Rules enforcement. MySQL APIs must enforce actor identity, role, resource ownership, field projection and workflow transitions server-side.
