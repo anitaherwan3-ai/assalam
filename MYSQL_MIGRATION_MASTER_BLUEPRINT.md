@@ -403,3 +403,8 @@ See [MYSQL_MIGRATION_FIRESTORE_RULES_EXHAUSTIVE_AUDIT.md](./MYSQL_MIGRATION_FIRE
 ## Legacy data compatibility, seed and restore audit
 
 See [MYSQL_MIGRATION_LEGACY_DATA_COMPATIBILITY_AUDIT.md](./MYSQL_MIGRATION_LEGACY_DATA_COMPATIBILITY_AUDIT.md). It documents the 16 local collections, seed-on-empty behavior, observed legacy field dictionary, mixed timestamps/date semantics, purchase/return/stock normalization risks, unsafe full-state JSON restore, demo-vs-live classification protocol and reconciliation gates. Static source only; actual historical document key/type union and data provenance remain unknown until a protected data export is profiled.
+
+
+## Session, synchronization and authentication provenance audit
+
+See [MYSQL_MIGRATION_SESSION_SYNC_AUTH_AUDIT.md](./MYSQL_MIGRATION_SESSION_SYNC_AUTH_AUDIT.md). Key gates: do not port generic local-state push to SQL; implement explicit atomic commands; reject checkout if patient is missing; enforce one open shift per cashier; use a durable outbox; and locate the authoritative Cloud Functions source/deployment before authentication cutover. This is static source analysis only.
