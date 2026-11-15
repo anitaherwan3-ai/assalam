@@ -388,3 +388,8 @@ See [MYSQL_MIGRATION_EXPORT_BACKUP_WHATSAPP_DISPLAY_AUDIT.md](./MYSQL_MIGRATION_
 ## Exhaustive backend method and collection catalog
 
 See [MYSQL_MIGRATION_BACKEND_METHOD_COLLECTION_CATALOG.md](./MYSQL_MIGRATION_BACKEND_METHOD_COLLECTION_CATALOG.md). It inventories Firebase authentication/profile methods, realtime listener scopes, patient/queue, checkout, cancellation, return/quota/payout, audio/display, generic sync, configuration and disconnect paths; includes collection/document path mapping and critical concurrency/sync risks. It also records that PR13 A/B support remains unmerged reference behavior while the main baseline queue allocator is A-only.
+
+
+### Authentication source-reproducibility gap
+
+The backend catalog now records a repository artifact gap: the inspected `main` tree and `firebase.json` contain Firestore Rules configuration but no tracked Cloud Functions source/entrypoint, while README/auth migration docs describe Admin SDK/Cloud Functions behavior. This does not establish whether functions are deployed elsewhere; their authoritative source and deployed configuration must be located and audited before identity migration. Do not deploy or delete functions during this audit.
