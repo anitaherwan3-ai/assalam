@@ -588,3 +588,8 @@ The specification gap matrix is in [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MA
 ## U. Schema scope control and anti-overfitting — pass 8
 
 See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md). Apply evidence-first scope: do not add generic abstractions or speculative tables solely for hypothetical future cases. Preserve the confirmed single-clinic, A/B queue, role and financial/inventory workflows; defer conditional event, guard, outbox, partial-receipt and file-job tables unless source or owner evidence establishes v1 necessity. This does not relax core ownership, money, stock, return, idempotency or audit invariants. Documentation-only; no DDL or data mutation.
+
+
+## V. Critical ownership chain matrix — pass 9
+
+See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). Preserve exact ownership across cashier/shift, invoice/encounter, medicine/batch/movement, return quota and supplier finance. Tests are targeted to real business invariants rather than exhaustive hypothetical combinations. No schema/data mutation.
