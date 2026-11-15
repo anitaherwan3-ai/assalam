@@ -378,3 +378,8 @@ The latest read-only source fingerprints and PR13 review are recorded in the cro
 ## App UI callsite audit
 
 The read-only UI/business-command inventory is available in [MYSQL_MIGRATION_APP_UI_CALLSITE_AUDIT.md](./MYSQL_MIGRATION_APP_UI_CALLSITE_AUDIT.md). It covers patient lifecycle, shifts/cash, petty cash, medicine/tariff/package master data, purchases/supplier returns, expenses/loss, return/cancellation UI, staff management, clinic settings, Display TV/audio, exports and stock card. It records legacy local-mutation risks and the MySQL command boundaries and regression tests required to preserve behavior safely.
+
+
+## Export, backup/restore, WhatsApp and Display integration audit
+
+See [MYSQL_MIGRATION_EXPORT_BACKUP_WHATSAPP_DISPLAY_AUDIT.md](./MYSQL_MIGRATION_EXPORT_BACKUP_WHATSAPP_DISPLAY_AUDIT.md). This audit records the current CSV/PDF report inventory and correctness/security gaps, destructive local JSON restore behavior, WhatsApp composer (manual send rather than automatic delivery), shift recap reconciliation risks, full-collection Display TV listener/privacy concerns, audio storage migration and acceptance tests. It also records the remaining exhaustive backend/collection pass before schema approval.
