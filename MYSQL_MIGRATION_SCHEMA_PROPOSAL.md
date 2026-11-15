@@ -628,3 +628,8 @@ See [MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md](./MYSQL_MIGRATION_FK_FIE
 ## 32. Schema scope control and anti-overfitting — pass 8
 
 See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md). Schema v1 must be evidence-led and limited to confirmed clinic workflows plus essential relational integrity. Conditional support tables and generalized architectures must not become automatic v1 requirements without source/owner evidence. P0 integrity gates remain mandatory; speculative multi-tenant, generic workflow, broad event-sourcing and unrequested queue abstractions are deferred. No DDL or data mutation.
+
+
+## 33. Critical ownership chain matrix — pass 9
+
+See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). The pass focuses on encounter/shift, invoice/encounter/shift, medicine/batch/movement/allocation, return quota, and supplier return/credit/payment ownership. It uses existing source columns and marks unresolved nullability and same-parent rules as blockers; it does not add generic registries or speculative tables. No DDL or data mutation.
