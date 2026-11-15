@@ -556,3 +556,43 @@ DDL remains blocked pending owner policy decisions, exact source-field profiling
 See [MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md). The detailed cross-check identified unresolved source-scoped legacy IDs, same-parent FK gaps in encounters/invoices/stock allocations/returns/supplier finance, queue first-use/overlap races, polymorphic ledger references, mutable projection controls, timestamp provenance and reconciliation versioning. A candidate `migration_source_records` mapping table is proposed to preserve source collection/path identity and idempotency. This is design review only; it is not DDL.
 
 The proposal remains blocked until these corrections, owner decisions, full source-field profiling and TiDB compatibility tests are completed.
+
+
+## 11. Technical amendment addendum — 2026-11-15 (supersedes conflicting draft wording)
+
+This addendum applies the technical design candidates in [MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md). It is still a review proposal, not approved DDL. If earlier sections conflict, use this addendum as the current candidate design; do not silently generate SQL until the exact FK/type/index manifest and owner policy gates are closed.
+
+### 11.1 Canonical identity and actor provenance
+- Freeze candidate internal `user_id` as `VARCHAR(64)` everywhere, including every actor/user FK. It is immutable and never derived from email.
+- Keep provider identities (Firebase UID, future provider subject) in a separate provider-identity mapping with unique (provider, provider_subject); never use email as FK.
+- This schema is single-clinic. `active_role_slots` is one active role per user in Klinik Assalaam Palembang; reject unsupported scope values in the API. Multi-clinic tenancy requires a later versioned redesign.
+- Event/audit actor provenance must distinguish human, system, import and unknown legacy actors. Human actors reference `users.user_id`; system/import use explicit service principals; unknown historical actors remain unknown. Do not invent a staff identity to satisfy a FK.
+- Protect the five owner-confirmed accounts exactly: `assalamkasir1@gmail.com`, `assalamkasir2@gmail.com`, `assalamadmin@gmail.com`, `praktekrose@gmail.com`, `nursalim422@gmail.com`. Verify provider UID + email + user mapping + role before identity changes. This is a protection rule, not proof of current provisioning.
+
+### 11.2 Legacy identity and dummy data handling
+- A bare `legacy_id` is not globally unique across source collections. Canonical source identity is `(source_system, source_collection, source_document_id)` in `migration_source_records`; target-domain `legacy_id` is non-unique unless a source-specific uniqueness proof exists.
+- Owner confirmed that all old Firebase operational records are development dummy data. Do not import them as genuine clinic/patient/financial history. Use them only for structural audit or controlled regression fixtures; use new deterministic synthetic fixtures for TiDB tests.
+- Snapshot/cleanup remains a separate pre-release activity: private encrypted snapshot, verified restore, read-only five-account identity check, path-level deletion dry-run, explicit final approval, then selective deletion of approved dummy operational documents. No cleanup or Auth bulk deletion is authorized now.
+
+### 11.3 Queue concurrency
+- Add `queue_prefix_guards(prefix PRIMARY KEY, version, updated_at_utc)` with fixed guard rows for A and B. Assignment commands lock affected user and prefix guards in deterministic order, reject overlapping validity ranges, and append an assignment event in the same transaction.
+- First queue-counter initialization must be race-safe (serialized daily initialization or insert-if-absent + duplicate retry + locking read). Do not depend on locking a missing row.
+- Ticket allocation, counter update, encounter association, idempotency and audit are one transaction. Cancelled numbers remain consumed. Reissue creates a new ticket linked to the prior ticket; it never recycles a number.
+- A/B remain separate queues; cashier selection/display switching is a UI/config concern. PR #13 remains unmerged and must pass separate regression review before any code adoption.
+
+### 11.4 Return quota, ledger and idempotency
+- Add append-only `sales_return_quota_events` to record reserve/release/approve/consume/reversal effects by quota subject and return line, including quantity delta, actor provenance, timestamp and idempotency identity. Aggregate quota counters are projections rebuildable from these events.
+- Every return line must reference exactly one quota subject; component-aware composite constraints must prove the subject, invoice line and optional package component are the same source.
+- Financial/inventory/queue commands require durable domain event IDs. Do not expire idempotency protection while a replay could create duplicate stock or money effects.
+- Stock, batch, supplier-credit, refund-paid and shift-cash balances are projections owned by server commands and rebuilt/reconciled from append-only events; browser-provided balances are never accepted.
+
+### 11.5 Composite integrity and FK manifest
+Use composite parent UNIQUE keys and matching composite FKs whenever ownership must be consistent across multiple columns. Required pairs include cashier+shift, encounter+patient, receipt-line+medicine, batch+medicine, invoice-line+invoice, component+invoice-line, quota-subject+line+component, payment+supplier, supplier invoice+supplier, supplier return+invoice and credit note+return/invoice. Add child indexes with exact FK column order. Reject partially NULL composite tuples.
+
+The next schema pass must create a complete per-FK manifest with exact child/parent types, signedness, length/precision, charset/collation, nullability/default, parent PK/UNIQUE, child index, ON DELETE/UPDATE, same-parent invariant, and test IDs. Any missing FK or child index blocks DDL.
+
+### 11.6 Remaining policy blockers
+Do not freeze physical schema until D01–D20 decisions in the schema review are resolved or explicitly quarantined from v1. Split/partial supplier receipt behavior remains a specific blocker: if one purchase line may create multiple deliveries/lots/expiry batches, use `supplier_invoice_line_batch_allocations` from v1 instead of enforcing one batch per line. Invoice-number scope and encounter ticket reissue lifecycle also require source/workflow verification.
+
+### 11.7 Current status
+No TiDB application DDL has been generated or applied. No compatibility runtime result is claimed. No real data import, Firebase mutation, Auth mutation, production deployment or PR #13 merge occurred.
