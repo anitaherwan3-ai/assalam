@@ -613,3 +613,7 @@ See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATI
 
 ## AA. Inventory ledger FK lineage closure — pass 14
 See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). This pass reconciles signed movement quantity semantics and traces stock ownership from source documents through invoice lines, batch allocations and reversals. It records unresolved exact composite FK tuples and source provenance, and defines focused TiDB tests. No DDL or live data changes were made.
+
+
+## AB. Financial and cash ownership audit — pass 15
+See [MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md](./MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md). The pass audits invoice collection, tender/change, shift float and cash custody, petty cash, operating expenses, supplier payable/settlement, sales-return refund obligation/payout, cancellation and report semantics. It records the opening-float boundary, report date bases, cash/revenue separation, missing partial-payment/split-tender evidence and targeted synthetic reconciliation tests. Owner/accounting gates remain open; documentation-only, no DDL/data/deployment/production changes.
