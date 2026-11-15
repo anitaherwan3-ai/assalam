@@ -445,3 +445,23 @@ Before approving DDL, run an isolated compatibility spike on the actual TiDB clu
 - [Financial/inventory reconciliation](./MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md)
 - [Relational integrity/orphan audit](./MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md)
 - [Screen role E2E test plan](./MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md)
+
+---
+
+## 19. Schema review amendment — 2026-11-15
+
+The independent schema review is recorded in `MYSQL_MIGRATION_SCHEMA_REVIEW.md`. Its findings supersede conflicting draft details above before any DDL is generated.
+
+Mandatory corrections for schema v1:
+1. Remove the reverse `supplier_invoice_lines.batch_id` reference; use `inventory_batches.supplier_invoice_line_id` as the single one-to-one direction, or a dedicated allocation table if receipt-line splitting is required.
+2. Replace global unique email history with active email claims plus historical `user_emails`.
+3. Replace line-only `return_quotas` with component-aware `return_quota_subjects` and deterministic unique quota keys.
+4. Enforce one active role with an explicit active slot/authoritative role field; ordinary indexes are insufficient.
+5. Add composite cashier/shift integrity to `active_shift_slots`.
+6. Add append-only `sales_return_events` for every return state transition.
+7. Enforce invoice line target cardinality in server commands; add CHECK only after TiDB version testing.
+8. Treat encounter as the source visit relation; invoice patient snapshot must agree when both exist.
+9. Configure mysql2 BIGINT handling explicitly to avoid JavaScript precision loss.
+10. Confirm batch splitting policy before choosing one-batch-per-purchase-line.
+
+No DDL or application tables have been created by this amendment.
