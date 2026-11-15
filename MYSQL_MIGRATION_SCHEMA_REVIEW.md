@@ -169,3 +169,20 @@ The preview compatibility endpoint now includes source-level checks for:
 - cleanup outcome surfaced in the error response, with `stopSchemaV1: true` when cleanup fails.
 
 Node.js `node --check` passed for the latest endpoint source using an isolated Node 22 sandbox. Static inspection also confirms these test paths are present. **This is not a TiDB runtime test.** The endpoint remains undeployed/unexecuted; no database compatibility result is claimed. The suite still does not replace the application-level concurrency tests for queue counters, duplicate open shifts, return reservations, cancellation-vs-return, or duplicate refund payout.
+
+
+## I. FK and index closure review — 2026-11-15
+
+See `MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md`. The relationship summary is not yet a column-level FK catalogue. DDL remains blocked until every FK has exact child/parent column tuples, matching types, parent PK/UNIQUE key, child supporting index, nullability and ON DELETE/UPDATE policy. Additional composite same-parent checks are required for cashier/shift, medicine/batch, receipt-line/batch, invoice/line/component/quota, supplier/payment and return/credit-note relationships. Polymorphic references require typed validation/reconciliation. The missing `sales_return_events` relationship/index entry must be added.
+
+## J. Key, nullability and concurrency closure review — 2026-11-15
+
+See `MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md`. Additional blockers:
+- A shared queue-prefix guard row is required to serialize overlapping assignments made by different users.
+- Queue counter first-use must use an explicit atomic initialization algorithm; do not assume a missing-row gap lock.
+- Return quota reservation/release must have exactly-once event linkage, not only aggregate counters.
+- Composite parent unique keys must be enumerated for same-parent FK constraints.
+- Define actor NULL/system semantics, normalized email collation, role scope and cancelled/reissued queue ticket behavior.
+- Confirm split/partial supplier receipt behavior before enforcing one batch per receipt line.
+
+These are static design findings. No TiDB DDL/runtime test has been performed; no schema v1 approval is granted.
