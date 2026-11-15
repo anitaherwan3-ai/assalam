@@ -176,7 +176,7 @@ module.exports = async function handler(req, res) {
       if (error.code === "ER_DUP_ENTRY" || error.errno === 1062) {
         pass("composite_unique_non_null_enforcement", "Duplicate non-NULL composite unique key rejected");
       } else {
-        fail("unique_non_null_enforcement", error);
+        fail("composite_unique_non_null_enforcement", error);
       }
     }
 
