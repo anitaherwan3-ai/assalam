@@ -653,3 +653,8 @@ See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATI
 
 ## 34. Inventory ledger FK lineage closure — pass 14
 See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). Pass 14 resolves the Pass 13 sign inconsistency: retain signed `quantity_delta`, with movement-type sign rules. It distinguishes scalar FK existence from same-event ownership, identifies unresolved sale-allocation/movement composite identity, supplier receipt/batch ownership, nullable batch semantics, polymorphic source provenance, actor provenance and source-ID widths. No physical FK is approved until exact ordered parent keys, child indexes/types and TiDB runtime enforcement are proven.
+
+
+## Financial and cash ownership audit — pass 15
+
+See [MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md](./MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md). The source audit confirms opening float is drawer custody, not omzet/income; traces invoice tender/change, shift cash reconciliation, petty cash, operating-expense approval, supplier full-settlement boolean, return obligation vs payout, cancellation exclusivity and report date bases. It identifies material gaps around split tender, non-cash settlement evidence, partial supplier payments/credits, petty-cash double counting, cash refund shift ownership and package COGS. It proposes focused synthetic tests and keeps all unresolved owner/accounting policies explicit. Static review only; no DDL, live data, Firebase/Auth, deployment or production changes.
