@@ -623,3 +623,8 @@ See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATIO
 ## 31. FK field-level expansion and cardinality correction — pass 7
 
 See [MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md](./MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md). A complete line scan confirms that Pass 3 has 104 numbered rows (F01–F104); Pass 6's 99-row count was caused by truncated extraction and is withdrawn. Ten grouped rows expand to 22 tuple candidates, so the literal expansion is 116 candidate tuples. This is not 116 approved constraints: F63/F65 are mutually exclusive polymorphic alternatives, F76 remains an undefined typed composite, and all tuples still require exact type/collation/nullability, parent unique key, child index, action, ownership and TiDB positive/negative test evidence. Pass 6's 86/11/2 counts are not a complete-manifest metric. Schema v1 remains BLOCKED; no DDL or data mutation was performed.
+
+
+## 32. Schema scope control and anti-overfitting — pass 8
+
+See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md). Schema v1 must be evidence-led and limited to confirmed clinic workflows plus essential relational integrity. Conditional support tables and generalized architectures must not become automatic v1 requirements without source/owner evidence. P0 integrity gates remain mandatory; speculative multi-tenant, generic workflow, broad event-sourcing and unrequested queue abstractions are deferred. No DDL or data mutation.
