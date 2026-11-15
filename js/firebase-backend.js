@@ -1516,6 +1516,10 @@ class FirebaseBackend {
                 delete item._pendingCallingSync;
                 this.store.saveLocal(false);
               }
+              if (item._pendingCashierPatientEdit === true && localTime <= remoteTime) {
+                delete item._pendingCashierPatientEdit;
+                this.store.saveLocal(false);
+              }
               if (localTime <= remoteTime) continue;
 
               const identityPatch = {};
