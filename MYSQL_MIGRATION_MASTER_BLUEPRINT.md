@@ -572,7 +572,7 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 
 ## R. Normalized dictionary and FK manifest — pass 3
 
-The column type-family dictionary and 104-entry candidate FK manifest are captured in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Schema v1 remains blocked pending exact null/default/collation details, composite same-parent enforcement, queue guards, return quota events, supplier receipt split policy, actor provenance and TiDB runtime tests. This remains isolated migration-branch documentation.
+The column type-family dictionary and 99 explicitly enumerated candidate FK rows (F01–F99) are captured in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The earlier 104 count is withdrawn; F100–F104 are not present. See [Pass 6 FK type/ownership reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) for the static comparison and unresolved supplemental-table, composite ownership, index/action and nullable-pair blockers. Schema v1 remains blocked. This remains isolated migration-branch documentation.
 
 
 ## S. Exact column dictionary and signedness reconciliation — pass 4
