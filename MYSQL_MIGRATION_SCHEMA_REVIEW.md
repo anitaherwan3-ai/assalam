@@ -236,3 +236,7 @@ See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCO
 ## S. Critical ownership chain matrix — pass 9
 
 See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). Five high-risk ownership chains have targeted positive/negative test cases. Key blockers are partial-null encounter/shift identity, invoice patient snapshot policy, batch-bound movement semantics, quota component identity, and same-supplier purchase/return/payment relationships. This is static review only.
+
+
+## R. Decision and requirement traceability closure — pass 10
+See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). This pass consolidates workflow-to-domain traceability, distinguishes owner policy decisions from engineering decisions, identifies source-verification gates (medicine units, split receipts, batchless movement types, invoice patient semantics, queue lifecycle, auth provenance and legacy identity/timestamps), and explicitly defers conditional support tables absent evidence. It is documentation-only; schema v1 remains blocked and no DDL/TiDB runtime test is claimed.
