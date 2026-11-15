@@ -248,3 +248,7 @@ See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRAT
 
 ## T. Return/refund/cancellation state-machine audit — pass 12
 See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md). This pass details the observed cloud state machine and target invariants: atomic quota reserve/release, Admin forward, Pimpinan final approval/stock restore, separate one-time payout, line-level package quota, and invoice-level serialization against cancellation. It identifies the out-of-transaction query race pattern in legacy Firestore code and specifies independent-connection TiDB race tests. Static only; no runtime or DDL claim.
+
+
+## U. Inventory movement source matrix — pass 13
+See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). Source evidence supports one stock movement ledger for opening/seed, purchase, sale, return, cancellation, supplier return and loss/expiry. It also records projection mismatches and append-only reversal requirements. Batch lineage is mandatory for the observed stock-affecting workflows; batchless movement types remain narrowly defined and must be proven. No DDL or runtime reconciliation was performed.
