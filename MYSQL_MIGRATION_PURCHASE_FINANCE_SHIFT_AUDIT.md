@@ -147,3 +147,42 @@ No SQL DDL should be created until:
 - shift cash formula and reopen/adjustment policy are documented;
 - all dates use a single clinic operational-date rule;
 - all these actions have server-side authorization and atomicity tests defined.
+
+
+---
+
+## Addendum — exact source verification (2026-11-15)
+
+This addendum was checked directly against `main` in:
+- `js/store.js` blob `99e74acf8caec9c70d82be1d5f6efc5bfa6bc4fb`
+- `js/app.js` blob `f74c4710161ddd2af230e51c18b1f107d6c52c82`
+- `js/firebase-backend.js` blob `3a613d96564f120b8141966f9ecbae21471c4e65`
+
+### Exact purchase and supplier-return details
+- `recordPurchase()` creates exactly one batch for the purchase call and stores `batchId` on the invoice; batch fields are `id,oid,no,ed,qty,sisa,beli,_t`.
+- Purchase invoice fields include `id,tgl,supplier,faktur,oid,qty,total,tempo,lunas,tglBayar,qtyAwal,totalAwal,hargaBeliSatuan,batchId,_t`.
+- HPP is rounded weighted moving average; stock aggregate is incremented by received quantity.
+- `lunasiBeli()` only flips `lunas=true`, sets `tglBayar`, logs and saves. There is no payment amount/method/reference/allocation history in this method.
+- `processReturBeli()` finds the first batch whose `beli` equals the invoice ID; it caps requested qty with invoice qty, batch remaining and aggregate stock via `Math.min`. It calculates return value from the original unit purchase price, decreases aggregate stock and that batch's remaining qty, recalculates HPP if stock remains, decreases invoice total only if the invoice is unpaid, decreases invoice qty, and appends `returBeli` with `id,tgl,beliId,supplier,faktur,namaObat,qty,nilai,alasan,_t`.
+- This silent capping is a design hazard: the SQL command should reject over-limit quantities and report the exact available amount, not silently process less than requested.
+- A return against a paid invoice leaves its historical invoice total unchanged; the future relational design must represent supplier credit/refund separately rather than forcing the original invoice amount to change.
+
+### Exact expense behavior
+- `actionAddBiaya()` computes `total = satuan * qty`; `qty` defaults to 1. Threshold is `set.batasApproval || 1000000`. A total >= threshold starts as `pending`; lower totals start as `approved`.
+- Expense fields are `id,tgl,kat,ket,jml,status,kasir,_t`.
+- `editBiaya()` changes `ket` and `jml`, recalculates status from the threshold, and writes an activity log. There is no immutable approval-decision record in this path.
+- `delBiaya()` physically filters the expense out of local state after logging; it does not create a reversal record.
+- `actionApproveBiaya()` changes only `status`, `_t`, and activity log. The inspected UI function does not itself check role; server-side authorization must be mandatory.
+
+### Exact shift behavior
+- `actionTutupShift()` calculates `sistem = calcShiftCash(shift)`, sets `status='tutup'`, `jamT`, `sistem`, `fisik`, `selisih=fisik-sistem`, `verif=false`, and `_t`; then logs, saves, and opens the WhatsApp recap flow.
+- The verification UI explicitly describes expected shift cash as opening modal + cash transactions - petty cash. This cash reconciliation must remain separate from pure omzet; opening modal is not sales revenue.
+- `actionVerifShift()` sets `verif=true`, `oleh=currentUser.nama` (or 'Admin'), `_t`, and activity log. The visible function has no guard against repeat verification or post-verification edits.
+- New API should enforce state transitions, server-derived expected cash, one open shift per cashier, immutable verification actor/time, and adjustment/reversal records after verification.
+
+### Return quota and sales-return workflow note
+- `actionMigrateReturKuota()` is gated in UI to `currentRole === 'pimpinan'` and calls backend `migrateReturKuota()`. Its UI contract says it creates separate guard documents and must not mutate original invoices, stock, or return history.
+- In `commitCashierTransaction()`, duplicate invoice ID is treated as idempotent and returns without a second stock deduction. It reads invoice/patient/medicine/batch documents inside a Firestore transaction and validates stock quantities before writes. The SQL implementation must preserve this idempotency while also deriving authoritative prices, HPP, batch selection and quantities on the server rather than trusting browser-supplied stock changes.
+
+### Important qualification
+These are source-code observations only. The inspection does not prove all callers, Rules, offline behavior, or runtime synchronization are correct. The source fingerprints above identify the exact baseline used for this addendum.
