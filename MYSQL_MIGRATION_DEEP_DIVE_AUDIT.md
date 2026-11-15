@@ -209,3 +209,64 @@ Additional functions and constraints confirmed from the PR branch:
 These are multiple separate state transitions and should not become a generic patient update endpoint. The API should expose distinct operations with transactional checks, and retain a handover history table (not only overwrite the current patient owner). The current PR stores latest handover metadata on the patient; a relational migration should consider an append-only handover event table so multiple handovers remain auditable.
 
 PR #13 also has explicit regression requirements for old workflows. Its branch is not a passing test report; these functions and Rules were source-reviewed only.
+
+
+## 13. Candidate field dictionary — verified source fields (not SQL DDL)
+
+The following field names are observed in seed data, object construction, transactional writes, Rules conditions or UI reads. Optionality, nullability, SQL types, indexes and foreign keys still require the full write-path review. Nested arrays/objects must not be flattened or discarded without an explicit design.
+
+| Entity | Verified fields / nested structures | Relationships / notes |
+|---|---|---|
+| `users` | `u`, `id`, `email`, `uid`, `nama`, `hp`, `role`, `active`, `updatedAt`, `updatedBy` | Stable internal user key; email/UID are auth identity attributes. Preserve owner accounts. |
+| `pasien` | `id`, `no`, `tgl`, `jam`, `nama`, `hp`, `layanan`, `kasir`, `sh`, `done`, `calling`, `status`, `deletedAt`, `batalBerobatPada`, `batalBerobatOleh`, `_t` | Assigned cashier and shift; queue number/date; optional handover metadata from PR13. |
+| `shift` | `id`, `kasir`, `tgl`, `jamBuka`, `jamTutup`, `modal`, `status`, `verif`, `fisik`, `sistem`, `selisih`, `jam`, `jamT`, `_t` | User/cashier; shift-linked patients, transactions and petty cash. PR13 adds `queuePrefix` on its branch. |
+| `trx` | `id`, `no`, `tgl`, `jam`, `pid`, `nama`, `hp`, `kasir`, `sh`, `items[]`, `total`, `bayar`, `kembalian`, `metode`, `status`, `dibatalkanPada`, `dibatalkanOleh`, `_t` | Patient, cashier, shift. Item snapshot includes `id`, `oid`, `nama`, `t`/`jenis`, `qty`, `harga`, `hpp`, `signa`, `catatan`, `batchDeductions[]`, package `items[]), discount lines and item-specific metadata. |
+| `obat` | `id`, `nama`, `satuan`, `hpp`, `jual`, `stok`, `min`, `_t` | Aggregate stock plus batches; must reconcile against batch ledger. |
+| `batch` | `id`, `oid`, `no`, `ed`, `qty`, `sisa`, `beli`, `_t` | Medicine and originating purchase; FEFO deductions recorded in invoice item snapshots. |
+| `tarif` | `id`, `nama`, `jenis`, `harga` | Service/tariff master; includes consultation, procedure and lab-type services. |
+| `paket` | `id`, `nama`, `deskripsi`, `harga`, `items[]` | Components have `id`, `type` (tarif/obat), `oid`, `nama`, `harga`, `qty`; transaction snapshot may include per-component batch deductions. |
+| `beli` | `id`, `tgl`, `supplier`, `faktur`, `oid`, `qty`, `total`, `tempo`, `lunas`, `tglBayar`, `qtyAwal`, `totalAwal`, `hargaBeliSatuan`, `batchId`, `_t` | Medicine, batch; outstanding payable is derived from unpaid invoice balance. Preserve original values for staged supplier returns. |
+| `returBeli` | `id`, `tgl`, `beliId`, `supplier`, `faktur`, `namaObat`, `qty`, `nilai`, `alasan`, `_t` | Purchase invoice and medicine/batch; reduces stock and unpaid balance when applicable. |
+| `biaya` | `id`, `tgl`, category/description fields, `jml`, `status`, requester/verifier and timestamps | Expense approval lifecycle; exact complete field list still to be extracted. |
+| `loss` | `id`, `tgl`, `oid`/`obatId`, `qty`, `nilai`, `ket`/`keterangan` | Medicine stock loss/expiry and reason. |
+| `petty` | `id`, `tgl`, `sh`, `jml`, description, cashier/user | Cashier and shift; access restricted to own records for Kasir. |
+| `returJual` | `id`, `trxId`, `itemIndex`, `quotaId`, `priorQty`, `qty`, `harga`, `total`, `hpp`, `jenis`, `oid`, `batchRestores[]`, `status`, `alasan`, `alasanPenolakan`, `kasir`, `diverifikasiOleh`, `diverifikasiPada`, `diverifikasiAdminOleh`, `diverifikasiAdminPada`, `pengembalian{}`, `_t` | Original invoice and item index; nested batch restore records contain `oid`, `bid`, `qty`, `batchNo`, `ed`. Refund object contains status, nominal, method, reference, payer and paid time. |
+| `returKuota` | `trxId`, `itemIndex`, `qtyTerpakai`, `lastReturId`, `lastQty`, `_t` | Composite identity from invoice ID + item index; reserved quantity prevents cumulative over-return. |
+| `batalTrx` | `id`, `trxId`, `status`, `kasir`, `alasan`, `tgl`, `_t`, decision/rejection actor and time | One cancellation request per invoice ID in current backend. Must coordinate with returns. |
+| `log` | `id`, `_t`, `tgl`, `jam`, `u`, `aksi`, `kol`, `rinci`, `_pendingSync` | Actor and append-only audit intent; staff logs are own-only append/sync. |
+| `klinik_config/settings` | nested `set{}`, `seq{}`; display fields `youtubeVideoId`, `enableYoutubeDisplay`, `runningTextDisplay`; queue display mode exists on PR13 branch | General settings are Pimpinan-managed; Admin limited to display settings. |
+| Queue audio clips | `type`, `clipId`, `audioData`, `sizeBytes`, `fileName`, `mimeType`, `updatedAt`, `updatedBy` | Validated MP3, max 600 KiB; media should be moved to object storage with metadata in SQL. |
+
+## 14. Important source inconsistencies and migration hazards
+
+1. **Return approval differs between local store and Cloud backend.** Local `ClinicStore.approveReturJual` allows Admin/Pimpinan to set status `disetujui` and restore batch/medicine stock immediately. Cloud backend has a two-stage workflow: Admin verifies to `menunggu_pimpinan`; Pimpinan finalizes and only then restores stock and creates refund obligation. The SQL design must follow the approved secure workflow, not copy the local shortcut. This is a source discrepancy to test and resolve.
+2. **Current queue generator in main is A-only.** PR13 contains A/B prefix and per-cashier sequence changes. Queue prefix and sequence scope must be explicit, and old A numbers must remain readable.
+3. **Client-side LocalStorage and Firestore cache are not authoritative transaction boundaries.** Some local store methods mutate local objects before sync; migration must avoid client-side stock, money or status writes.
+4. **Legacy return records may not have complete quota/payment metadata.** Backend contains migration/reconciliation helpers. Existing historical data needs a read-only reconciliation report before any import.
+5. **Aggregate medicine stock and batch balances can diverge.** Enforce invariant and ledger reconciliation in the new system.
+6. **Invoice line arrays are historical snapshots.** Do not calculate historical revenue/HPP using current tariff, medicine master or current HPP.
+7. **Date semantics differ by business event.** Operational date is WIB; return approval affects net revenue date while actual refund payment affects cashflow date. Store UTC instants plus explicit Asia/Jakarta business date where required.
+8. **Some rules allow multiple narrow patient transitions in one update predicate.** API should model each transition as its own command and recheck state inside transaction.
+
+## 15. Proposed state machines to validate
+
+- Patient: `aktif` → `batal_berobat` → `aktif`; separately `aktif` → `done=true`; archive/delete is Pimpinan-only and must not erase audit history. Handover is a separate event that changes assignment while preserving patient identity and queue number.
+- Shift: open → closed → verified; reopening/adjustment policy is not yet fully specified.
+- Sales return: `menunggu` → Admin verified `menunggu_pimpinan` → Pimpinan `disetujui` or rejected; then refund `menunggu` → `dibayar`. Admin rejection releases reserved quota. Legacy `disetujui` states require reconciliation.
+- Invoice cancellation: request `menunggu` → approved/rejected; approved path updates invoice/patient and restores batch/stock exactly once; pending cancellation blocks new return and active return blocks cancellation.
+- Expense: draft/request → approval/rejection (exact state and field map remains to verify).
+- Purchase payable: unpaid → partially/fully adjusted by supplier returns and payment; current code marks `lunas` and `tglBayar`, but partial-payment support is not yet confirmed.
+
+## 16. Field dictionary status and remaining gaps
+
+This is a candidate field dictionary based on inspected source usage, not a complete SQL schema. Still to verify:
+- Exact object construction for every expense, stock loss, petty cash, shift, patient, invoice and user form.
+- Exact package component shape when nested inside an invoice and how discount is applied to each component.
+- Complete cancellation request decision fields and every Firestore Rules branch for all 16 collections.
+- Purchase payment history, partial payment, and supplier-return accounting.
+- Audit log events and retention/export behavior.
+- Handover history fields from full PR #13 patch and selected queue display mode semantics.
+- Whether clinic config settings currently contain fields not visible in defaults or TV page.
+- Backup/restore validation and whether restore can overwrite protected master accounts.
+
+No table DDL is approved by this document. Next step is endpoint/field permission matrix and focused tests built from these invariants.
