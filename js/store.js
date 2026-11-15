@@ -368,11 +368,13 @@ class ClinicStore {
           p.calling && !p.done && !p.deletedAt &&
           p.status !== 'dihapus' && p.status !== 'batal_berobat') {
         p.calling = false;
+        p._pendingCallingSync = true;
         p._t = now;
       }
     });
 
     patient.calling = true;
+    patient._pendingCallingSync = true;
     patient._t = now;
     this.logActivity('Panggil', 'Antrean', `${patient.no} - ${patient.nama} (${patient.layanan})`);
     this.saveLocal();
