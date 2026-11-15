@@ -537,3 +537,22 @@ This draft maps observed legacy fields from identity/configuration, audio, audit
 The document also defines read-only repair detection patterns for stock-vs-batch variance, invoice math, missing references, absent batch lineage, duplicate candidates, return/cancellation conflicts, supplier-return ambiguity, paid-boolean evidence gaps, shift cash differences, timestamp conflicts, identity conflicts, seed provenance and unknown fields. None are auto-repairable. It includes a synthetic-only reconciliation fixture pack and ETL/repair gates.
 
 **Important limitation:** this is a static source crosswalk, not a complete historical Firestore schema export. Actual key/type union, record counts, hashes, real discrepancy candidates and repair patches remain unknown until a protected owner-controlled snapshot is profiled. No production database was read or changed, no real data was exported/imported, no repair was executed, no TiDB application DDL was run, and no deployment occurred.
+
+
+## O. Owner confirmation — legacy dataset is development dummy; protect five accounts
+
+On 2026-11-15 the owner clarified that the old Firebase application's operational records are development/testing dummy data, not genuine clinic production history. They may be used for structural audit and regression fixtures, but must not be imported as real patient, inventory or financial history into the final database. Controlled synthetic fixtures may be added to the isolated TiDB preview when the schema/test gates are ready.
+
+The owner explicitly requires these five identities to survive all future reset/cleanup operations, including Firebase Authentication and their linked profile/role documents:
+
+1. Kasir Pagi — `assalamkasir1@gmail.com`
+2. Kasir Sore — `assalamkasir2@gmail.com`
+3. Admin — `assalamadmin@gmail.com`
+4. Pimpinan — `praktekrose@gmail.com`
+5. Akun kita — `nursalim422@gmail.com`
+
+This latest whitelist supersedes older email references elsewhere in static audit notes for any future cleanup decision. Actual UID/email/profile/role matching still requires read-only verification; never infer or replace an identity by display name.
+
+Before final deployment, the team must take and verify an encrypted private snapshot, test reset in an isolated Firebase clone, prepare a path-level deletion dry-run with explicit exceptions, obtain a separate final owner approval, then clean only the approved dummy operational documents. **No Firebase/Auth deletion is authorized now.** Never bulk-delete Auth users; preserve the five identities and their linked profiles/roles. Keep Firebase rollback/archive until the MySQL/TiDB cutover is accepted.
+
+Current status: owner classification and whitelist confirmed; live snapshot, UID/role verification, cleanup dry-run and cleanup execution not yet performed. See section 14 of the legacy sync/repair runbook for the operational procedure.
