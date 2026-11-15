@@ -68,6 +68,8 @@ module.exports = async function handler(req, res) {
   const childTable = `compat_${suffix}_child`;
   const quote = (name) => "`" + name + "`";
   const tests = [];
+  let cleanupStatus = "NOT_STARTED";
+  let tablesMayExist = false;
   const pass = (name, detail) => tests.push({ name, status: "PASS", detail });
   const fail = (name, error) => tests.push({
     name,
@@ -106,6 +108,7 @@ module.exports = async function handler(req, res) {
         marker INT NOT NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
     );
+    tablesMayExist = true;
     await connectionA.query(
       `CREATE TABLE ${quote(childTable)} (
         id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
@@ -217,7 +220,7 @@ module.exports = async function handler(req, res) {
     );
     pass("session_time_functions", timeRows[0]);
 
-    let cleanupStatus = "PASS";
+    cleanupStatus = "PASS";
     try {
       await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
       await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
@@ -238,10 +241,26 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     fail("suite_runtime", error);
+    // Make cleanup outcome visible even when a test fails before the normal
+    // cleanup block. A cleanup failure is a hard stop for schema-v1 work.
+    if (tablesMayExist && connectionA) {
+      try {
+        await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
+        await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
+        cleanupStatus = "PASS_AFTER_ERROR";
+      } catch (cleanupError) {
+        cleanupStatus = "FAIL: " + String(cleanupError.message).slice(0, 180);
+        fail("cleanup_test_tables_after_error", cleanupError);
+      }
+    } else if (!tablesMayExist) {
+      cleanupStatus = "NOT_CREATED";
+    }
     return json(res, 500, {
       ok: false,
       message: "Compatibility test could not complete",
-      tests
+      tests,
+      cleanup: cleanupStatus,
+      stopSchemaV1: cleanupStatus.startsWith("FAIL")
     });
   } finally {
     if (connectionB) {
