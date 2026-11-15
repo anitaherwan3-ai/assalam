@@ -568,3 +568,8 @@ The draft explicitly preserves unresolved owner/accounting/clinical gates, espec
 ## Q. FK/index reconciliation pass 2 — 2026-11-15
 
 See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md). The latest static pass confirms that the canonical FK/type/index manifest is still incomplete and schema v1 remains blocked. Key blockers include the encounter/invoice ownership chain, same-parent invoice component and batch allocation constraints, component-aware return quota identity, supplier payment/return ownership, queue guard integration, reversal/idempotency semantics, shift reconciliation versioning, and unresolved split supplier receipts. No DDL or TiDB runtime test is authorized or claimed. The pass is proposal-level only; exact SQL types, charset/collation, nullability, child index order and delete/update actions must still be normalized per FK.
+
+
+## R. Normalized dictionary and FK manifest — pass 3
+
+The column type-family dictionary and 104-entry candidate FK manifest are captured in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Schema v1 remains blocked pending exact null/default/collation details, composite same-parent enforcement, queue guards, return quota events, supplier receipt split policy, actor provenance and TiDB runtime tests. This remains isolated migration-branch documentation.
