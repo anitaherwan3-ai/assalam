@@ -259,6 +259,7 @@ function applyCloudPatientResult(cloudPatient) {
   if (index >= 0) {
     store.state.pasien[index] = Object.assign({}, store.state.pasien[index], cloudPatient);
     delete store.state.pasien[index]._pendingCallingSync;
+    delete store.state.pasien[index]._pendingCashierPatientEdit;
   } else {
     store.state.pasien.push(cloudPatient);
   }
