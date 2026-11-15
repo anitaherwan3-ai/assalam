@@ -363,6 +363,12 @@ class FirebaseBackend {
                   // Cache lokal yang pernah gagal ditulis tidak boleh menghidupkan
                   // kembali pembatalan atau pelimpahan yang ditolak Rules.
                   const mergedPatient = Object.assign({}, localItem, { id: remoteItem.id });
+                  if (localItem._pendingCashierPatientEdit !== true &&
+                      localItem._pendingAdminPatientEdit !== true &&
+                      Number(remoteItem._t || 0) >= Number(localItem._t || 0)) {
+                    if (Object.prototype.hasOwnProperty.call(remoteItem, 'nama')) mergedPatient.nama = remoteItem.nama;
+                    if (Object.prototype.hasOwnProperty.call(remoteItem, 'hp')) mergedPatient.hp = remoteItem.hp;
+                  }
                   [
                     'kasir', 'sh', 'queuePrefix', 'queueDisplayPrefix', 'done',
                     'status', 'calling', 'batalBerobatPada', 'batalBerobatOleh',
@@ -1503,6 +1509,13 @@ class FirebaseBackend {
 
               const localTime = Number(item._t || 0);
               const remoteTime = Number(remote._t || 0);
+              const remotePatientActive = remote.done !== true && remote.deletedAt == null &&
+                remote.status !== 'dihapus' && remote.status !== 'batal_berobat';
+              if (item._pendingCallingSync === true &&
+                  (localTime <= remoteTime || !remotePatientActive || item.calling === remote.calling)) {
+                delete item._pendingCallingSync;
+                this.store.saveLocal(false);
+              }
               if (localTime <= remoteTime) continue;
 
               const identityPatch = {};
@@ -1524,15 +1537,9 @@ class FirebaseBackend {
                   delete item._pendingCashierPatientEdit;
                   this.store.saveLocal(false);
                 }
-                const remotePatientActive = remote.done !== true && remote.deletedAt == null &&
-                  remote.status !== 'dihapus' && remote.status !== 'batal_berobat';
                 if (item._pendingCallingSync === true &&
-                    (localTime <= remoteTime || !remotePatientActive || item.calling === remote.calling)) {
-                  delete item._pendingCallingSync;
-                  this.store.saveLocal(false);
-                } else if (item._pendingCallingSync === true &&
                     Object.prototype.hasOwnProperty.call(item, 'calling') &&
-                    remotePatientActive) {
+                    remotePatientActive && item.calling !== remote.calling) {
                   await patientRef.update({ calling: item.calling === true, _t: nextTime });
                   delete item._pendingCallingSync;
                   this.store.saveLocal(false);
