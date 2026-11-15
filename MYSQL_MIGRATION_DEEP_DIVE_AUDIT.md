@@ -119,3 +119,56 @@ Treat these as separately identified requirements, not existing main behavior. R
 ## 8. Next audit sequence
 
 Continue full PR #13 diff review; inspect index.html, helpers.js, export-helper.js, firebase-config.js, README and auth migration docs for hidden workflows; build field-level data dictionary and endpoint/role/field permission matrix; review inventory with user before schema design. No production migration or data copy without explicit approval.
+
+
+## 9. Supporting modules and deployment/auth assumptions
+
+### `index.html` (177 lines)
+- Loads Firebase Web SDK compat v10.8.0 (app, Firestore, Auth, Functions), jsPDF + autoTable, and Chart.js from CDNs.
+- Provides global shell, role navigation mount, login/reset-password UI, confirmation/form/alert modals, thermal receipt modal, medicine label modal, shift-close/WhatsApp modal and TV display launch.
+- Script load order: helpers, store, Firebase config, Firebase backend, export helper, app.
+- The new application must replace client SDK direct database access with authenticated API calls; do not expose database credentials in browser bundles.
+
+### `helpers.js` (371 lines)
+- XSS escaping and number/currency helpers: esc, rp, pct, uid.
+- Dynamic tables/pagination: renderTable, changePage.
+- Alert/confirm/form modal helpers.
+- Queue broadcast helpers: broadcastCall, broadcastQueueUpdate, openTvDisplay.
+- WhatsApp helpers: formatWaNumber, sendReceiptWA, sendShiftRecapWA.
+- Shift WhatsApp recap includes cash/non-cash sales, petty cash, physical/system cash and service detail. Preserve as an operational workflow, not merely a link/button.
+
+### `export-helper.js` (267 lines)
+- getExportData selects datasets and applies export filters.
+- toCSV/exportCSV, exportPDF.
+- downloadBackup and restoreBackup use JSON backup/restore.
+- Restore path currently checks required top-level data such as obat/users. New implementation must define backup versioning, validation, role restriction, atomic restore, duplicate protection, audit trail and recovery procedure before exposing restore to production.
+
+### `AUTH_MIGRATION.md`
+- Existing auth migration documentation protects the primary owner profile and operational data during bootstrap.
+- Documents two Pimpinan identities and stable internal IDs, Firebase Auth UID/profile binding, staff account migration, email changes while retaining internal IDs, and cautions around Admin SDK credentials.
+- This is a legacy Firebase-auth implementation guide, not a decision that Firebase Auth must remain forever. If retained temporarily, Vercel API must verify Firebase ID tokens server-side and map UID/email to active internal profiles. If replaced, account recovery and owner bootstrap must be designed explicitly.
+- Never migrate passwords or Firebase service-account private keys into SQL or browser code.
+
+### `README.md` and `firebase.json`
+- README documents the product-client-first / local-first design and describes FEFO, weighted moving average HPP, packages, labels, queue, shift/WA, reports, audit, exports and JSON backup.
+- README says package components can include consultation, procedures, lab checks and medicines; ensure service/tariff types are not narrowed to medicine-only.
+- `firebase.json` configures Firestore Rules and Functions source. The migration branch's Vercel API is a separate backend path; Firebase deployment settings must not be changed as part of the read-only audit.
+
+## 10. Additional requirements confirmed from support files
+
+- Preserve keyboard shortcuts and cashier touch POS if present in the app flow.
+- Preserve thermal 58mm/80mm and A4 print paths where applicable.
+- Preserve receipt WhatsApp, patient WhatsApp, owner shift recap WhatsApp and resend flow.
+- Preserve JSON backup/restore only after a safe, tested replacement is designed.
+- Preserve PDF and CSV exports with appropriate filters and UTF-8 handling.
+- Preserve clinic branding, logo upload, theme/font, page size, warning thresholds, fixed clinic identity, editable operational settings and owner WhatsApp contact.
+- Preserve medicine label white/blue type, signa/dose shortcuts and printing from POS/receipt/history.
+- Preserve TV local video fallback and health-tip slides, not only YouTube playback.
+
+## 11. Audit completion status
+
+This is a broader source inventory, not yet a complete relational field dictionary or test suite. Remaining work:
+1. Extract exact field definitions and transitions from every store/backend write path.
+2. Map each endpoint operation to actor, allowed fields, invariants and transaction boundary.
+3. Review full PR #13 patch, particularly every workflow transition and its interaction with current main.
+4. Create a user-reviewable permission matrix and data dictionary before proposing tables.
