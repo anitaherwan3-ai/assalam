@@ -608,3 +608,8 @@ The reconciliation also requires one canonical user ID type (`VARCHAR(64)`), com
 ## 28. Normalized column dictionary and FK manifest — pass 3
 
 The normalized type-family dictionary, table/PK inventory, 104 candidate FK tuples, composite parent-key requirements, nullable tuple blockers, and TiDB positive/negative test matrix are recorded in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). This pass clarifies that the remaining CHAR(36) is audit_events.event_uuid, not a user key; user identity remains VARCHAR(64). The manifest is static and not executable DDL. Exact per-column NULL/default/collation attributes and runtime TiDB validation remain open.
+
+
+## 29. Exact column / NULL / DEFAULT dictionary — pass 4
+
+See [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md). The static extraction covers 56 base tables and 566 unique columns. It preserves source-declared types and marks unspecified nullability/defaults rather than inventing them. A critical mismatch was identified: the general convention says internal PKs are `BIGINT UNSIGNED`, while many inline table declarations spell `BIGINT` without signedness; these must be reconciled column-by-column, with money fields treated separately. Charset/collation, exact indexes/FKs/actions, added integrity-table definitions and TiDB runtime tests remain open. This pass is documentation only; no DDL or database mutation.
