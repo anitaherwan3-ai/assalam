@@ -393,3 +393,8 @@ See [MYSQL_MIGRATION_BACKEND_METHOD_COLLECTION_CATALOG.md](./MYSQL_MIGRATION_BAC
 ### Authentication source-reproducibility gap
 
 The backend catalog now records a repository artifact gap: the inspected `main` tree and `firebase.json` contain Firestore Rules configuration but no tracked Cloud Functions source/entrypoint, while README/auth migration docs describe Admin SDK/Cloud Functions behavior. This does not establish whether functions are deployed elsewhere; their authoritative source and deployed configuration must be located and audited before identity migration. Do not deploy or delete functions during this audit.
+
+
+## Firestore Rules exhaustive static audit
+
+See [MYSQL_MIGRATION_FIRESTORE_RULES_EXHAUSTIVE_AUDIT.md](./MYSQL_MIGRATION_FIRESTORE_RULES_EXHAUSTIVE_AUDIT.md). This document maps all matched Firestore paths and read/create/update/delete rules, records identity and field-validation gaps, prioritizes server-side authorization and atomic command requirements, and lists negative/security tests. Source fingerprint: main/firestore.rules SHA `d02b6d02c13bc85f867b668085edb85c54726779`. Static inspection only; no Rules deployment or live Firebase test was performed.
