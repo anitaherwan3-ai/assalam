@@ -358,7 +358,24 @@ class FirebaseBackend {
             remoteDocs.forEach(remoteItem => {
               if (remoteItem && remoteItem.id) {
                 const localItem = mergedMap.get(remoteItem.id);
-                if (!localItem || (remoteItem._t || 0) >= (localItem._t || 0)) {
+                if (colName === 'pasien' && localItem) {
+                  // Field status/kepemilikan/alur kerja selalu mengikuti Cloud.
+                  // Cache lokal yang pernah gagal ditulis tidak boleh menghidupkan
+                  // kembali pembatalan atau pelimpahan yang ditolak Rules.
+                  const mergedPatient = Object.assign({}, localItem, { id: remoteItem.id });
+                  [
+                    'kasir', 'sh', 'queuePrefix', 'queueDisplayPrefix', 'done',
+                    'status', 'calling', 'batalBerobatPada', 'batalBerobatOleh',
+                    'deletedAt', 'deletedBy', 'pelimpahanDari', 'pelimpahanKe',
+                    'pelimpahanAlasan', 'pelimpahanPada'
+                  ].forEach(key => {
+                    if (key === 'calling' && localItem._pendingCallingSync === true) return;
+                    if (Object.prototype.hasOwnProperty.call(remoteItem, key)) mergedPatient[key] = remoteItem[key];
+                    else delete mergedPatient[key];
+                  });
+                  mergedPatient._t = Math.max(Number(localItem._t || 0), Number(remoteItem._t || 0));
+                  mergedMap.set(remoteItem.id, mergedPatient);
+                } else if (!localItem || (remoteItem._t || 0) >= (localItem._t || 0)) {
                   mergedMap.set(remoteItem.id, remoteItem);
                 } else if (colName === 'trx' && Object.prototype.hasOwnProperty.call(remoteItem, 'status')) {
                   // Status nota dari Cloud harus selalu menang, terutama status dibatalkan.
@@ -1005,6 +1022,131 @@ class FirebaseBackend {
     return true;
   }
 
+  // =========================================================
+  // PERUBAHAN STATUS PASIEN WAJIB ATOMIK DI CLOUD (PR13)
+  // Cache lokal tidak boleh memindahkan kepemilikan/status pasien.
+  // =========================================================
+  _assertPatientWorkflowAccess() {
+    if (!this.db || !this.auth || !this.auth.currentUser ||
+        !this.currentProfile || !['kasir', 'pimpinan'].includes(this.currentProfile.role)) {
+      throw new Error('Akun tidak memiliki akses untuk mengubah status pasien.');
+    }
+    return this.currentProfile;
+  }
+
+  async cancelPatientVisit(patientId) {
+    const profile = this._assertPatientWorkflowAccess();
+    const ref = this.db.collection('k_pasien').doc(String(patientId || ''));
+    const now = Date.now();
+    let updated = null;
+    await this.db.runTransaction(async transaction => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new Error('Pasien tidak ditemukan di Cloud.');
+      const patient = snap.data() || {};
+      if (profile.role === 'kasir' && patient.kasir !== profile.u) {
+        throw new Error('Akses ditolak: pasien bukan tanggung jawab Kasir ini.');
+      }
+      if (patient.done === true || patient.deletedAt != null ||
+          patient.status === 'dihapus' || patient.status === 'batal_berobat') {
+        throw new Error('Pasien sudah selesai, diarsipkan, atau sudah Batal Berobat.');
+      }
+      const patch = {
+        status: 'batal_berobat',
+        batalBerobatPada: now,
+        batalBerobatOleh: String(profile.u || profile.email || 'pimpinan'),
+        calling: false,
+        _t: now
+      };
+      transaction.update(ref, patch);
+      updated = Object.assign({}, patient, patch, { id: String(patientId) });
+    });
+    return updated;
+  }
+
+  async restorePatientVisit(patientId) {
+    const profile = this._assertPatientWorkflowAccess();
+    const ref = this.db.collection('k_pasien').doc(String(patientId || ''));
+    const now = Date.now();
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date(now));
+    let updated = null;
+    await this.db.runTransaction(async transaction => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) throw new Error('Pasien tidak ditemukan di Cloud.');
+      const patient = snap.data() || {};
+      if (profile.role === 'kasir' && patient.kasir !== profile.u) {
+        throw new Error('Akses ditolak: pasien bukan tanggung jawab Kasir ini.');
+      }
+      if (patient.status !== 'batal_berobat' || patient.done === true || patient.tgl !== today) {
+        throw new Error('Hanya pasien Batal Berobat hari ini yang dapat diaktifkan kembali.');
+      }
+      const patch = {
+        status: 'aktif',
+        batalBerobatPada: null,
+        batalBerobatOleh: null,
+        _t: now
+      };
+      transaction.update(ref, patch);
+      updated = Object.assign({}, patient, patch, { id: String(patientId) });
+    });
+    return updated;
+  }
+
+  async handoffPatient(patientId, targetShiftId, reason) {
+    const profile = this._assertPatientWorkflowAccess();
+    const note = String(reason || '').trim();
+    if (!String(targetShiftId || '') || note.length < 5) {
+      throw new Error('Shift tujuan dan alasan minimal 5 karakter wajib diisi.');
+    }
+    const patientRef = this.db.collection('k_pasien').doc(String(patientId || ''));
+    const shiftRef = this.db.collection('k_shift').doc(String(targetShiftId));
+    const now = Date.now();
+    const expectedPrefix = cashierId => {
+      const id = String(cashierId || '').trim().toLowerCase();
+      return id === 'kasir' ? 'A' : (id === 'kasir2' ? 'B' : '');
+    };
+    let updated = null;
+    await this.db.runTransaction(async transaction => {
+      // Semua pembacaan dilakukan sebelum penulisan agar transaksi dapat diulang aman.
+      const patientSnap = await transaction.get(patientRef);
+      const shiftSnap = await transaction.get(shiftRef);
+      if (!patientSnap.exists) throw new Error('Pasien tidak ditemukan di Cloud.');
+      if (!shiftSnap.exists) throw new Error('Shift penerima tidak ditemukan di Cloud.');
+      const patient = patientSnap.data() || {};
+      const target = shiftSnap.data() || {};
+      if (profile.role === 'kasir' && patient.kasir !== profile.u) {
+        throw new Error('Akses ditolak: pasien bukan tanggung jawab Kasir ini.');
+      }
+      if (patient.done === true || patient.deletedAt != null ||
+          patient.status === 'dihapus' || patient.status === 'batal_berobat') {
+        throw new Error('Pasien sudah selesai, diarsipkan, atau Batal Berobat.');
+      }
+      const targetPrefix = expectedPrefix(target.kasir);
+      if (target.status !== 'buka' || !target.kasir ||
+          target.kasir === patient.kasir || target.tgl !== patient.tgl) {
+        throw new Error('Shift penerima harus aktif, milik Kasir lain, dan tanggalnya sama dengan tanggal pasien.');
+      }
+      if (!targetPrefix || String(target.queuePrefix || '').toUpperCase() !== targetPrefix) {
+        throw new Error('Prefix shift penerima tidak sesuai dengan akun Kasir.');
+      }
+      const patch = {
+        kasir: target.kasir,
+        sh: String(targetShiftId),
+        calling: false,
+        pelimpahanDari: String(patient.kasir || ''),
+        pelimpahanKe: String(target.kasir),
+        pelimpahanAlasan: note,
+        pelimpahanPada: now,
+        queueDisplayPrefix: targetPrefix,
+        _t: now
+      };
+      transaction.update(patientRef, patch);
+      updated = Object.assign({}, patient, patch, { id: String(patientId) });
+    });
+    return updated;
+  }
+
   // ==========================================
   // 3. PUSH DATA KE FIREBASE DENGAN ANTREAN AMAN (DEBOUNCE)
   // ==========================================
@@ -1346,9 +1488,10 @@ class FirebaseBackend {
               continue;
             }
 
-            // Dokumen pasien Kasir disinkronkan sebagai patch terbatas, bukan
-            // set seluruh cache lokal. Pendaftaran baru sudah dibuat atomik oleh
-            // registerPatientWithQueueNumber; jangan membuat ulang pasien lama yang hilang.
+            // Sinkronisasi umum Kasir hanya boleh membawa identitas (nama/HP)
+            // dan panggilan yang secara eksplisit ditandai oleh store.callPatient.
+            // Status batal/pulih, done, kepemilikan, shift, dan pelimpahan wajib
+            // memakai transaksi Cloud khusus; cache tidak boleh mengirim gabungan field.
             if (col === 'pasien' && profile.role === 'kasir') {
               const patientId = String(item.id || '');
               if (!patientId) continue;
@@ -1356,51 +1499,56 @@ class FirebaseBackend {
               const remoteSnap = await patientRef.get();
               if (!remoteSnap.exists) continue;
               const remote = remoteSnap.data() || {};
-              // Cache pasien dibaca bersama oleh semua perangkat, tetapi Kasir hanya boleh
-              // mendorong perubahan pada pasien yang saat ini menjadi tanggung jawabnya.
-              // Ini mencegah cache lama Kasir 1 menulis ulang dokumen saat Kasir 2 bekerja.
-              if (remote.kasir !== profile.u) {
-                console.warn('[SYNC-DIAG] Lewati pasien milik kasir lain', {
-                  patientId, owner: remote.kasir || '-', currentKasir: profile.u
-                });
-                continue;
-              }
+              if (remote.kasir !== profile.u) continue;
+
               const localTime = Number(item._t || 0);
               const remoteTime = Number(remote._t || 0);
               if (localTime <= remoteTime) continue;
-              const patientFields = [
-                'nama', 'hp', 'calling', 'done', 'status',
-                'batalBerobatPada', 'batalBerobatOleh',
-                'kasir', 'sh', 'queueDisplayPrefix', 'pelimpahanDari', 'pelimpahanKe',
-                'pelimpahanAlasan', 'pelimpahanPada'
-              ];
-              const patch = {};
-              patientFields.forEach(key => {
+
+              const identityPatch = {};
+              ['nama', 'hp'].forEach(key => {
                 if (Object.prototype.hasOwnProperty.call(item, key) &&
                     JSON.stringify(item[key]) !== JSON.stringify(remote[key])) {
-                  patch[key] = item[key];
+                  identityPatch[key] = item[key];
                 }
               });
-              // Jangan izinkan cache Kasir mengubah status panggilan pasien
-              // yang di Cloud sudah selesai, dibatalkan, atau dihapus.
-              // Cache lintas perangkat dapat tertinggal; Rules Cloud tetap menjadi
-              // otoritas status pasien.
-              if (Object.prototype.hasOwnProperty.call(patch, 'calling') &&
-                  (remote.done === true ||
-                   remote.deletedAt != null ||
-                   remote.status === 'dihapus' ||
-                   remote.status === 'batal_berobat')) {
-                console.warn('[SYNC-DIAG] Lewati perubahan calling pasien nonaktif', {
-                  patientId, done: remote.done === true,
-                  status: remote.status || '', deletedAt: remote.deletedAt || null
+              let nextTime = Math.max(Date.now(), remoteTime + 1);
+              try {
+                if (Object.keys(identityPatch).length) {
+                  await patientRef.update(Object.assign({}, identityPatch, { _t: nextTime }));
+                  nextTime++;
+                }
+                if (item._pendingCallingSync === true &&
+                    Object.prototype.hasOwnProperty.call(item, 'calling') &&
+                    item.calling !== remote.calling &&
+                    remote.done !== true && remote.deletedAt == null &&
+                    remote.status !== 'dihapus' && remote.status !== 'batal_berobat') {
+                  await patientRef.update({ calling: item.calling === true, _t: nextTime });
+                  delete item._pendingCallingSync;
+                  this.store.saveLocal(false);
+                }
+              } catch (patientSyncError) {
+                console.error('[SYNC-DIAG] Perubahan identitas/panggilan pasien ditolak', {
+                  role: profile.role, path: patientRef.path,
+                  fields: [...Object.keys(identityPatch), ...(item._pendingCallingSync ? ['calling'] : [])],
+                  errorCode: patientSyncError && patientSyncError.code,
+                  errorMessage: patientSyncError && patientSyncError.message
                 });
-                delete patch.calling;
               }
-              // Jangan mengirim update timestamp kosong atau menulis ulang
-              // dokumen yang hanya berbeda pada metadata lokal.
-              if (!Object.keys(patch).length) continue;
-              patch._t = Math.max(Date.now(), remoteTime + 1);
-              operations.push({ ref: patientRef, data: patch, merge: true });
+
+              const workflowFields = [
+                'status', 'batalBerobatPada', 'batalBerobatOleh',
+                'kasir', 'sh', 'queueDisplayPrefix',
+                'pelimpahanDari', 'pelimpahanKe', 'pelimpahanAlasan', 'pelimpahanPada'
+              ];
+              const skippedWorkflowChanges = workflowFields.filter(key =>
+                JSON.stringify(item[key]) !== JSON.stringify(remote[key])
+              );
+              if (skippedWorkflowChanges.length) {
+                console.warn('[SYNC-DIAG] Perubahan status/pelimpahan cache diabaikan; gunakan transaksi pasien khusus', {
+                  path: patientRef.path, fields: skippedWorkflowChanges
+                });
+              }
               continue;
             }
 
