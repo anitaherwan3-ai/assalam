@@ -126,3 +126,18 @@ MySQL should replace broad collection subscriptions with role-scoped read models
 - [ ] Resolve owner policy decisions and only then draft schema/DDL.
 
 No DDL, production deployment, Firebase mutation or real-data migration was performed.
+
+
+## 8. Repository deployment/auth artifact gap — requires verification
+
+A separate read-only pass compared the complete `main` Git tree, `firebase.json`, `AUTH_MIGRATION.md`, `README.md`, `index.html`, `js/app.js` and `js/firebase-backend.js`.
+
+Observed facts in the inspected repository snapshot:
+- The tracked repository tree contains `firestore.rules` and `firebase.json`, but no `functions/` source directory, no Functions `package.json`, and no Cloud Functions entrypoint.
+- `firebase.json` configures only the Firestore rules path; it does not declare a Functions source directory.
+- `AUTH_MIGRATION.md` and `README.md` describe Admin SDK / Cloud Functions behavior and give a deployment command for `functions:activateInitialPimpinan`.
+- The inspected browser files do not contain a callable Functions invocation (`httpsCallable` / `firebase.functions()`) or an implementation of that function.
+
+This does not prove that a function is not already deployed in the Firebase project or stored in another private repository. It means the current Git source snapshot is insufficient to reproduce and audit the documented Cloud Functions. Before replacing Firebase auth or designing the MySQL identity workflow, locate the authoritative Functions source/repository and compare deployed function names, regions, triggers, service accounts, custom claims, allowed emails and exact authorization behavior. Do not deploy a replacement or delete any deployed function as part of this audit.
+
+MySQL migration consequence: identity administration must be fully specified and version-controlled. Do not rely on undocumented deployed behavior. If Firebase Authentication is retained temporarily, the Vercel backend must verify Firebase ID tokens server-side and resolve the clinic role from authoritative database records; no Admin SDK secret may be placed in the browser or Git repository.
