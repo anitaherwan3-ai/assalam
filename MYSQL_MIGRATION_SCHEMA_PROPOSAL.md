@@ -645,3 +645,7 @@ See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRAT
 
 ## 32. Return/refund/cancellation state-machine audit — pass 12
 See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md). Source confirms quota reservation at return submission, release on rejection, Admin forwarding, Pimpinan final approval with stock restoration, separate Pimpinan payout and atomic quota creation at invoice commit. Package quota is currently top-level invoice-line based; nested component-only returns are not demonstrated. Cancellation and return checks include out-of-transaction query reads, so the target must serialize both through a shared invoice lock/guard. Conditional quota event tables remain deferred absent evidence.
+
+
+## 33. Inventory movement source matrix — pass 13
+See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). The pass maps observed opening/seed, purchase receipt, sale issue, sales return, invoice cancellation, supplier return and loss/expiry movements into one append-only stock ledger. It identifies stock-card projection gaps (flat purchase/return rows vs renderer expecting `items[]`), loss deletion behavior, and supplier-return capping. The minimum model retains one movement ledger plus invoice batch allocations; no generic event framework or speculative positive stocktake flow is added.
