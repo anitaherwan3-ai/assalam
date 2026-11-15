@@ -573,3 +573,8 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 ## R. Normalized dictionary and FK manifest — pass 3
 
 The column type-family dictionary and 104-entry candidate FK manifest are captured in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Schema v1 remains blocked pending exact null/default/collation details, composite same-parent enforcement, queue guards, return quota events, supplier receipt split policy, actor provenance and TiDB runtime tests. This remains isolated migration-branch documentation.
+
+
+## S. Exact column dictionary and signedness reconciliation — pass 4
+
+The static physical dictionary is recorded in [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md): 56 base tables and 566 extracted columns. It intentionally leaves unspecified NULL/default attributes unresolved and identifies a signedness mismatch between the general internal-key convention (`BIGINT UNSIGNED`) and many table declarations written as bare `BIGINT`. This must be reconciled for every identifier/FK pair without changing signed financial amounts by assumption. Schema v1 remains blocked; no DDL, TiDB runtime validation, Firebase/Auth changes, production deployment, or PR13 merge occurred.
