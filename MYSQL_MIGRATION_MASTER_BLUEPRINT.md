@@ -509,3 +509,20 @@ Canonical corrections continue to supersede older text in this blueprint:
 - Optional PR13/A-B queue and handoff behavior remains gated.
 
 No DDL was created, no TiDB application table was created, and no production system was changed.
+
+
+## M. Legacy synchronization and repair runbook — 2026-11-15
+
+Added `MYSQL_MIGRATION_LEGACY_SYNC_AND_REPAIR_RUNBOOK.md`. It establishes that unrestricted bidirectional Firebase↔TiDB writes are unsafe with the legacy generic collection push: per-collection partial commits, no reliable delete/tombstone propagation, client-clock conflict ordering and stale local merge behavior.
+
+The approved migration direction is staged and controlled:
+1. Read-only source snapshot with hashes and collection manifests.
+2. Raw staging, normalization, crosswalk and quarantine.
+3. Synthetic TiDB validation.
+4. Read-only shadow reconciliation.
+5. Controlled write freeze + final snapshot/delta replay + sign-off.
+6. TiDB becomes the single writer only after cutover approval.
+
+The runbook defines source-of-truth boundaries, domain mapping, structural/referential/inventory/financial/event reconciliation, discrepancy classes, mandatory repair approvals, rollback evidence and synthetic replay/concurrency tests.
+
+**No live Firebase snapshot, data correction, production write, TiDB application data load or bidirectional sync was performed.** Legacy repair and migration remain blocked until backup/restore, source field completeness, schema/decision closure, TiDB runtime tests, reconciliation and explicit owner sign-off.
