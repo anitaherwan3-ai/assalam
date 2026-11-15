@@ -240,3 +240,7 @@ See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION
 
 ## R. Decision and requirement traceability closure — pass 10
 See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). This pass consolidates workflow-to-domain traceability, distinguishes owner policy decisions from engineering decisions, identifies source-verification gates (medicine units, split receipts, batchless movement types, invoice patient semantics, queue lifecycle, auth provenance and legacy identity/timestamps), and explicitly defers conditional support tables absent evidence. It is documentation-only; schema v1 remains blocked and no DDL/TiDB runtime test is claimed.
+
+
+## S. Source-verified workflow findings — pass 11
+See [MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md](./MYSQL_MIGRATION_SOURCE_VERIFIED_WORKFLOW_FINDINGS_PASS11.md). Source review verifies the local purchase/FEFO/return/HPP behaviors and identifies specific target requirements: reject over-limit supplier returns rather than silently cap, use WIB business date, preserve invoice line/component snapshots, enforce staged return authority and separate payout, and do not rely on local demo seeding or 1,000-row audit truncation. Stale Firebase adapter email defaults are a high-priority identity crosswalk discrepancy. Static only; no runtime test or data mutation.
