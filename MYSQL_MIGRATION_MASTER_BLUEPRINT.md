@@ -625,3 +625,7 @@ See [MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md](./MYSQL
 
 ## AD. Operational date, report filter and export consistency — pass 17
 See [MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md](./MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md). This pass audits Asia/Jakarta business-date handling, UTC fallback writes, period presets, report filter scope and CSV/PDF generators. It identifies screen/export divergence, cancellation leakage, discount-line mismatch, missing-date inclusion, and snapshot reports presented with period filters. A shared authorized report contract and synthetic parity tests are specified. Documentation only; no app, DDL, data, deployment or production change.
+
+
+## AE. Role authorization and data security — pass 18
+See [MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md](./MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md). This pass documents role navigation, Firebase profile verification, collection listeners, write synchronization and dedicated approval/payment guards. It flags stale protected-account identities, missing persistent staff UID binding, reactivation risk in staff provisioning, unverified Firestore Rules, broad Admin collection access and client-side authorization limits. The target MySQL service must use immutable identity mapping, centralized deny-by-default server authorization, scoped resource queries, dedicated business commands and append-only audit events. Documentation only; no account or production mutation.
