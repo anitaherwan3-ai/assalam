@@ -473,3 +473,8 @@ Both documents are design/audit artifacts only. No Firebase rules/functions were
 ## Foreign-key and index closure audit
 
 See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md). Static review found the proposal's relationship section is not yet a complete column-level FK catalogue. Additional same-parent composite integrity is required for cashier/shift, medicine/batch, invoice/line/component/quota, and supplier/payment allocations. Every FK needs exact parent unique key, child supporting index, matching types/nullability and explicit delete/update policy. Polymorphic source references need typed service validation/reconciliation. `sales_return_events` must be added to relationship/index catalogues. DDL remains blocked; no TiDB FK/index runtime test or schema creation has occurred.
+
+
+## Key, type, nullability and concurrency closure audit
+
+See [MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md). The second static pass identified additional blockers: queue-prefix assignment needs a shared guard row; first-use queue counter creation needs an explicit atomic algorithm; composite same-parent unique keys must be enumerated; return quota reservation/release needs exactly-once event linkage; actor NULL/system semantics, email collation, role scope and ticket reissue behavior need definition; and split supplier receipts must be confirmed. No TiDB runtime tests or DDL have been performed.
