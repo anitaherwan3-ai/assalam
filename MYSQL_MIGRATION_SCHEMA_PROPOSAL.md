@@ -663,3 +663,8 @@ See [MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md](./MYSQL_MIGRATION
 ## Financial reconciliation and source-of-truth audit — pass 16
 
 See [MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md](./MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md). Pass 16 maps every major report aggregate to its source rows/date basis and identifies the cash-on-hand projection as non-reconciled/unused, a return payout-method filter contradiction, missing shift attribution for cash refunds, supplier paid-flag and post-payment supplier-return gaps, and expense/petty double-counting risk. It defines a minimal source-of-truth model and synthetic reconciliation suite. Accounting decisions remain open; no DDL/runtime/live-data/deployment/production change.
+
+
+## Operational date, report filter and export audit — pass 17
+
+See [MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md](./MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md). The pass confirms screen/export divergence: transaction exports do not apply cashier/payment-method filters or approved-cancellation exclusion; exported line subtotals use qty × price rather than invoice discount allocation; missing-date rows leak into ranges; current stock/expiry/master exports are snapshots, not period reports; UTC date extraction conflicts with Asia/Jakarta business dates. It defines a shared report contract and synthetic parity tests. Static documentation only; no app source or production changes.
