@@ -556,3 +556,10 @@ This latest whitelist supersedes older email references elsewhere in static audi
 Before final deployment, the team must take and verify an encrypted private snapshot, test reset in an isolated Firebase clone, prepare a path-level deletion dry-run with explicit exceptions, obtain a separate final owner approval, then clean only the approved dummy operational documents. **No Firebase/Auth deletion is authorized now.** Never bulk-delete Auth users; preserve the five identities and their linked profiles/roles. Keep Firebase rollback/archive until the MySQL/TiDB cutover is accepted.
 
 Current status: owner classification and whitelist confirmed; live snapshot, UID/role verification, cleanup dry-run and cleanup execution not yet performed. See section 14 of the legacy sync/repair runbook for the operational procedure.
+
+
+## P. Schema v1 decision closure draft — 2026-11-15
+
+See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md). This pass turns recurring design findings into concrete technical amendments (canonical user ID type, single-clinic role scope, explicit system/import actor provenance, source-scoped legacy IDs, queue-prefix guard rows, safe first-use queue counter algorithm, append-only return quota events, durable stock/finance idempotency, composite same-parent integrity and projection ownership). It also records the five owner-protected account emails and the owner-confirmed classification of old Firebase operational records as development dummy data.
+
+The draft explicitly preserves unresolved owner/accounting/clinical gates, especially medicine unit/fraction policy, returned medicine disposition, package/service refund rules, expense self-approval, petty cash classification, supplier credit/payment, shift verifier, refund payout, non-cash recognition, opening stock/HPP, timestamps, patient/audit retention, authentication provenance and split supplier receipts. It is a design amendment, not owner sign-off or DDL. No TiDB runtime compatibility test, application DDL, Firebase snapshot/cleanup or production change has occurred.
