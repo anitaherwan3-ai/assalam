@@ -16,7 +16,7 @@ function page(res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
-  return res.end(`<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TiDB Preview Compatibility Check</title><body style="font:16px system-ui;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.5"><h2>TiDB Preview Compatibility Check</h2><p>Halaman ini hanya untuk project preview migrasi Klinik Assalaam. Tombol akan membuat tabel uji sintetis dengan nama acak, menguji foreign key, unique index, transaksi, DECIMAL/BIGINT, EXPLAIN, dan row lock, lalu menghapus semua tabel uji.</p><p><b>Tidak ada tabel aplikasi atau data klinik yang disentuh.</b></p><form method="post"><button style="padding:12px 18px;font-size:16px">Jalankan tes kompatibilitas</button></form></body></html>`);
+  return res.end(`<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TiDB Preview Compatibility Check</title><body style="font:16px system-ui;max-width:720px;margin:40px auto;padding:0 18px;line-height:1.5"><h2>TiDB Preview Compatibility Check</h2><p>Halaman ini hanya untuk project preview migrasi Klinik Assalaam. Tombol akan membuat tabel uji sintetis dengan nama acak, menguji foreign key, unique index, transaksi, DECIMAL/BIGINT, EXPLAIN, dan row lock, lalu menghapus semua tabel uji.</p><p><b>Tidak ada tabel aplikasi atau data klinik yang disentuh.</b></p><form method="post"><label for="token">Token akses pengujian (diatur sebagai COMPATIBILITY_TEST_TOKEN pada preview)</label><p><input id="token" name="token" type="password" autocomplete="off" required style="width:100%;padding:10px;box-sizing:border-box"></p><button style="padding:12px 18px;font-size:16px">Jalankan tes kompatibilitas</button></form></body></html>`);
 }
 
 module.exports = async function handler(req, res) {
@@ -35,6 +35,30 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "GET, POST");
     return json(res, 405, { ok: false, message: "Method not allowed" });
+  }
+
+  // Preview URLs are publicly reachable. Require a separately configured secret
+  // before allowing any DDL or row-lock test to run against the preview database.
+  const expectedToken = process.env.COMPATIBILITY_TEST_TOKEN || "";
+  if (!expectedToken) {
+    return json(res, 503, {
+      ok: false,
+      message: "Compatibility test is locked: preview access token is not configured"
+    });
+  }
+  let requestBody = req.body;
+  if (typeof requestBody === "string") {
+    requestBody = Object.fromEntries(new URLSearchParams(requestBody));
+  }
+  const suppliedToken = requestBody && typeof requestBody.token === "string"
+    ? requestBody.token
+    : "";
+  const expectedBuffer = Buffer.from(expectedToken);
+  const suppliedBuffer = Buffer.from(suppliedToken);
+  const tokenMatches = expectedBuffer.length === suppliedBuffer.length &&
+    crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
+  if (!tokenMatches) {
+    return json(res, 401, { ok: false, message: "Invalid compatibility test token" });
   }
 
   let connectionA;
