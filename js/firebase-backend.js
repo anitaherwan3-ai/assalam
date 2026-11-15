@@ -1394,6 +1394,8 @@ class FirebaseBackend {
         // Kumpulkan operasi terlebih dahulu. Batas aman 400 operasi per batch,
         // di bawah batas maksimum Firestore 500 operasi.
         const operations = [];
+        let patientSyncHadError = false;
+        let patientSyncErrorText = '';
 
         // Pimpinan mengelola seluruh konfigurasi; Admin hanya field Display TV.
         if (profile.role === 'pimpinan') {
@@ -1513,10 +1515,13 @@ class FirebaseBackend {
                 remote.status !== 'dihapus' && remote.status !== 'batal_berobat';
               if (item._pendingCallingSync === true &&
                   (localTime <= remoteTime || !remotePatientActive || item.calling === remote.calling)) {
+                item.calling = remote.calling === true;
                 delete item._pendingCallingSync;
                 this.store.saveLocal(false);
               }
               if (item._pendingCashierPatientEdit === true && localTime <= remoteTime) {
+                if (Object.prototype.hasOwnProperty.call(remote, 'nama')) item.nama = remote.nama;
+                if (Object.prototype.hasOwnProperty.call(remote, 'hp')) item.hp = remote.hp;
                 delete item._pendingCashierPatientEdit;
                 this.store.saveLocal(false);
               }
@@ -1549,6 +1554,8 @@ class FirebaseBackend {
                   this.store.saveLocal(false);
                 }
               } catch (patientSyncError) {
+                patientSyncHadError = true;
+                patientSyncErrorText = patientSyncError && (patientSyncError.code || patientSyncError.message) || 'Sinkronisasi pasien gagal';
                 console.error('[SYNC-DIAG] Perubahan identitas/panggilan pasien ditolak', {
                   role: profile.role, path: patientRef.path,
                   fields: [...Object.keys(identityPatch), ...(item._pendingCallingSync ? ['calling'] : [])],
@@ -1662,7 +1669,8 @@ class FirebaseBackend {
           }
         }
 
-        this.updateBadge('online');
+        if (patientSyncHadError) this.updateBadge('error', patientSyncErrorText);
+        else this.updateBadge('online');
       } catch (err) {
         console.error('Push ke Firebase gagal:', err);
         this.updateBadge('error', err.code || err.message);
