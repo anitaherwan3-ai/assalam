@@ -530,3 +530,16 @@ Mandatory closure items include:
 - Document polymorphic references as intentionally non-FK and provide typed source validation/reconciliation.
 
 This amendment does not authorize DDL. It records blockers discovered by static review; TiDB FK/index behavior remains untested.
+
+
+## 24. Key/type/concurrency closure amendment — 2026-11-15
+
+See [MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md). Additional blockers:
+- Add a stable queue-prefix guard row; locking a cashier alone cannot prevent two different cashiers from claiming overlapping dates for the same prefix.
+- Specify a first-use-safe queue counter initialization/increment algorithm; a missing counter row is not safely serialized by assuming a gap lock.
+- Enumerate composite parent unique keys and matching same-parent FKs for invoice lines/components, medicine/batch, supplier payment/invoice and shift/cashier.
+- Model return quota reservation/release as an idempotent, auditable association/event; aggregate counters alone do not prove exactly-once release.
+- Define actor NULL/system semantics, email collation/normalization, role scope and ticket cancellation/reissue behavior.
+- Confirm whether supplier receipt lines can split across expiry/lot/partial deliveries before selecting one-batch-per-line.
+
+These are design gates only. No TiDB runtime compatibility is claimed and no DDL is authorized.
