@@ -900,3 +900,18 @@ Untuk setiap field bertanda `UNSPECIFIED`, schema freeze ditahan sampai diputusk
 ## 8. Gate sebelum DDL
 
 Pass 4 ini hanya inventory deklarasi fisik yang dapat dibuktikan dari proposal saat ini. Sebelum DDL: review seluruh `UNSPECIFIED`, lengkapkan tabel integrity tambahan, cocokkan seluruh 104 kandidat FK terhadap parent key yang benar-benar didefinisikan, lakukan test positif/negatif TiDB pada preview dengan data sintetis, dan dapatkan persetujuan owner untuk policy gate. Sampai itu selesai, Firebase tetap tidak disentuh dan produksi tetap berjalan pada sistem lama.
+
+
+## 9. Temuan penting: konflik tipe integer dengan konvensi umum
+
+Konvensi bagian 1 proposal menyebut internal PK `BIGINT UNSIGNED AUTO_INCREMENT`, tetapi banyak deklarasi tabel inline hanya menulis `BIGINT` tanpa `UNSIGNED`; beberapa counter juga menulis `INT` tanpa signedness. Kamus ini mempertahankan teks deklarasi sumber dan **tidak** menganggap konvensi umum otomatis mengubah deklarasi kolom. Ini adalah mismatch yang harus diselesaikan sebelum DDL.
+
+Jumlah baris kolom yang secara eksplisit tertulis sebagai `BIGINT`, `INT`, atau `SMALLINT` tanpa `UNSIGNED` dalam hasil ekstraksi: **186**. Daftar ini bukan otomatis salah—sebagian nominal uang memang sengaja signed—tetapi setiap ID/FK, version/counter, amount/money, reversal pointer dan ukuran harus diklasifikasikan satu per satu. Semua pasangan FK wajib identik signedness dan lebar dengan parent.
+
+Tindakan wajib:
+1. Tandai seluruh identifier internal (`*_id`) sebagai kandidat `BIGINT UNSIGNED` hanya setelah dibandingkan dengan parent/child dan konvensi canonical; jangan menerapkannya ke kolom uang bertanda.
+2. Tentukan signedness eksplisit untuk semua integer tanpa mengandalkan implicit type.
+3. Pastikan `version`, counters, sequence numbers, attempts dan size metadata memiliki rentang dan signedness yang disengaja.
+4. Jalankan static scan otomatis untuk setiap FK candidate agar child/parent tipe, signedness dan panjang identik.
+
+Temuan ini memperkuat status **NOT READY FOR DDL**. Tidak ada type coercion yang dilakukan pada dokumen sumber.
