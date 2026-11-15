@@ -415,3 +415,10 @@ See [MYSQL_MIGRATION_SESSION_SYNC_AUTH_AUDIT.md](./MYSQL_MIGRATION_SESSION_SYNC_
 See [MYSQL_MIGRATION_FOLLOWUP_SOURCE_VERIFICATION.md](./MYSQL_MIGRATION_FOLLOWUP_SOURCE_VERIFICATION.md). The follow-up rechecks the exact Rules and Store source fingerprints and records additional target requirements: verified identity, least-privilege read projections, append-only petty cash/audit, command-only inventory changes, no implicit production seeding, WIB expiry handling, exact-batch supplier returns, and preservation of the staged patient-return approval/payment workflow. It also confirms the Cloud Functions reproducibility gate: `firebase.json` and documentation reference a Functions source directory and `activateInitialPimpinan`, but the inspected tracked main tree has no `functions/` directory or bootstrap script. Deployed Functions may exist elsewhere; source and deployed configuration must be located before auth cutover.
 
 This remains static source review only. No DDL, Firebase changes, real-data migration or production deployment occurred.
+
+
+## Cancellation, supplier return and Display asset callsite audit
+
+See [MYSQL_MIGRATION_CANCELLATION_SUPPLIER_RETURN_DISPLAY_AUDIT.md](./MYSQL_MIGRATION_CANCELLATION_SUPPLIER_RETURN_DISPLAY_AUDIT.md). It records the exact `batalTrx` document shape and invoice/batch reversal behavior, the supplier-return local-only mutation and its silent quantity cap, and queue audio/Display TV storage and permission behavior. Key design gates: SQL must lock cancellation and return state together, quarantine legacy invoices missing batch allocations, preserve original purchase snapshots and create supplier credit/payment records, move MP3 binaries to object storage, and expose a least-privilege TV projection.
+
+Static review only; no SQL DDL, Firebase mutation, real-data migration or production deployment.
