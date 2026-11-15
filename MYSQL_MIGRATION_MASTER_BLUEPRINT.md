@@ -439,3 +439,8 @@ See [MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md](./MYSQL_MIGRATION_REL
 ## Financial and inventory reconciliation audit
 
 See [MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md](./MYSQL_MIGRATION_FINANCIAL_INVENTORY_RECONCILIATION_AUDIT.md) for the source-based review of net revenue, returns, HPP, loss, expenses, petty cash, opening float, shift cash, FEFO, weighted-average HPP, purchase settlement, supplier returns, refund payout, reconciliation equations and 28 synthetic regression tests. No live data query, DDL or production mutation was performed.
+
+
+## Screen, role and end-to-end acceptance test plan
+
+See [MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md](./MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md). It expands the current screen specification into role-specific UI/API/database/business-result tests, concurrency and failure tests, isolated PR #13 tests, evidence requirements and release gates. Test cases are specified but have NOT been executed; no schema DDL or production migration is authorized by this document.
