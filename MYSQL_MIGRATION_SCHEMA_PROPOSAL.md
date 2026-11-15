@@ -649,3 +649,7 @@ See [MYSQL_MIGRATION_RETURN_REFUND_CANCELLATION_STATE_MACHINE_PASS12.md](./MYSQL
 
 ## 33. Inventory movement source matrix — pass 13
 See [MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md](./MYSQL_MIGRATION_INVENTORY_MOVEMENT_SOURCE_MATRIX_PASS13.md). The pass maps observed opening/seed, purchase receipt, sale issue, sales return, invoice cancellation, supplier return and loss/expiry movements into one append-only stock ledger. It identifies stock-card projection gaps (flat purchase/return rows vs renderer expecting `items[]`), loss deletion behavior, and supplier-return capping. The minimum model retains one movement ledger plus invoice batch allocations; no generic event framework or speculative positive stocktake flow is added.
+
+
+## 34. Inventory ledger FK lineage closure — pass 14
+See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md). Pass 14 resolves the Pass 13 sign inconsistency: retain signed `quantity_delta`, with movement-type sign rules. It distinguishes scalar FK existence from same-event ownership, identifies unresolved sale-allocation/movement composite identity, supplier receipt/batch ownership, nullable batch semantics, polymorphic source provenance, actor provenance and source-ID widths. No physical FK is approved until exact ordered parent keys, child indexes/types and TiDB runtime enforcement are proven.
