@@ -7,10 +7,12 @@ Status: **STATIC RECONCILIATION ONLY — NOT EXECUTABLE DDL / NOT TiDB RUNTIME V
 
 ## 1. Ringkasan hasil
 
-- FK manifest contains **99 numbered entries (F01–F99)**. The earlier statement of **104 candidate relationships** may count individual FK tuples inside grouped entries; the 99 numbered rows are not necessarily 99 individual constraints. The precise individual-tuple count is not independently verified in this pass.
-- The initial parser compared only the first concrete tuple expression in each numbered entry. It did **not** expand grouped actor FKs or all alternatives inside multi-target rows. Therefore its result is a preliminary sample, not complete coverage of all candidate relationships.
+**CORRECTION — PASS 7 SUPERSEDES THIS CARDINALITY:** a fresh full-file scan confirms that Pass 3 contains 104 numbered rows (F01–F104), not 99. Pass 6's 99-row count and its implied F01–F99 completeness were caused by a truncated extraction and are withdrawn. The Pass 6 table below is only a partial first-tuple diagnostic; it omitted F100–F104 and did not expand grouped rows. Pass 7 expands the grouped rows to 116 literal candidate tuples (not 115) and documents why this is not yet a count of approved SQL constraints. Do not use Pass 6's 86/11/2 figures as a complete-manifest metric. See [Pass 7](./MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md).
+
+- Pass 6's original count of 99 numbered entries was incorrect; the complete Pass 3 file contains 104 numbered rows (F01–F104). The Pass 6 extraction was truncated. Pass 7 records the corrected count and grouped expansion.
+- The initial parser compared only the first concrete tuple expression in the rows it extracted. It did not cover F100–F104 and did not expand grouped actor FKs or all alternatives inside multi-target rows. Its result is an incomplete diagnostic, not a complete sample of all 104 rows.
 - Preliminary first-tuple comparison: **86** textual matches; **11** entries reference supplemental/unmodeled columns or tables absent from the Pass 4 base-table extraction; **2** entries are abbreviated/multi-target and cannot be compared mechanically; **0** explicit type mismatches detected among directly comparable first tuples.
-- The prior assertion that F100–F104 were missing is withdrawn. No missing five FK IDs have been established; the discrepancy is between numbered entries and the earlier count of individual candidate relationships, and must be reconciled by expanding grouped entries.
+- The prior assertion that F100–F104 were missing is withdrawn: those rows are present in Pass 3. The discrepancy came from truncated extraction, not missing source entries.
 
 A textual match is not proof of a valid FK: it does not verify actual SQL parent UNIQUE/PK declarations, index order, collation, nullable tuple semantics, ON DELETE/UPDATE, engine support, or runtime behavior. No constraints are created by this report.
 
@@ -61,6 +63,6 @@ A textual match is not proof of a valid FK: it does not verify actual SQL parent
 Do not generate or apply application DDL until (a) F01–F99 are reconciled and missing F100–F104 are sourced or formally withdrawn, (b) supplemental tables are fully defined, (c) all 99 concrete tuples have exact parent key and child index definitions, (d) nullable/polymorphic/ownership invariants have physical or service enforcement plus negative tests, (e) all ON DELETE/UPDATE actions are decided, and (f) D01–D20 policy gates have owner decisions. Firebase, the five protected accounts, production deployment, and main branch remain untouched.
 
 
-## 7. Correction to initial cardinality interpretation
+## 7. Historical correction (superseded by Pass 7)
 
 The first draft incorrectly interpreted F01–F99 as proving that F100–F104 were absent. That is withdrawn. The manifest numbers rows/entries, and some entries bundle multiple actor or alternative relationships. A complete next pass must expand every field-level FK tuple (including grouped actor references, supplier/payment/return chains and polymorphic alternatives), then produce a one-row-per-FK inventory. Until that expansion, neither 99 nor 104 should be presented as a verified count of individual SQL constraints. The preliminary 86/11/2 comparison is limited to the first concrete tuple in each numbered row.
