@@ -186,3 +186,10 @@ See `MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md`. Additional blockers
 - Confirm split/partial supplier receipt behavior before enforcing one batch per receipt line.
 
 These are static design findings. No TiDB DDL/runtime test has been performed; no schema v1 approval is granted.
+
+
+## K. Data type, nullability, orphan and duplicate closure — 2026-11-15
+
+See MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md and MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md. The pass confirms schema v1 is not freeze-ready: exact FK type/signedness/length/collation manifest is missing; user_id representation is not frozen; quantity base unit and fractional rules (D01), legacy ID source scoping, text collations, lifecycle nullability and legacy timestamp conversion (D17) remain open. Several same-parent relationships require composite keys/FKs or explicit tested API invariants. The candidate catalogue marks unresolved rows.
+
+Orphan/duplicate checks have NOT been executed against historical clinic data; they are static logical checks and synthetic fixtures only. TiDB runtime compatibility remains untested. No DDL approval.
