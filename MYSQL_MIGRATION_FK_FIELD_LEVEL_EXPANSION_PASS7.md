@@ -8,7 +8,7 @@ Status: **STATIC DOCUMENT RECONCILIATION ONLY — NOT DDL / NOT TiDB RUNTIME VAL
 
 Pass 6's statement that the Pass 3 manifest contains 99 entries (F01–F99) is incorrect. A fresh line-by-line read of the current Pass 3 file finds **104 numbered rows, F01–F104**. The earlier 99-row extraction was truncated before F100–F104. Consequently, Pass 6's assertion that the count discrepancy was merely grouped rows is incomplete and its 99-row inventory must not be used as a source of truth.
 
-The earlier prose count of 104 candidate relationships happens to equal the number of numbered rows, but that does **not** establish that it equals the number of individual FK tuples: ten rows group actor or polymorphic relationships. Expanding those groups adds 11 additional tuple candidates, giving **115 candidate FK tuples** on a literal expansion basis. This is a candidate count, not 115 approved/enforceable SQL constraints. F63/F65 are nullable polymorphic alternatives and F76 remains an unresolved typed composite relationship.
+The earlier prose count of 104 candidate relationships happens to equal the number of numbered rows, but that does **not** establish that it equals the number of individual FK tuples: ten rows group actor or polymorphic relationships. Expanding those groups adds 12 additional tuple candidates, giving **116 candidate FK tuples** on a literal expansion basis. This is a candidate count, not 115 approved/enforceable SQL constraints. F63/F65 are nullable polymorphic alternatives and F76 remains an unresolved typed composite relationship.
 
 ## 2. Reproducible cardinality
 
@@ -16,8 +16,8 @@ The earlier prose count of 104 candidate relationships happens to equal the numb
 |---|---:|---|
 | Numbered manifest rows | 104 | F01 through F104, inclusive |
 | Rows with grouped child-side references | 10 | F12, F23, F35, F54, F60, F63, F65, F74, F86, F90 |
-| Additional tuples created by expanding grouped rows | 11 | Relative to treating each numbered row as one |
-| Literal expanded candidate tuples | 115 | 104 + 11; includes polymorphic alternatives |
+| Additional tuples created by expanding grouped rows | 12 | Relative to treating each numbered row as one |
+| Literal expanded candidate tuples | 116 | 104 + 11; includes polymorphic alternatives |
 | Approved physical FK constraints | 0 | None has been generated or applied |
 
 Expansion detail:
@@ -53,7 +53,7 @@ The remaining 94 numbered rows each contribute one literal tuple candidate and r
 
 The previous Pass 6 figures (86 matches / 11 absent / 2 not comparable) were produced by a first-tuple-only extraction from a truncated view. They are **withdrawn as a complete-manifest metric**. They must not be cited as a pass rate.
 
-Current verified statements from the static documents:
+The ten grouped rows expand to 22 tuples (rather than ten), i.e. 12 additional tuples over the 104-row count. Current verified statements from the static documents:
 
 - Canonical user/actor key is `VARCHAR(64)`; the parent `users.user_id` and every human actor FK must match exact length, charset and collation.
 - Canonical internal entity keys are generally `BIGINT UNSIGNED`; each child must match the exact parent declaration.
@@ -112,4 +112,4 @@ Do not mark a tuple ready because only its scalar types match. A tuple can be re
 - No production deployment, main-branch change or PR13 merge occurred.
 - Firebase remains the operational rollback source until the MySQL/TiDB cutover is explicitly accepted.
 
-**Pass 7 outcome:** the manifest cardinality is corrected to 104 numbered rows and 115 literal tuple candidates after expanding grouped rows. The full physical FK validation remains open; schema v1 is still **BLOCKED**.
+**Pass 7 outcome:** the manifest cardinality is corrected to 104 numbered rows and 116 literal tuple candidates after expanding grouped rows. The full physical FK validation remains open; schema v1 is still **BLOCKED**.
