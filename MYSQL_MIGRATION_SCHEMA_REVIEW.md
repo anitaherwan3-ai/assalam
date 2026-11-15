@@ -113,3 +113,17 @@ Semua tes memakai nama tabel khusus compatibility test, fixture sintetis, dan cl
 6. Jalankan FK, unique, rollback, lock/concurrency dan reconciliation tests.
 7. Jangan menyatakan aplikasi siap migrasi sebelum authorization, backup/restore, regression dan UI E2E tests lulus.
 
+
+
+## F. Compatibility endpoint access control — 2026-11-15
+
+A source review found that a public preview URL could otherwise allow any visitor to trigger synthetic DDL and row-lock tests against the preview database. The diagnostic endpoint has therefore been changed to require a separate `COMPATIBILITY_TEST_TOKEN` environment variable and a constant-time token comparison on POST. GET remains read-only and reveals no database credentials.
+
+Before the compatibility endpoint is deployed:
+1. Set a high-entropy random `COMPATIBILITY_TEST_TOKEN` in the isolated `assalam-mysql-preview` Preview environment only.
+2. Do not reuse any database password or Firebase credential as this token.
+3. Never put the token in source control, URL query parameters, screenshots, or chat.
+4. Confirm the endpoint returns 503 when the token is not configured and 401 for an incorrect token; only a correct token may start the test.
+5. After the test window, rotate/remove the token and verify synthetic test-table cleanup.
+
+This is a source-level security improvement only. It has not yet been deployed or runtime-tested. It does not change the production project or database.
