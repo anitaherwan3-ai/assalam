@@ -578,3 +578,8 @@ The column type-family dictionary and 104-entry candidate FK manifest are captur
 ## S. Exact column dictionary and signedness reconciliation — pass 4
 
 The static physical dictionary is recorded in [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md): 56 base tables and 566 extracted columns. It preserves source `UNSIGNED` modifiers and leaves unspecified NULL/default attributes unresolved. An initial parser falsely dropped `UNSIGNED`; that finding has been corrected and withdrawn. Remaining bare signed integer fields require semantic/range review, especially monetary values, and every FK pair still needs exact type matching. Schema v1 remains blocked; no DDL, TiDB runtime validation, Firebase/Auth changes, production deployment, or PR13 merge occurred.
+
+
+## T. NULL/default completeness matrix — pass 5
+
+The specification gap matrix is in [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md): 56 base tables / 566 columns, with 65 nullability declarations and 535 defaults still unspecified in the current proposal. These remain explicit blockers; no implicit engine defaults or guessed NULL behavior may be used. Prioritize encounter/invoice ownership, batch nullable-pair semantics, actor provenance and lifecycle states. Migration remains documentation-only; Firebase/Auth and production are unchanged.
