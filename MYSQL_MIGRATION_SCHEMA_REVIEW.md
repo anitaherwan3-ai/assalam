@@ -215,7 +215,7 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 
 ## O. Normalized dictionary and FK manifest — pass 3
 
-See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The table explicitly enumerates 99 candidate FK rows (F01–F99), not 104; F100–F104 are missing and the old 104 count is withdrawn. Pass 6 [FK reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) compares 99 rows against the Pass 4 dictionary: 86 textual type matches, 11 missing supplemental fields/tables, 2 not mechanically comparable, and no explicit type mismatch among directly comparable rows. This is not runtime proof. User identity is VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. No DDL or TiDB runtime test is claimed.
+See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). It contains 99 numbered entries (F01–F99), some of which group multiple FK tuples; the earlier prose count of 104 individual candidate relationships remains to be verified by expanding every grouped entry. Pass 6 [FK reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) is a preliminary first-tuple static comparison only: 86 textual matches, 11 entries with supplemental fields/tables absent from Pass 4, 2 not mechanically comparable, and no explicit mismatch among directly compared first tuples. It is not full-manifest or runtime proof. User identity is VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. No DDL or TiDB runtime test is claimed.
 
 
 ## P. Exact physical column dictionary — pass 4
