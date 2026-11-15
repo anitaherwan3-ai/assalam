@@ -543,3 +543,10 @@ See [MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_KE
 - Confirm whether supplier receipt lines can split across expiry/lot/partial deliveries before selecting one-batch-per-line.
 
 These are design gates only. No TiDB runtime compatibility is claimed and no DDL is authorized.
+
+
+## 25. Data type, nullability and orphan/duplicate closure — 2026-11-15
+
+See [MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md) and [MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md](./MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md). The type/nullability pass records that a complete physical column manifest is still missing; user ID representation, quantity base units/scale, legacy ID source scoping, collations, lifecycle nullability, timestamp provenance and several composite same-parent invariants are not frozen. The FK catalogue is a candidate review matrix, not approved DDL. Orphan/duplicate checks are specified but have not been run against historical clinic data.
+
+DDL remains blocked pending owner policy decisions, exact source-field profiling, full column/FK type manifest, and actual TiDB compatibility testing.
