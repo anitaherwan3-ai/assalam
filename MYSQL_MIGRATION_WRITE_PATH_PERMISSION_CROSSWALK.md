@@ -157,3 +157,34 @@ Migration requirement:
 - Review PR13 separately as an unmerged optional delta; do not merge automatically.
 - Reconcile all findings into the Master Blueprint.
 - Only after the source inventory and owner policy decisions are complete should normalized schema/DDL be drafted.
+
+
+## 8. PR13 reference-only review (not merged)
+
+PR metadata at review time:
+- PR: [#13 — Wajib selesaikan pasien sebelum logout + pelimpahan antar-shift](https://github.com/anitaherwan3-ai/assalam/pull/13)
+- State: open; base `main`; head `feature/kasir-wajib-selesaikan-pasien-sebelum-logout`.
+- 54 commits; 5 changed files: `display.html`, `firestore.rules`, `js/app.js`, `js/firebase-backend.js`, `js/store.js`; 845 additions / 161 deletions.
+- This is a source review only. PR13 remains unmerged and is not part of the production baseline.
+
+Observed PR13 changes:
+1. **Patient responsibility and logout guard** — adds a list of unfinished patients belonging to the current Kasir and logout blocking/continuation/handoff UI. It adds explicit ownership checks for Kasir and a Pimpinan override.
+2. **Handoff command** — backend `handoffPatient` transaction reads patient and target shift, checks source ownership, patient state, target shift open/date/different cashier, and expected queue prefix; then updates cashier/shift, clears calling, and records source, target, reason and time. MySQL equivalent must also lock both rows, ensure target shift still open at commit, audit the handoff, and invalidate stale local ownership.
+3. **Queue A/B** — queue prefix is inferred from stable cashier IDs `kasir` => A and `kasir2` => B; new queue IDs include date and prefix; old unprefixed tickets are treated as A. Display filters by selected A/B mode. This matches the user's preferred separate/switchable display direction, but must be tested with legacy records and concurrent allocation.
+4. **Display selector** — `saveQueueDisplayMode` permits Kasir/Pimpinan to write `set.queueDisplayMode`; verify the exact Rules whitelist and ensure Admin's separate display-settings permission does not accidentally grant queue ownership controls.
+5. **Calling sync** — store marks pending calling changes; local queue call reset is scoped to the same cashier. Backend adds patient workflow commands rather than allowing cache sync to move ownership/status.
+6. **Rules rewrite** — adds helper functions for expected cashier prefix, patient ownership and constrained calling/status updates; patient status/ownership transitions are intended to be Cloud-atomic.
+
+PR13 acceptance risks to test before any future merge or MySQL translation:
+- Logout guard must not strand a Kasir when network is unavailable; explicit continue/cancel/handoff behavior must be unambiguous and auditable.
+- Handoff must reject closed/foreign/wrong-date/wrong-prefix shifts, self-handoff, completed/deleted/cancelled patients, and concurrent handoffs. Verify there is no race where target shift closes between selection and commit.
+- Handoff must preserve patient history, queue number and encounter identity while updating only the responsible cashier/shift and handoff metadata.
+- The current prefix mapping is hard-coded to internal cashier IDs. A future staff replacement or extra cashier must use a maintained server-side assignment, not a fragile email or UI guess.
+- Queue sequence scan + candidate probing must be stress-tested for two concurrent Kasir registrations per prefix/date and for legacy mixed-format numbers. MySQL should use a locked sequence row rather than porting scan/probe logic.
+- Confirm old records with no `queuePrefix` remain A and that B numbers never get counted in A sequence (and vice versa).
+- TV selector changes must propagate to all display clients; test reload/reconnect and ensure call audio is not replayed or lost when switching mode.
+- Verify the Rules allow the intended Kasir actions while rejecting another cashier's patient edits/calling/handoff and any forged cashier ID in request data.
+- Verify the role matrix for Pimpinan, Admin, Kasir1 and Kasir2 against every changed patient path. Admin should not gain unintended patient ownership/status privileges.
+- PR13 touches all five high-risk files including Rules and core app/backend/store; a merge requires regression testing of all previously working workflows, not just the new logout/handoff feature.
+
+Disposition: keep PR13 as a separate reference branch. Do not merge automatically. Translate the validated business behavior into explicit MySQL commands only after the source audit and role policy are reconciled.
