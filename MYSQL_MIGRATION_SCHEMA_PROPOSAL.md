@@ -512,3 +512,21 @@ This amendment is a design-document correction only. It does not authorize DDL a
 ## 22. Foreign-key closure notes — 2026-11-15
 
 Schema v1 DDL must include composite parent keys and matching child FK types exactly as specified in sections 2.7–2.8. The one-to-one receipt-line/batch link requires a unique nullable batch-side FK. Every sales return line must reference exactly one quota subject; API validation must also confirm that its invoice_line_id and optional invoice_component_id match that subject. Legacy quota records map to quota subjects only after deterministic line/component mapping; otherwise quarantine. These are design requirements, not evidence that TiDB has accepted the DDL.
+
+
+
+## 23. FK/index closure audit amendment — 2026-11-15
+
+See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md). This audit found that section 9 is only a domain-level relationship summary, not a complete column-level FK specification. Before DDL v1, the schema must gain a canonical catalogue containing every child FK column tuple, exact parent candidate/unique key, matching types and nullability, child supporting index, ON DELETE/UPDATE policy, and same-parent invariant.
+
+Mandatory closure items include:
+- Composite cashier/shift ownership for encounters, invoices, active shift slots and petty cash where both identities are stored.
+- Composite medicine/batch and purchase-line/batch integrity for movements, losses, stocktakes, invoice allocations and supplier returns.
+- Composite invoice/line/component/quota subject integrity for discount allocations and customer returns.
+- Supplier identity consistency across supplier payments, invoice allocations and supplier credit notes.
+- Explicit actor FKs and self-FKs for reversal records, plus clarification of `petty_cash_entries.reversed_by_entry_id`.
+- Supporting child indexes for every FK and reverse lookup; indexes must be measured with EXPLAIN.
+- Add `sales_return_events` to the relationship and index catalogues.
+- Document polymorphic references as intentionally non-FK and provide typed source validation/reconciliation.
+
+This amendment does not authorize DDL. It records blockers discovered by static review; TiDB FK/index behavior remains untested.
