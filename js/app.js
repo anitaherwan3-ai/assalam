@@ -253,6 +253,19 @@ function getPendingPatientsForLogout() {
     p.status !== 'dihapus' && p.status !== 'batal_berobat'
   ).sort((a,b)=>(Number(a.registeredAt)||0)-(Number(b.registeredAt)||0));
 }
+function applyCloudPatientResult(cloudPatient) {
+  if (!cloudPatient || !cloudPatient.id) return false;
+  const index = (store.state.pasien || []).findIndex(item => item && item.id === cloudPatient.id);
+  if (index >= 0) {
+    store.state.pasien[index] = Object.assign({}, store.state.pasien[index], cloudPatient);
+    delete store.state.pasien[index]._pendingCallingSync;
+  } else {
+    store.state.pasien.push(cloudPatient);
+  }
+  store.saveLocal(false);
+  return true;
+}
+
 function continuePatientService(patientId) {
   const p=store.get('pasien',patientId);
   if(!p || p.kasir!==(currentUser&&currentUser.u) || p.done || p.status==='batal_berobat') return;
@@ -260,7 +273,7 @@ function continuePatientService(patientId) {
   setTab('Transaksi');
   setTimeout(()=>{const el=$('trx-pasien');if(el)el.value=patientId;},0);
 }
-function savePatientHandoff(patientId,targetShiftId,reason) {
+async function savePatientHandoff(patientId,targetShiftId,reason) {
   const p=store.get('pasien',patientId), target=store.get('shift',targetShiftId), note=String(reason||'').trim();
   if(!p||!target||note.length<5){showAlert('Pasien, shift tujuan, dan alasan minimal 5 karakter wajib diisi.');return false;}
   if(!['kasir','pimpinan'].includes(currentRole) ||
@@ -271,13 +284,21 @@ function savePatientHandoff(patientId,targetShiftId,reason) {
   if(p.done||p.deletedAt||p.status==='dihapus'||p.status==='batal_berobat'){showAlert('Pasien ini tidak dapat dilimpahkan.');return false;}
   if(target.status!=='buka'||target.kasir===p.kasir||target.tgl!==p.tgl){showAlert('Shift tujuan harus sedang berjalan, milik kasir lain, dan pada tanggal pasien yang sama.');return false;}
   if(!isShiftQueuePrefixCurrent(target)){showAlert('Shift tujuan masih memakai prefix lama. Kasir penerima harus menyelesaikan dan menutup shift tersebut, lalu membuka shift baru agar prefix otomatis sesuai.');return false;}
-  const targetPrefix=getShiftQueuePrefix(target);
-  if(!['A','B'].includes(targetPrefix)){showAlert('Prefix antrean shift tujuan tidak valid.');return false;}
-  const now=Date.now(), from=p.kasir;
-  p.kasir=target.kasir;p.sh=target.id;p.queueDisplayPrefix=targetPrefix;p.calling=false;
-  p.pelimpahanDari=from;p.pelimpahanKe=target.kasir;p.pelimpahanAlasan=note;p.pelimpahanPada=now;p._t=now;
-  store.logActivity('Pelimpahan Pasien','Pasien',`${p.no} - ${p.nama}; ${from} → ${target.kasir}; Alasan: ${note}`);
-  store.saveLocal();if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();renderApp();return true;
+  const backend=window.firebaseBackend;
+  if(!backend||typeof backend.handoffPatient!=='function'){showAlert('Fitur pelimpahan Cloud belum tersedia. Muat ulang aplikasi Preview.');return false;}
+  try {
+    const cloudPatient=await backend.handoffPatient(patientId,targetShiftId,note);
+    applyCloudPatientResult(cloudPatient);
+    store.logActivity('Pelimpahan Pasien','Pasien',`${cloudPatient.no} - ${cloudPatient.nama}; ${cloudPatient.pelimpahanDari} → ${cloudPatient.pelimpahanKe}; Alasan: ${note}`);
+    store.saveLocal();
+    if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();
+    renderApp();
+    return true;
+  } catch(err) {
+    console.error('Pelimpahan pasien gagal:',err);
+    showAlert(err.message||'Pelimpahan gagal disimpan ke Cloud. Data pasien tidak dipindahkan.');
+    return false;
+  }
 }
 function actionLimpahkanPasien(patientId) {
   const p=store.get('pasien',patientId);
@@ -309,14 +330,23 @@ function showPendingPatientsBeforeLogout() {
     if(r.aksi==='lanjut'){continuePatientService(p.id);return;}
     if(r.aksi==='limpahkan'){
       if(!r.tujuan||String(r.alasan||'').trim().length<5){showAlert('Pilih shift tujuan dan isi alasan minimal 5 karakter.');return;}
-      if(savePatientHandoff(p.id,r.tujuan,r.alasan))showPendingPatientsBeforeLogout();
+      savePatientHandoff(p.id,r.tujuan,r.alasan).then(ok=>{if(ok)showPendingPatientsBeforeLogout();});
       return;
     }
-    showConfirm(`Tandai ${p.nama} sebagai Batal Berobat? Data tetap tersimpan.`,()=>{
-      const patient=store.get('pasien',p.id);if(!patient)return;
-      patient.status='batal_berobat';patient.batalBerobatPada=Date.now();patient.batalBerobatOleh=currentUser?currentUser.u:'kasir';patient.calling=false;patient._t=Date.now();
-      store.logActivity('Batal Berobat','Pasien',`${patient.no} - ${patient.nama}`);
-      store.saveLocal();if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();showPendingPatientsBeforeLogout();
+    showConfirm(`Tandai ${p.nama} sebagai Batal Berobat? Data tetap tersimpan.`,async()=>{
+      const backend=window.firebaseBackend;
+      if(!backend||typeof backend.cancelPatientVisit!=='function'){showAlert('Fitur pembatalan Cloud belum tersedia. Muat ulang aplikasi Preview.');return;}
+      try {
+        const cloudPatient=await backend.cancelPatientVisit(p.id);
+        applyCloudPatientResult(cloudPatient);
+        store.logActivity('Batal Berobat','Pasien',`${cloudPatient.no} - ${cloudPatient.nama}`);
+        store.saveLocal();
+        if(typeof broadcastQueueUpdate==='function')broadcastQueueUpdate();
+        showPendingPatientsBeforeLogout();
+      } catch(err) {
+        console.error('Batal Berobat dari logout gagal:',err);
+        showAlert(err.message||'Batal Berobat gagal disimpan ke Cloud. Pasien tetap menjadi tanggung jawab Kasir.');
+      }
     },'Konfirmasi Batal Berobat');
   });
 }
@@ -1075,15 +1105,20 @@ function actionBatalBerobat(id) {
   const p = store.get('pasien', id);
   if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat' ||
       (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u))) return;
-  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', () => {
-    p.status = 'batal_berobat';
-    p.batalBerobatPada = Date.now();
-    p.batalBerobatOleh = currentUser ? currentUser.u : 'kasir';
-    p.calling = false;
-    p._t = Date.now();
-    store.logActivity('Batal Berobat', 'Pasien', `${p.no} - ${p.nama}`);
-    store.saveLocal();
-    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', async () => {
+    const backend=window.firebaseBackend;
+    if(!backend||typeof backend.cancelPatientVisit!=='function'){showAlert('Fitur pembatalan Cloud belum tersedia. Muat ulang aplikasi Preview.');return;}
+    try {
+      const cloudPatient=await backend.cancelPatientVisit(id);
+      applyCloudPatientResult(cloudPatient);
+      store.logActivity('Batal Berobat', 'Pasien', `${cloudPatient.no} - ${cloudPatient.nama}`);
+      store.saveLocal();
+      if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+      renderApp();
+    } catch(err) {
+      console.error('Batal Berobat gagal:',err);
+      showAlert(err.message||'Batal Berobat gagal disimpan ke Cloud. Status pasien tidak diubah.');
+    }
   });
 }
 
@@ -1095,14 +1130,20 @@ function actionPulihkanBatalBerobat(id) {
   const p = store.get('pasien', id);
   if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr ||
       (currentRole === 'kasir' && p.kasir !== (currentUser && currentUser.u))) return;
-  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', () => {
-    p.status = 'aktif';
-    p.batalBerobatPada = null;
-    p.batalBerobatOleh = null;
-    p._t = Date.now();
-    store.logActivity('Pulihkan Antrean', 'Pasien', `${p.no} - ${p.nama}`);
-    store.saveLocal();
-    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', async () => {
+    const backend=window.firebaseBackend;
+    if(!backend||typeof backend.restorePatientVisit!=='function'){showAlert('Fitur pemulihan Cloud belum tersedia. Muat ulang aplikasi Preview.');return;}
+    try {
+      const cloudPatient=await backend.restorePatientVisit(id);
+      applyCloudPatientResult(cloudPatient);
+      store.logActivity('Pulihkan Antrean', 'Pasien', `${cloudPatient.no} - ${cloudPatient.nama}`);
+      store.saveLocal();
+      if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+      renderApp();
+    } catch(err) {
+      console.error('Pemulihan pasien gagal:',err);
+      showAlert(err.message||'Pemulihan gagal disimpan ke Cloud. Status pasien tidak diubah.');
+    }
   });
 }
 
