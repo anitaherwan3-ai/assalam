@@ -266,3 +266,8 @@ See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGR
 ## Financial reconciliation review — pass 16
 
 [Pass 16 source-of-truth audit](./MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md) distinguishes period flows from cutoff balances and traces each financial aggregate to its source/date. It flags the non-reconciled cash-on-hand projection, original-sale vs refund-payout method filter mismatch, incomplete shift refund attribution, supplier settlement/credit gaps and expense-vs-petty duplication. The proposed target keeps commercial, collection, custody, expense, supplier, return and cancellation sources distinct. No schema approval or DDL is implied.
+
+
+## Date and report-export consistency review — pass 17
+
+[Pass 17 audit](./MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md) records report parity blockers across UI, CSV and PDF, including ignored cashier/method filters, cancelled invoice leakage, discount allocation mismatch, undated legacy rows, UTC/WIB date inconsistency and snapshot-vs-period confusion. The target MySQL report contract must make date basis, timezone, filters, generated time and snapshot cutoff explicit and shared across screen/CSV/PDF.
