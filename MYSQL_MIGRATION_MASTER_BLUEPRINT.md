@@ -408,3 +408,10 @@ See [MYSQL_MIGRATION_LEGACY_DATA_COMPATIBILITY_AUDIT.md](./MYSQL_MIGRATION_LEGAC
 ## Session, synchronization and authentication provenance audit
 
 See [MYSQL_MIGRATION_SESSION_SYNC_AUTH_AUDIT.md](./MYSQL_MIGRATION_SESSION_SYNC_AUTH_AUDIT.md). Key gates: do not port generic local-state push to SQL; implement explicit atomic commands; reject checkout if patient is missing; enforce one open shift per cashier; use a durable outbox; and locate the authoritative Cloud Functions source/deployment before authentication cutover. This is static source analysis only.
+
+
+## Follow-up source verification — Rules, seed behavior and authentication provenance
+
+See [MYSQL_MIGRATION_FOLLOWUP_SOURCE_VERIFICATION.md](./MYSQL_MIGRATION_FOLLOWUP_SOURCE_VERIFICATION.md). The follow-up rechecks the exact Rules and Store source fingerprints and records additional target requirements: verified identity, least-privilege read projections, append-only petty cash/audit, command-only inventory changes, no implicit production seeding, WIB expiry handling, exact-batch supplier returns, and preservation of the staged patient-return approval/payment workflow. It also confirms the Cloud Functions reproducibility gate: `firebase.json` and documentation reference a Functions source directory and `activateInitialPimpinan`, but the inspected tracked main tree has no `functions/` directory or bootstrap script. Deployed Functions may exist elsewhere; source and deployed configuration must be located before auth cutover.
+
+This remains static source review only. No DDL, Firebase changes, real-data migration or production deployment occurred.
