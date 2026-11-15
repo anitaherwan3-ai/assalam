@@ -613,3 +613,8 @@ The normalized type-family dictionary, table/PK inventory, 104 candidate FK tupl
 ## 29. Exact column / NULL / DEFAULT dictionary — pass 4
 
 See [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md). The corrected static extraction covers 56 base tables and 566 unique columns. It preserves source-declared types (including `UNSIGNED`) and marks unspecified nullability/defaults rather than inventing them. The remaining bare signed integer declarations are predominantly financial amounts and other explicitly typed fields; each still needs semantic/range review, but the earlier apparent widespread ID signedness mismatch was an extraction artifact and is withdrawn. Charset/collation, exact indexes/FKs/actions, added integrity-table definitions and TiDB runtime tests remain open. This pass is documentation only; no DDL or database mutation.
+
+
+## 30. NULL/default completeness matrix — pass 5
+
+See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md). The pass counts 566 extracted columns across 56 base tables: 65 columns lack explicit NULL/NOT NULL in the current proposal and 535 lack an explicit DEFAULT. These are documentation gaps, not permission to assume nullable or engine defaults. The matrix prioritizes encounter/invoice ownership, nullable batch pairs, actor provenance and lifecycle-dependent fields. No defaults or nullability were invented; no DDL or database mutation.
