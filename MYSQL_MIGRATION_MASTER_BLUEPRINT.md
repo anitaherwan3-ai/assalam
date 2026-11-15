@@ -478,3 +478,11 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_FOREI
 ## Key, type, nullability and concurrency closure audit
 
 See [MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_KEY_TYPE_CONCURRENCY_CLOSURE_AUDIT.md). The second static pass identified additional blockers: queue-prefix assignment needs a shared guard row; first-use queue counter creation needs an explicit atomic algorithm; composite same-parent unique keys must be enumerated; return quota reservation/release needs exactly-once event linkage; actor NULL/system semantics, email collation, role scope and ticket reissue behavior need definition; and split supplier receipts must be confirmed. No TiDB runtime tests or DDL have been performed.
+
+
+## Data type, nullability, orphan/duplicate and canonical FK catalogue
+
+- [MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_DATA_TYPE_NULLABILITY_ORPHAN_DUPLICATE_CLOSURE_AUDIT.md)
+- [MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md](./MYSQL_MIGRATION_CANONICAL_FK_INDEX_CATALOGUE.md)
+
+The static pass documents type-family rules, unresolved nullability/collation/quantity/timestamp decisions, synthetic orphan/duplicate scenarios and a candidate FK/index catalogue. It does not represent a TiDB runtime test, historical data profile, DDL approval or application table creation. See schema review section K for blockers.
