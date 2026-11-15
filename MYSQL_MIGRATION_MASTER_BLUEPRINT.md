@@ -429,3 +429,8 @@ Static review only; no SQL DDL, Firebase mutation, real-data migration or produc
 See [MYSQL_MIGRATION_SCREEN_BY_SCREEN_UI_SPECIFICATION.md](./MYSQL_MIGRATION_SCREEN_BY_SCREEN_UI_SPECIFICATION.md). This document maps the actual `main` navigation for Kasir, Admin and Pimpinan to visible forms, buttons, table columns, user journeys, proposed API commands, authorization and acceptance tests. It separately describes the TV display page and flags the legacy Firebase settings/JSON backup controls, supplier-return local-only path, destructive correction buttons, patient PII, and unmerged PR13 A/B/handoff behavior. It explicitly distinguishes visible UI presence from tested behavior and requires desktop/tablet/phone parity plus database/ledger verification before sign-off.
 
 No DDL, production change, Firebase mutation or real-data migration was performed.
+
+
+## Relational integrity and orphan-data audit
+
+See [MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md](./MYSQL_MIGRATION_RELATIONAL_INTEGRITY_ORPHAN_AUDIT.md). It maps patient/visit/queue/invoice, invoice-line/package/batch/return, purchase/stock/loss, shift/cash/finance, identity and audit relationships; documents archive/cancel/return lifecycles; defines candidate FK policies, pre-import orphan checks, quarantine rules, synthetic edge-case tests and unresolved owner policies. This is source-based analysis only: no live orphan query, production data export, DDL or production mutation was performed.
