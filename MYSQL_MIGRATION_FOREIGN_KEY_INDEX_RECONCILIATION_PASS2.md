@@ -194,3 +194,8 @@ Standardize queue_audio_assets.size_bytes and stored_files.size_bytes to BIGINT 
 - Production Vercel/Firebase/main/PR #13: unchanged.
 
 Next safe task: convert the proposal to a normalized column dictionary and exact FK manifest (one record per FK column tuple), resolve split supplier receipt and owner policy gates, then run the controlled TiDB compatibility spike only after the preview package is complete and deployment quota permits.
+
+
+## 10. Correction from pass 3
+
+The current proposal has been corrected: user_id is VARCHAR(64). The CHAR(36) occurrence in audit_events is event_uuid, not a user identifier. The pass-2 statement describing a remaining CHAR(36) user-key convention is stale and superseded by [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Likewise, size_bytes is now BIGINT UNSIGNED and one-batch-per-receipt-line uniqueness is explicitly not approved. The original pass-2 report is retained as historical audit evidence, not current canonical state.
