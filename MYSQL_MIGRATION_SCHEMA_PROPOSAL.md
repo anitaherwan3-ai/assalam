@@ -633,3 +633,7 @@ See [MYSQL_MIGRATION_SCHEMA_SCOPE_CONTROL_PASS8.md](./MYSQL_MIGRATION_SCHEMA_SCO
 ## 33. Critical ownership chain matrix — pass 9
 
 See [MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md](./MYSQL_MIGRATION_CRITICAL_OWNERSHIP_CHAIN_MATRIX_PASS9.md). The pass focuses on encounter/shift, invoice/encounter/shift, medicine/batch/movement/allocation, return quota, and supplier return/credit/payment ownership. It uses existing source columns and marks unresolved nullability and same-parent rules as blockers; it does not add generic registries or speculative tables. No DDL or data mutation.
+
+
+## 30. Decision and requirement traceability closure — pass 10
+See [MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md](./MYSQL_MIGRATION_DECISION_AND_TRACEABILITY_CLOSURE_PASS10.md). Pass 10 maps clinic workflows to candidate domains, invariants and acceptance evidence; separates confirmed requirements, engineering closure, owner policy gates, source-verification gates and deferred scope; and prevents conditional support tables from silently entering v1. It does not approve DDL or close unresolved policy/source gates. Schema remains blocked pending exact physical FK/nullability/index closure and isolated TiDB compatibility tests.
