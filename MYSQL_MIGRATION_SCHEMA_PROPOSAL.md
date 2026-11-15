@@ -607,7 +607,7 @@ The reconciliation also requires one canonical user ID type (`VARCHAR(64)`), com
 
 ## 28. Normalized column dictionary and FK manifest — pass 3
 
-The normalized type-family dictionary, table/PK inventory, 104 candidate FK tuples, composite parent-key requirements, nullable tuple blockers, and TiDB positive/negative test matrix are recorded in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). This pass clarifies that the remaining CHAR(36) is audit_events.event_uuid, not a user key; user identity remains VARCHAR(64). The manifest is static and not executable DDL. Exact per-column NULL/default/collation attributes and runtime TiDB validation remain open.
+The normalized type-family dictionary, table/PK inventory, 99 explicitly enumerated candidate FK rows (F01–F99), composite parent-key requirements, nullable tuple blockers, and TiDB positive/negative test matrix are recorded in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The earlier count of 104 was a documentation/counting error; F100–F104 are absent and must be reconciled against source inventory, not invented. Pass 6 static comparison is in [MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md). User identity remains VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. These are static documents, not executable DDL; exact NULL/default/collation, ownership enforcement and runtime TiDB validation remain open.
 
 
 ## 29. Exact column / NULL / DEFAULT dictionary — pass 4
