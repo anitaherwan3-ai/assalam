@@ -261,3 +261,8 @@ See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGR
 ## Financial and cash ownership closure — pass 15
 
 [Pass 15 financial/cash audit](./MYSQL_MIGRATION_FINANCIAL_CASH_OWNERSHIP_AUDIT_PASS15.md) traces the current source formulas and workflow ownership. It separates revenue adjustment (return approval date) from cash payout date, confirms opening float is not income, and flags report/cash-custody projection risks, petty/expense double-counting, one-method-per-invoice, supplier boolean settlement, and missing supplier credit/partial payment evidence. Schema v1 remains blocked on the listed owner/accounting decisions and synthetic reconciliation tests. No DDL or runtime test was performed.
+
+
+## Financial reconciliation review — pass 16
+
+[Pass 16 source-of-truth audit](./MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md) distinguishes period flows from cutoff balances and traces each financial aggregate to its source/date. It flags the non-reconciled cash-on-hand projection, original-sale vs refund-payout method filter mismatch, incomplete shift refund attribution, supplier settlement/credit gaps and expense-vs-petty duplication. The proposed target keeps commercial, collection, custody, expense, supplier, return and cancellation sources distinct. No schema approval or DDL is implied.
