@@ -668,3 +668,8 @@ See [MYSQL_MIGRATION_FINANCIAL_RECONCILIATION_SOURCE_OF_TRUTH_PASS16.md](./MYSQL
 ## Operational date, report filter and export audit — pass 17
 
 See [MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md](./MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md). The pass confirms screen/export divergence: transaction exports do not apply cashier/payment-method filters or approved-cancellation exclusion; exported line subtotals use qty × price rather than invoice discount allocation; missing-date rows leak into ranges; current stock/expiry/master exports are snapshots, not period reports; UTC date extraction conflicts with Asia/Jakarta business dates. It defines a shared report contract and synthetic parity tests. Static documentation only; no app source or production changes.
+
+
+## Role authorization and data security audit — pass 18
+
+See [MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md](./MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md). The static audit records UI role tabs, Firebase profile verification, collection read listeners, generic write scopes and dedicated workflow guards. Critical blockers include stale account allowlists versus the five latest protected identities, staff profile UID binding gaps, provisioning that can reactivate staff, unverified Firestore read rules, broad Admin collection synchronization, and client-side authorization boundaries. Target design requires immutable identity binding, centralized server-side deny-by-default policies, scoped queries, command endpoints and append-only server audit. No accounts or application data changed.
