@@ -215,7 +215,7 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 
 ## O. Normalized dictionary and FK manifest — pass 3
 
-See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The document enumerates 104 candidate FK relationships, table/PK type families, composite parent keys, child-index candidates and unresolved nullability/ownership blockers. It supersedes the stale pass-2 note that appeared to imply CHAR(36) was still a user identity type: only audit_events.event_uuid uses CHAR(36); user_id is VARCHAR(64). No DDL or runtime test is claimed.
+See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The table explicitly enumerates 99 candidate FK rows (F01–F99), not 104; F100–F104 are missing and the old 104 count is withdrawn. Pass 6 [FK reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) compares 99 rows against the Pass 4 dictionary: 86 textual type matches, 11 missing supplemental fields/tables, 2 not mechanically comparable, and no explicit type mismatch among directly comparable rows. This is not runtime proof. User identity is VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. No DDL or TiDB runtime test is claimed.
 
 
 ## P. Exact physical column dictionary — pass 4
