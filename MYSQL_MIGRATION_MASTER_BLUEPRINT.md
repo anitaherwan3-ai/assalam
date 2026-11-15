@@ -492,3 +492,20 @@ The static pass documents type-family rules, unresolved nullability/collation/qu
 - [MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md](./MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md)
 
 This audit records 30 design contradictions/omissions, source-scoped migration identity requirements and synthetic negative tests. It is a static review only; schema v1 remains blocked and no DDL has been applied.
+
+
+## L. Column dictionary v0.1 — 2026-11-15
+
+Added `MYSQL_MIGRATION_COLUMN_DICTIONARY_V0_1.md` as a centralized extraction of the candidate column definitions across schema proposal domains 2–8. It records the proposed names, SQL types, explicit nullability/defaults and stated key/index notes without silently filling unspecified details.
+
+This is an **extracted baseline, not an approved physical schema**. It does not close the source-field union, exact FK type/signedness/collation manifest, complete child-index coverage, lifecycle nullability, code dictionaries, money bounds, quantity units or timestamp provenance. All unresolved items remain DDL blockers.
+
+Canonical corrections continue to supersede older text in this blueprint:
+- Legacy document identity must be source-scoped; do not assume global uniqueness of `legacy_id`.
+- Use `return_quota_subjects`, not the older `return_quotas` name.
+- Use `active_email_claims` for active email uniqueness, not global uniqueness on email history.
+- Preserve `sales_return_events` and component-aware return constraints.
+- Purchase-line/batch link is one-directional unless split-receipt policy requires an allocation bridge.
+- Optional PR13/A-B queue and handoff behavior remains gated.
+
+No DDL was created, no TiDB application table was created, and no production system was changed.
