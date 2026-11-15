@@ -199,3 +199,10 @@ Orphan/duplicate checks have NOT been executed against historical clinic data; t
 The new audit MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md records 30 concrete conflicts/omissions. Highest-priority blockers: per-table global UNIQUE legacy IDs despite collection-scoped source IDs; missing same-parent constraints across encounter/invoice/shift, invoice line/component/batch, return quota and supplier payment/return; queue assignment/counter races; ambiguous timestamp normalization; and source-event idempotency for polymorphic ledger references. Candidate migration_source_records mapping preserves (source_system, source_collection, source_document_id) and source hash.
 
 These are static design findings, not evidence of live data anomalies. No DDL, live export, historical orphan query, TiDB runtime test or deployment has occurred. Schema v1 remains NOT APPROVED.
+
+
+## M. Schema v1 decision closure draft — 2026-11-15
+
+See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_CLOSURE_DRAFT.md). The latest pass specifies technical amendment candidates for queue prefix serialization and first counter initialization, return quota event ledger, actor provenance, source-scoped legacy identity, composite parent-child constraints, durable idempotency and projection ownership. It records the five protected account emails supplied by the owner and confirms the old Firebase operational dataset is development dummy data.
+
+This does not approve DDL. The exact FK/type/index manifest is still missing; D01–D20 owner policy gates and split supplier receipt behavior remain open; the compatibility harness has not been deployed or run against TiDB. No Firebase snapshot, account verification, data cleanup, production change or application table creation occurred.
