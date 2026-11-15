@@ -211,3 +211,8 @@ This does not approve DDL. The exact FK/type/index manifest is still missing; D0
 ## N. FK/index reconciliation pass 2 — 2026-11-15
 
 See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md). The latest static pass confirms that the canonical FK/type/index manifest is still incomplete and schema v1 remains blocked. Key blockers include the encounter/invoice ownership chain, same-parent invoice component and batch allocation constraints, component-aware return quota identity, supplier payment/return ownership, queue guard integration, reversal/idempotency semantics, shift reconciliation versioning, and unresolved split supplier receipts. No DDL or TiDB runtime test is authorized or claimed. The pass is proposal-level only; exact SQL types, charset/collation, nullability, child index order and delete/update actions must still be normalized per FK.
+
+
+## O. Normalized dictionary and FK manifest — pass 3
+
+See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The document enumerates 104 candidate FK relationships, table/PK type families, composite parent keys, child-index candidates and unresolved nullability/ownership blockers. It supersedes the stale pass-2 note that appeared to imply CHAR(36) was still a user identity type: only audit_events.event_uuid uses CHAR(36); user_id is VARCHAR(64). No DDL or runtime test is claimed.
