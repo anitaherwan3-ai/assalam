@@ -618,3 +618,8 @@ See [MYSQL_MIGRATION_EXACT_COLUMN_NULL_DEFAULT_DICTIONARY_PASS4.md](./MYSQL_MIGR
 ## 30. NULL/default completeness matrix — pass 5
 
 See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md). The pass counts 566 extracted columns across 56 base tables: 65 columns lack explicit NULL/NOT NULL in the current proposal and 535 lack an explicit DEFAULT. These are documentation gaps, not permission to assume nullable or engine defaults. The matrix prioritizes encounter/invoice ownership, nullable batch pairs, actor provenance and lifecycle-dependent fields. No defaults or nullability were invented; no DDL or database mutation.
+
+
+## 31. FK field-level expansion and cardinality correction — pass 7
+
+See [MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md](./MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md). A complete line scan confirms that Pass 3 has 104 numbered rows (F01–F104); Pass 6's 99-row count was caused by truncated extraction and is withdrawn. Ten grouped rows expand to 22 tuple candidates, so the literal expansion is 116 candidate tuples. This is not 116 approved constraints: F63/F65 are mutually exclusive polymorphic alternatives, F76 remains an undefined typed composite, and all tuples still require exact type/collation/nullability, parent unique key, child index, action, ownership and TiDB positive/negative test evidence. Pass 6's 86/11/2 counts are not a complete-manifest metric. Schema v1 remains BLOCKED; no DDL or data mutation was performed.
