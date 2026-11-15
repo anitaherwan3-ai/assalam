@@ -364,3 +364,12 @@ Firestore naming in the sync layer prefixes these as `k_<collection>`. Additiona
 The local `approveReturJual()` accepts both Admin and Pimpinan, then immediately restores stock and marks return `disetujui`. The previously audited cloud workflow is staged: Cashier submits, Admin reviews/forwards, Pimpinan final-approves, stock is restored at final approval, and refund payment is a separate event. Do not blindly port local behavior. The secure cloud workflow and user's stated concern about refund abuse take precedence, subject to final owner policy.
 Local supplier return currently caps qty with `Math.min(requested, purchase remaining, batch remaining, aggregate stock)`, then mutates stock/batch/HPP and reduces unpaid invoice total. This silent cap can hide an over-return request; the new API should reject over-limit quantities and retain separate supplier credit/payment records.
 Local FEFO and return allocation are client-side state mutations. In MySQL the server must lock rows and derive batch allocation itself; client `batchDeductions`/`batchRestores` are reference snapshots only, never authority.
+
+
+## Source audit cross-reference — write paths, permissions and PR13
+
+The detailed Firebase write-path and role-permission crosswalk is maintained separately in [MYSQL_MIGRATION_WRITE_PATH_PERMISSION_CROSSWALK.md](./MYSQL_MIGRATION_WRITE_PATH_PERMISSION_CROSSWALK.md). It maps each legacy collection/action to the required MySQL command boundary, records observed backend atomic operations and Firestore field/role restrictions, and provides role/security/concurrency acceptance tests.
+
+PR13 remains open and unmerged. Its logout guard, patient handoff, queue A/B prefixing, display selector, calling synchronization and Firestore Rules changes have been reviewed as reference behavior only. Do not merge it automatically. Any future adoption must pass the PR13-specific regression checklist in the crosswalk and must not regress existing patient, POS, stock/batch, shift, returns, cancellation, finance, authentication or multi-device behavior.
+
+The latest read-only source fingerprints and PR13 review are recorded in the crosswalk. This is still an inventory/design phase: no SQL DDL, production code replacement, Firebase mutation or real patient-data migration is authorized by this document.
