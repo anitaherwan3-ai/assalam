@@ -449,3 +449,7 @@ See [MYSQL_MIGRATION_SCREEN_ROLE_END_TO_END_TEST_PLAN.md](./MYSQL_MIGRATION_SCRE
 ## Relational schema proposal (review-only)
 
 See [MYSQL_MIGRATION_SCHEMA_PROPOSAL.md](./MYSQL_MIGRATION_SCHEMA_PROPOSAL.md). It proposes the relational domains, table/column catalogue, keys and relationships, source collection mapping, role/security boundaries, command transaction locks, financial/inventory reconciliation definitions, TiDB compatibility spike, migration quarantine rules and 20 owner decisions. It is a design artifact only: no DDL, schema creation, production change or real-data migration has occurred.
+
+## Schema review gate
+- [Schema v1 review findings](MYSQL_MIGRATION_SCHEMA_REVIEW.md)
+- The schema proposal has an amendment listing mandatory corrections A1–A10. These corrections and the actual TiDB compatibility spike must pass before DDL v1 is generated.
