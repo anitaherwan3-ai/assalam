@@ -398,3 +398,8 @@ The backend catalog now records a repository artifact gap: the inspected `main` 
 ## Firestore Rules exhaustive static audit
 
 See [MYSQL_MIGRATION_FIRESTORE_RULES_EXHAUSTIVE_AUDIT.md](./MYSQL_MIGRATION_FIRESTORE_RULES_EXHAUSTIVE_AUDIT.md). This document maps all matched Firestore paths and read/create/update/delete rules, records identity and field-validation gaps, prioritizes server-side authorization and atomic command requirements, and lists negative/security tests. Source fingerprint: main/firestore.rules SHA `d02b6d02c13bc85f867b668085edb85c54726779`. Static inspection only; no Rules deployment or live Firebase test was performed.
+
+
+## Legacy data compatibility, seed and restore audit
+
+See [MYSQL_MIGRATION_LEGACY_DATA_COMPATIBILITY_AUDIT.md](./MYSQL_MIGRATION_LEGACY_DATA_COMPATIBILITY_AUDIT.md). It documents the 16 local collections, seed-on-empty behavior, observed legacy field dictionary, mixed timestamps/date semantics, purchase/return/stock normalization risks, unsafe full-state JSON restore, demo-vs-live classification protocol and reconciliation gates. Static source only; actual historical document key/type union and data provenance remain unknown until a protected data export is profiled.
