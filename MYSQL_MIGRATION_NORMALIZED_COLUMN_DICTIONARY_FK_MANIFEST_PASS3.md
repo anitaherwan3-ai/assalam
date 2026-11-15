@@ -319,7 +319,7 @@ Do not declare the physical dictionary complete until these attributes are prese
 
 - Table/PK type-family dictionary: **normalized from current proposal**.
 - Exact per-column NULL/default/collation dictionary: **incomplete**.
-- FK tuple inventory: **enumerated as 104 candidate relationships**, with blocked and nullable relationships flagged.
+- FK tuple inventory: **99 explicitly enumerated rows (F01–F99)**, with blocked and nullable relationships flagged. The earlier count of 104 was a documentation/counting error; F100–F104 are not present in the table and must not be assumed or fabricated.
 - Composite parent key list: **defined as requirements, not all present in table definitions**.
 - Child index ordering: **candidate list recorded; must verify against exact FK tuple and EXPLAIN**.
 - TiDB runtime compatibility: **not run in this pass**.
@@ -327,4 +327,4 @@ Do not declare the physical dictionary complete until these attributes are prese
 - Firebase/Auth snapshot or cleanup: **not performed**.
 - Production Vercel/Firebase/main/PR13: **unchanged**.
 
-Next step: turn this manifest into an exact column-by-column null/default/collation dictionary and reconcile the base proposal's individual table definitions with the 104 FK candidates. Then prepare the isolated TiDB compatibility test package. Do not apply schema DDL until owner policy gates and static manifest are approved.
+Next step: complete the exact column-by-column NULL/default/collation dictionary and reconcile the 99 enumerated FK rows with base table definitions. Pass 6 records the static comparison and the missing F100–F104 discrepancy. Then prepare the isolated TiDB compatibility test package. Do not apply schema DDL until owner policy gates and static manifest are approved. Do not apply schema DDL until owner policy gates and static manifest are approved.
