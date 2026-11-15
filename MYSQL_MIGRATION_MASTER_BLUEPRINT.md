@@ -383,3 +383,8 @@ The read-only UI/business-command inventory is available in [MYSQL_MIGRATION_APP
 ## Export, backup/restore, WhatsApp and Display integration audit
 
 See [MYSQL_MIGRATION_EXPORT_BACKUP_WHATSAPP_DISPLAY_AUDIT.md](./MYSQL_MIGRATION_EXPORT_BACKUP_WHATSAPP_DISPLAY_AUDIT.md). This audit records the current CSV/PDF report inventory and correctness/security gaps, destructive local JSON restore behavior, WhatsApp composer (manual send rather than automatic delivery), shift recap reconciliation risks, full-collection Display TV listener/privacy concerns, audio storage migration and acceptance tests. It also records the remaining exhaustive backend/collection pass before schema approval.
+
+
+## Exhaustive backend method and collection catalog
+
+See [MYSQL_MIGRATION_BACKEND_METHOD_COLLECTION_CATALOG.md](./MYSQL_MIGRATION_BACKEND_METHOD_COLLECTION_CATALOG.md). It inventories Firebase authentication/profile methods, realtime listener scopes, patient/queue, checkout, cancellation, return/quota/payout, audio/display, generic sync, configuration and disconnect paths; includes collection/document path mapping and critical concurrency/sync risks. It also records that PR13 A/B support remains unmerged reference behavior while the main baseline queue allocator is A-only.
