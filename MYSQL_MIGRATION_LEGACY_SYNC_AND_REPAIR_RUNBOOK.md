@@ -45,11 +45,11 @@ Tidak ada live dual-write selama fase S0–S3. Bila kelak dibutuhkan transisi se
 ## 3. Sumber kebenaran sementara
 
 Sampai cutover disetujui:
-- Firebase/Firestore produksi tetap sumber data operasional yang sedang dipakai aplikasi.
+- Firebase/Firestore lama diklasifikasikan oleh owner sebagai **dataset dummy development/testing**, bukan arsip operasional klinik yang harus dimigrasikan sebagai data produksi. Perlakukan sebagai sumber uji dan bahan audit struktur; jangan menganggap record-nya sebagai fakta operasional.
 - Data lokal `localStorage.klinik_data` adalah cache/offline state, bukan database otoritatif terpisah.
 - TiDB preview hanya untuk skema dan data sintetis; tidak boleh dianggap sudah mencerminkan produksi.
 - Laporan UI/CSV/print bukan sumber ledger. Hitung ulang dari dokumen dan peristiwa dasar.
-- Master Pimpinan `praktekrose@gmail.com` dan `nursalim42@gmail.com` wajib dilindungi dari reset, import, restore, merge, deduplikasi dan koreksi otomatis.
+- Lima akun yang secara eksplisit ditetapkan owner wajib dilindungi dari reset, import, restore, merge, deduplikasi, disablement, penghapusan dan koreksi otomatis: Kasir Pagi `assalamkasir1@gmail.com`, Kasir Sore `assalamkasir2@gmail.com`, Admin `assalamadmin@gmail.com`, Pimpinan `praktekrose@gmail.com`, serta Akun kita `nursalim422@gmail.com`. Daftar ini adalah whitelist identitas yang berlaku; jangan menggantinya dengan alamat lama yang pernah tercatat di audit.
 
 Setelah cutover, TiDB menjadi satu-satunya writer melalui API terautentikasi. Jangan mengizinkan dua database menerima command transaksi yang sama secara independen.
 
@@ -273,3 +273,53 @@ No real data migration or legacy correction until all are true:
 - `MYSQL_MIGRATION_SCHEMA_CONTRADICTION_SOURCE_IDENTITY_CLOSURE_AUDIT.md`
 - `MYSQL_MIGRATION_COLUMN_DICTIONARY_V0_1.md`
 - `MYSQL_MIGRATION_MASTER_BLUEPRINT.md`
+
+
+## 14. Keputusan owner: dataset lama dummy dan whitelist lima akun
+
+Pada 2026-11-15 owner menegaskan bahwa data pada aplikasi Firebase lama **bukan data produksi/operasional klinik**; seluruh data operasional lama merupakan data dummy yang dibuat selama development. Owner mengizinkan data dummy dipakai untuk audit, fixture, dan pengujian, serta meminta pembersihan data dummy yang tidak diperlukan sebelum deployment final.
+
+### 14.1 Identitas yang wajib dipertahankan
+
+Whitelist akun final berdasarkan instruksi owner:
+
+| Fungsi | Email yang wajib dipertahankan |
+|---|---|
+| Kasir Pagi | `assalamkasir1@gmail.com` |
+| Kasir Sore | `assalamkasir2@gmail.com` |
+| Admin | `assalamadmin@gmail.com` |
+| Pimpinan | `praktekrose@gmail.com` |
+| Akun kita | `nursalim422@gmail.com` |
+
+Perlindungan berlaku untuk akun Firebase Authentication dan dokumen/profil/role yang menjadi pasangan identitasnya. Jangan menghapus, menonaktifkan, mengganti UID, menurunkan role, atau mengubah email akun-akun ini sebagai bagian dari pembersihan dummy. Email lama yang muncul dalam audit sebelumnya tidak boleh dipakai untuk menimpa whitelist terbaru ini. Sebelum tindakan identitas apa pun, cocokkan UID dan email aktual secara read-only; jika tidak cocok, hentikan dan minta review owner.
+
+### 14.2 Perlakuan dataset dummy
+
+- Data pasien, kunjungan/antrian, transaksi, stok/batch, pembelian, retur, pembatalan, shift, biaya, kas kecil, kerugian, log uji, dan konfigurasi uji diklasifikasikan sebagai dummy development/testing sesuai penegasan owner.
+- Jangan migrasikan record dummy ke database final sebagai histori klinik atau laporan keuangan nyata.
+- Data dummy boleh diekstrak ke snapshot privat terenkripsi untuk bukti, audit struktur, dan pemulihan sementara. Jangan simpan data mentah atau PII di repository, issue, log publik, atau chat.
+- Gunakan fixture sintetis baru dan terkontrol untuk uji integrasi TiDB; jangan mengandalkan record lama sebagai sumber kebenaran.
+- Pertahankan dokumentasi skema, mapping, hasil tes, dan bukti teknis yang tidak memuat data pribadi.
+
+### 14.3 Rencana pembersihan sebelum rilis final
+
+1. Inventaris read-only Firebase Auth dan Firestore: UID, email, role, path dokumen profil, jumlah dokumen per koleksi, serta konfigurasi/asset yang masih diperlukan.
+2. Ambil snapshot privat terenkripsi dan manifest hash; verifikasi kelengkapan dan prosedur restore.
+3. Cocokkan kelima akun whitelist berdasarkan UID + email + profil + role. Jangan menebak akun berdasarkan nama tampilan saja.
+4. Pisahkan identitas/konfigurasi yang wajib dipertahankan dari dokumen operasional dummy.
+5. Uji prosedur reset pada proyek Firebase clone/isolasi terlebih dahulu; uji login kelima akun dan pemetaan role setelah reset.
+6. Menjelang deployment final, tampilkan dry-run berisi daftar path dan jumlah dokumen yang akan dibersihkan, daftar pengecualian, serta dampak terhadap konfigurasi dan aset.
+7. Minta persetujuan owner atas dry-run final. Baru setelah itu jalankan penghapusan terbatas dan terlog; jangan melakukan penghapusan menyeluruh pada Firebase Auth.
+8. Verifikasi ulang kelima akun dapat login dan memiliki role yang benar; verifikasi tidak ada data dummy tertinggal pada koleksi yang ditetapkan untuk reset.
+9. Simpan Firebase sebagai arsip/rollback sesuai keputusan cutover dan kebijakan retensi; jangan memutus atau menghapus proyek sebelum TiDB final diterima.
+
+**Larangan:** tidak ada penghapusan sekarang. Persetujuan owner untuk klasifikasi dummy dan rencana pembersihan menjelang rilis bukan persetujuan untuk langsung menjalankan DELETE hari ini. Pembersihan hanya boleh dilakukan setelah snapshot terverifikasi, dry-run, dan persetujuan final yang spesifik.
+
+### 14.4 Status
+
+- Klasifikasi seluruh data operasional lama sebagai dummy: **dikonfirmasi owner**.
+- Lima akun whitelist: **dikonfirmasi owner**.
+- Snapshot live Firebase/Auth: **belum dilakukan**.
+- UID/role/path aktual kelima akun: **belum diverifikasi read-only**.
+- Penghapusan data dummy: **belum dilakukan dan belum dijadwalkan**.
+- Data sintetis untuk TiDB preview: **boleh ditambahkan secara terkontrol setelah schema/test gate siap**.
