@@ -83,3 +83,25 @@ test("stock-only update uses optimistic projection version and recalculates sell
   assert.match(captured.sql, /disposition = 'sellable'/);
   assert.equal(captured.params[3], "3");
 });
+
+
+test("batch with unverified origin is quarantined even when expiry date is present", async () => {
+  let params;
+  const connection = {
+    async execute(sql, values) {
+      if (sql.startsWith("SELECT pr.purchase_receipt_id")) return [[]];
+      if (sql.startsWith("SELECT medicine_id AS medicineId")) return [[{ medicineId: 9, unitCost: "500" }]];
+      if (sql.startsWith("INSERT INTO purchase_receipt_lines")) return [{ insertId: 52, affectedRows: 1 }];
+      if (sql.startsWith("INSERT INTO inventory_batches")) { params = values; return [{ insertId: 62, affectedRows: 1 }]; }
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  await createTidbInventoryRepository().createBatch(connection, {
+    purchaseReceiptId: "32", sourcePurchaseLineId: "22", medicineId: "9",
+    batchNo: "LOT-UNVERIFIED", expiryDate: "2027-12-31", originVerified: false,
+    receivedQty: "5", remainingQty: "5", purchaseValue: "2500", disposition: "sellable"
+  });
+  assert.equal(params[4], 1, "expiry is verified");
+  assert.equal(params[5], 0, "origin remains unverified");
+  assert.equal(params[9], "quarantined", "unverified origin must never enter sellable stock");
+});
