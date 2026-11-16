@@ -673,3 +673,10 @@ See [MYSQL_MIGRATION_OPERATIONAL_DATE_REPORT_FILTER_EXPORT_AUDIT_PASS17.md](./MY
 ## Role authorization and data security audit — pass 18
 
 See [MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md](./MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md). The static audit records UI role tabs, Firebase profile verification, collection read listeners, generic write scopes and dedicated workflow guards. Critical blockers include stale account allowlists versus the five latest protected identities, staff profile UID binding gaps, provisioning that can reactivate staff, unverified Firestore read rules, broad Admin collection synchronization, and client-side authorization boundaries. Target design requires immutable identity binding, centralized server-side deny-by-default policies, scoped queries, command endpoints and append-only server audit. No accounts or application data changed.
+
+
+## Pass 19 — Patient, encounter, and queue integrity
+
+Static source audit: [MYSQL_MIGRATION_PATIENT_ENCOUNTER_QUEUE_INTEGRITY_AUDIT_PASS19.md](MYSQL_MIGRATION_PATIENT_ENCOUNTER_QUEUE_INTEGRITY_AUDIT_PASS19.md).
+
+Key schema implications: separate patient master from repeatable encounter; model queue type A/B and allocate each date/type sequence transactionally; enforce active-call policy server-side; preserve cancellation/reactivation and call history; validate encounter/patient/shift/cashier ownership at checkout; allocate invoice numbers server-side. Current source registration allocates A only, local calling is not a cross-device atomic invariant, checkout backend does not visibly reject a missing patient or validate the complete ownership tuple, and invoice display number is based on local transaction count. These are source findings, not runtime test results. Owner policy gates remain: meaning of A/B, queue switching, global-vs-per-queue active call, re-call behavior, and meaning of completed visit.
