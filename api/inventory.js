@@ -53,6 +53,16 @@ module.exports = async function handler(req, res) {
       result = await commands.receivePurchase(value);
     } else if (body.action === "supplier_return_request") {
       result = await commands.createSupplierReturnRequest(value);
+    } else if (body.action === "stocktake_create") {
+      result = await commands.createStocktake(value);
+    } else if (body.action === "stocktake_approve") {
+      result = await commands.approveStocktake(value);
+    } else if (body.action === "quarantine_inspect") {
+      result = await commands.inspectQuarantineBatch(value);
+    } else if (body.action === "quarantine_approve_release") {
+      result = await commands.approveQuarantineRelease(value);
+    } else if (body.action === "quarantine_release") {
+      result = await commands.releaseQuarantineBatch(value);
     } else if (body.action === "supplier_return_approve") {
       result = await commands.approveSupplierReturn(value);
     } else if (body.action === "supplier_return_dispatch") {
