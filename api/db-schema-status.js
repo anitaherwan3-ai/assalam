@@ -5,7 +5,7 @@ const { getPool } = require("../lib/tidb");
 const expected = [
   "users", "role_assignments", "active_role_slots", "firebase_identities",
   "audit_events", "idempotency_requests", "outbox_jobs", "tariffs", "suppliers",
-  "user", "session", "account", "verification",
+  "user", "session", "account", "verification", "rateLimit",
   "cashier_shifts", "active_shift_slots", "patients", "patient_encounters", "queue_counters",
   "cashier_queue_assignments", "queue_tickets", "queue_call_guards", "queue_call_events",
   "queue_transfer_events", "queue_display_configs",
