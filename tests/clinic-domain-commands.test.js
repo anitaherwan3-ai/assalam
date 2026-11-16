@@ -44,17 +44,19 @@ function createHarness(overrides = {}) {
 
   const repo = {
 
-    async lockCheckoutContext() {
+    async lockCheckoutContext(_c, encounterId, shiftId) {
       return {
-        encounter: { encounterId: "enc-checkout", patientId: "pat-1", cashierUserId: "cashier-1", shiftId: "shift-1", businessDate: "2026-11-17" },
-        shift: { shiftId: "shift-1", cashierUserId: "cashier-1", status: "open" }
+        encounter: { encounterId: String(encounterId), patientId: "patient-" + encounterId, cashierUserId: "cashier-1", shiftId: String(shiftId), businessDate: "2026-11-17" },
+        shift: { shiftId: String(shiftId), cashierUserId: "cashier-1", status: "open" }
       };
     },
-    async buildAuthoritativeCheckoutSnapshot() {
+    async buildAuthoritativeCheckoutSnapshot(_c, input) {
+      const qty = String(input.requestedItems[0].quantity);
+      const amount = String(Number(qty) * 1500);
       return {
-        invoice: { number: "N20261117-0001", total: "6000" },
-        lines: [{ name: "Obat Uji", medicineId: "med-1", quantity: "4", price: "1500", hpp: "1000" }],
-        inventoryRequirements: [{ medicineId: "med-1", quantity: "4" }]
+        invoice: { number: "N20261117-" + qty, total: amount },
+        lines: [{ name: "Obat Uji", medicineId: "med-1", quantity: qty, price: "1500", hpp: "1000" }],
+        inventoryRequirements: [{ medicineId: "med-1", quantity: qty }]
       };
     },
     async createInvoiceDraft() { const id = "invoice-" + (state.invoiceDrafts.length + 1); state.invoiceDrafts.push({ id, status: "draft" }); return id; },
@@ -158,9 +160,10 @@ const lead = { userId: "lead-1", role: "pimpinan" };
 
 test("two simultaneous checkouts competing for the last batch cannot create negative stock", async () => {
   const { state, commands } = createHarness();
-  const request = key => commands.issueStock({
-    actor: cashier, medicineId: "med-1", quantity: "4",
-    sourceInvoiceId: "invoice-" + key, idempotencyKey: "key-" + key, requestId: "req-" + key
+  const request = key => commands.postCheckout({
+    actor: cashier, encounterId: "enc-" + key, shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "4" }],
+    idempotencyKey: "key-" + key, requestId: "req-" + key
   });
   const results = await Promise.allSettled([request("one"), request("two")]);
   assert.equal(results.filter(x => x.status === "fulfilled").length, 1);
@@ -168,33 +171,38 @@ test("two simultaneous checkouts competing for the last batch cannot create nega
   assert.equal(state.medicine.stockQty, "1");
   assert.equal(state.batches[0].remainingQty, "1");
   assert.equal(state.movements.length, 1);
-  assert.equal(state.movements[0].quantity, "4");
+  assert.equal(state.invoices.length, 1);
 });
 
-test("idempotent retry returns the original result without a second stock movement", async () => {
+test("idempotent checkout retry returns the original invoice without duplicate movement", async () => {
   const { state, commands } = createHarness();
   const request = {
-    actor: cashier, medicineId: "med-1", quantity: "2",
-    sourceInvoiceId: "invoice-1", idempotencyKey: "same-key-123", requestId: "req-1"
+    actor: cashier, encounterId: "enc-idem", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "2" }],
+    idempotencyKey: "same-key-123", requestId: "req-1"
   };
-  const first = await commands.issueStock(request);
-  const replay = await commands.issueStock(request);
+  const first = await commands.postCheckout(request);
+  const replay = await commands.postCheckout(request);
   assert.deepEqual(replay, first);
   assert.equal(state.movements.length, 1);
+  assert.equal(state.invoices.length, 1);
   assert.equal(state.medicine.stockQty, "3");
 });
 
-test("failed movement write rolls back earlier batch changes and leaves no audit/idempotency result", async () => {
+test("checkout failure rolls back the invoice, batch and ledger writes together", async () => {
   const { state, commands } = createHarness({
     async appendInventoryMovement() { throw Object.assign(new Error("simulated failure"), { code: "WRITE_FAILED" }); }
   });
-  await assert.rejects(commands.issueStock({
-    actor: cashier, medicineId: "med-1", quantity: "2",
-    sourceInvoiceId: "invoice-fail", idempotencyKey: "failure-key-1", requestId: "req-fail"
+  await assert.rejects(commands.postCheckout({
+    actor: cashier, encounterId: "enc-fail", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "2" }],
+    idempotencyKey: "failure-key-1", requestId: "req-fail"
   }), { code: "WRITE_FAILED" });
   assert.equal(state.medicine.stockQty, "5");
   assert.equal(state.batches[0].remainingQty, "5");
   assert.equal(state.movements.length, 0);
+  assert.equal(state.invoiceDrafts.length, 0);
+  assert.equal(state.invoices.length, 0);
   assert.equal(state.audits.length, 0);
 });
 
