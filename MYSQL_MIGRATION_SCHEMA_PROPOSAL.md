@@ -720,3 +720,7 @@ See [MYSQL_MIGRATION_FK_CANDIDATE_CANONICALIZATION_PASS30.md](./MYSQL_MIGRATION_
 ## 33. FK child-index evidence audit — Pass 31
 
 See [MYSQL_MIGRATION_FK_CHILD_INDEX_EVIDENCE_AUDIT_PASS31.md](./MYSQL_MIGRATION_FK_CHILD_INDEX_EVIDENCE_AUDIT_PASS31.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_CHILD_INDEX_EVIDENCE_PASS31.csv). The static comparison finds 30 exact index declarations, 3 leading-prefix declarations, 74 candidate indexes not declared in the table section, and 9 supplemental/incomplete table sections without index evidence. These are proposal-text findings, not live TiDB metadata. Schema v1 remains blocked.
+
+## 34. FK parent PK/UNIQUE evidence audit — Pass 32
+
+See [MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_AUDIT_PASS32.md](./MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_AUDIT_PASS32.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_PASS32.csv). Pass 32 finds missing/integrated parent composite keys, plus the F70 ordered-key mismatch between the FK tuple (invoice_id, invoice_line_id) and the proposed UNIQUE (invoice_line_id, invoice_id). These are static text findings, not live TiDB metadata. Schema v1 remains blocked.
