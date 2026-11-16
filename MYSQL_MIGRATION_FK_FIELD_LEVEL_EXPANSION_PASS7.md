@@ -17,7 +17,7 @@ The earlier prose count of 104 candidate relationships happens to equal the numb
 | Numbered manifest rows | 104 | F01 through F104, inclusive |
 | Rows with grouped child-side references | 10 | F12, F23, F35, F54, F60, F63, F65, F74, F86, F90 |
 | Additional tuples created by expanding grouped rows | 12 | Relative to treating each numbered row as one |
-| Literal expanded candidate tuples | 116 | 104 + 11; includes polymorphic alternatives |
+| Literal expanded candidate tuples | 116 | 104 + 12; includes polymorphic alternatives |
 | Approved physical FK constraints | 0 | None has been generated or applied |
 
 Expansion detail:
