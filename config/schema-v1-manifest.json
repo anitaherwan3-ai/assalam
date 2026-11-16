@@ -157,16 +157,6 @@
           "name": "created_at_utc",
           "type": "DATETIME(3)",
           "attributes": "NOT NULL"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
         }
       ],
       "primaryKey": [
@@ -198,7 +188,32 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_role_assignments_user",
+          "columns": [
+            "user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_role_assignments_grantor",
+          "columns": [
+            "granted_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "active_role_slots": {
       "migration": "001_identity_foundation",
@@ -217,21 +232,6 @@
           "name": "activated_at_utc",
           "type": "DATETIME(3)",
           "attributes": "NOT NULL"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "role",
-          "attributes": "_assignments (role_assignment_id, user_id)"
-        },
-        {
-          "name": "ON",
-          "type": "DELETE",
-          "attributes": "RESTRICT ON UPDATE RESTRICT"
         }
       ],
       "primaryKey": [
@@ -246,7 +246,34 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_active_role_slots_user",
+          "columns": [
+            "user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_active_role_slots_assignment_owner",
+          "columns": [
+            "role_assignment_id",
+            "user_id"
+          ],
+          "referencedTable": "role_assignments",
+          "referencedColumns": [
+            "role_assignment_id",
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "firebase_identities": {
       "migration": "001_identity_foundation",
@@ -285,11 +312,6 @@
           "name": "last_seen_at_utc",
           "type": "DATETIME(3)",
           "attributes": "NULL"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
         }
       ],
       "primaryKey": [
@@ -313,7 +335,20 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_firebase_identity_user",
+          "columns": [
+            "user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "audit_events": {
       "migration": "002_audit_idempotency_outbox",
@@ -382,11 +417,6 @@
           "name": "source_ip_hash",
           "type": "VARCHAR(128)",
           "attributes": "NULL"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
         }
       ],
       "primaryKey": [
@@ -425,7 +455,20 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_audit_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "idempotency_requests": {
       "migration": "002_audit_idempotency_outbox",
@@ -489,11 +532,6 @@
           "name": "expires_at_utc",
           "type": "DATETIME(3)",
           "attributes": "NULL"
-        },
-        {
-          "name": "REFERENCES",
-          "type": "users",
-          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
         }
       ],
       "primaryKey": [
@@ -517,7 +555,20 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_idempotency_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "outbox_jobs": {
       "migration": "002_audit_idempotency_outbox",
@@ -893,7 +944,20 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_ba_session_user",
+          "columns": [
+            "userId"
+          ],
+          "referencedTable": "user",
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "account": {
       "migration": "004_better_auth_core",
@@ -984,7 +1048,20 @@
           ]
         }
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "name": "fk_ba_account_user",
+          "columns": [
+            "userId"
+          ],
+          "referencedTable": "user",
+          "referencedColumns": [
+            "id"
+          ],
+          "onDelete": "CASCADE",
+          "onUpdate": "RESTRICT"
+        }
+      ]
     },
     "verification": {
       "migration": "004_better_auth_core",
