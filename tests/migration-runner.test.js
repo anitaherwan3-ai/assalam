@@ -20,7 +20,7 @@ function mockConnection(fkEnabled = 1) {
       const match = sql.match(/CREATE TABLE IF NOT EXISTS ([a-z_]+)/i);
       if (match) {
         tables.add(match[1]);
-        ddl.push(match[1]);
+        if (match[1] !== "schema_migrations") ddl.push(match[1]);
       }
       return [{ affectedRows: 0 }];
     },

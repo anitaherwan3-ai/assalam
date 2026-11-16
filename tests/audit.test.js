@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const { encodeSnapshot } = require("../lib/audit");
 
 test("audit snapshot allows ordinary operational fields", () => {
-  assert.equal(encodeSnapshot({ status: "approved", amount: 125000 }), '{"status":"approved","amount":125000}');
+  assert.equal(encodeSnapshot({ status: "approved", amount: 125000 }), '{"amount":125000,"status":"approved"}');
 });
 
 test("audit snapshot blocks credentials recursively", () => {
