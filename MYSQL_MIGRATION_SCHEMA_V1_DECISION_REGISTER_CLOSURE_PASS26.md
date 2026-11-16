@@ -143,3 +143,8 @@ D02/D03 (patient/encounter and historical invoice linkage) are engineering-handl
 ## 10. Safety statement
 
 No app source was edited; no DDL or data import was executed; no Firebase/Auth data was read or changed; no protected account was modified; no Vercel deployment or production operation occurred; no merge to `main` or PR13 was performed. This document is a design/decision register only.
+
+
+## Follow-on physical manifest audit — Pass 27
+
+Pass 27 corrects stale FK manifest cardinality wording: 104 numbered rows F01–F104, 116 literal expanded candidate tuples, and zero approved/applied physical constraints. The full physical FK/type/index/ownership/action matrix remains incomplete. See `MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md`. The schema v1 readiness verdict remains unchanged.
