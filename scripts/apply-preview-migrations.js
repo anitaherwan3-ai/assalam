@@ -29,7 +29,8 @@ async function main() {
     require("../lib/migrations/007_sales_returns_refunds_v1"),
     require("../lib/migrations/008_finance_controls_v1"),
     require("../lib/migrations/009_operational_controls_v1"),
-    require("../lib/migrations/010_supplier_return_dispatch_reference")
+    require("../lib/migrations/010_supplier_return_dispatch_reference"),
+    require("../lib/migrations/011_quarantine_inspection_decision")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
