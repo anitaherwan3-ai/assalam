@@ -1,7 +1,7 @@
 "use strict";
 
 const crypto = require("node:crypto");
-const { requireFirebaseActor, requireRole } = require("../../lib/require-auth");
+const { requireBetterAuthActor, requireRole } = require("../../lib/require-better-auth-actor");
 const {
   listSuppliers, createSupplier, updateSupplier, deactivateSupplier
 } = require("../../lib/catalog");
@@ -9,7 +9,7 @@ const {
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, private");
   try {
-    const actor = requireRole(await requireFirebaseActor(req), ["admin", "pimpinan"]);
+    const actor = requireRole(await requireBetterAuthActor(req), ["admin", "pimpinan"]);
     if (req.method === "GET") {
       return res.status(200).json({ ok: true, data: await listSuppliers() });
     }
