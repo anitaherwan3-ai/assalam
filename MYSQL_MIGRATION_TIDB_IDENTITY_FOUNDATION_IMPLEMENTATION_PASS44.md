@@ -36,4 +36,4 @@ The migration runner remains disabled because `TIDB_MIGRATIONS_ENABLED` and `ASS
 
 ## Verification status
 
-Automated test source and CI workflow have been added. Tests are **pending CI execution**; the repository Actions API currently reports no workflow run for this branch. No local Node runtime or live TiDB migration was run in this pass. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.
+Automated test source and CI workflow have been added. The first CI pass verified the token and identity-migration tests (7 passed) but exposed a test-isolation issue: importing the transaction helper eagerly loaded the production MySQL driver. The helper now loads the driver only when a real pool transaction is requested, so its mock-connection tests run without a database package or live DB. The corrected CI run is pending. No live TiDB migration was run. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.
