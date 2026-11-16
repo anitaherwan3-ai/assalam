@@ -83,7 +83,7 @@ test("medicine unit approval is restricted to whole tablet, capsule, bottle and 
 test("queue lanes are assigned to the owner-confirmed morning and evening cashiers", () => {
   const policy = JSON.parse(fs.readFileSync(file, "utf8"));
   const d16 = policy.decisions.find(item => item.id === "D16");
-  assert.match(d16.recommendation.assignment, /Morning shift uses lane A.*assalamkasir1@gmail.com/i);
+  assert.match(d16.recommendation.laneRule, /Morning shift uses lane A.*assalamkasir1@gmail.com/i);
   assert.match(d16.recommendation.assignment, /evening shift uses lane B.*assalamkasir2@gmail.com/i);
   assert.equal(d16.ownerMustConfirm.length, 0);
   assert.match(d16.recommendation.transfer, /recorded reason/i);
