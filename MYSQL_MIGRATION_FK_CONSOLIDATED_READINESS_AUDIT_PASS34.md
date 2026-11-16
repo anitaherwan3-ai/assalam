@@ -28,7 +28,7 @@ Pass 34 joins the 116-row FK candidate/type matrix (Pass 28), child-index eviden
 
 ## 3. Gates still open for every or affected candidate
 
-1. **Child index:** only proposal-text matches are evidence; no live TiDB index metadata has been inspected. Candidates without table-section evidence need explicit final index definitions.
+1. **Child index:** only proposal-text matches are evidence; no live TiDB index metadata has been inspected. Candidates without table-section child-index evidence may rely on TiDB's documented automatic child-index creation, but the final schema must verify actual generated index names and ordered columns. Parent referenced indexes remain mandatory.
 2. **Parent key:** several composite UNIQUE tuples are only requirements in addenda/catalogue, not integrated in parent table definitions; F18 has no dedicated complete parent table section.
 3. **Nullability:** the final all-null/all-present policy for composite relationships is not verified row by row.
 4. **Charset/collation:** all text FK tuples require exact shared charset/collation declarations.
@@ -49,3 +49,8 @@ All 116 candidates remain blocked for DDL. This is not a reason to abandon the m
 ## 6. Safety
 
 No DDL, TiDB schema/data mutation, Firebase/Auth access or mutation, protected-account change, import, deployment, main merge or PR13 merge occurred.
+
+
+## TiDB child-index behavior addendum — Pass 38
+
+Official TiDB documentation states that missing child FK indexes are automatically created when the FK is added; missing parent indexes cause FK creation failure. See [Pass 38](./MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md). Actual cluster version and runtime behavior remain unverified.
