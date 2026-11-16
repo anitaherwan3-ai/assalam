@@ -743,3 +743,7 @@ See [MYSQL_MIGRATION_FK_ACTION_POLICY_AUDIT_PASS36.md](./MYSQL_MIGRATION_FK_ACTI
 ## 39. FK child-index prefix coverage — Pass 37
 
 See [MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.md](./MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.csv). Pass 37 tests the full ordered FK child tuple against proposal index leading columns: 41 candidates have proposal index coverage, 72 do not, and 3 lack a complete table-section index definition. These are proposal-text findings, not live TiDB metadata. Schema v1 remains blocked.
+
+## 40. TiDB foreign-key capability and runtime gate — Pass 38
+
+See [MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md](./MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md). Official TiDB documentation states FK constraints are GA from v8.5.0, child indexes are automatically created when absent, parent referenced indexes are required, and FK checks may lock referenced parent rows. The actual `assalamklinik` version and session settings are not yet verified; a disposable preview compatibility probe is mandatory before DDL. No DDL or database mutation.
