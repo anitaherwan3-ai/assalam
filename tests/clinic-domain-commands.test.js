@@ -9,6 +9,7 @@ function createHarness(overrides = {}) {
     medicine: { medicineId: "med-1", quantityScale: 0, stockQty: "5", hpp: "1000", version: "1" },
     batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", version: "1" }],
     movements: [], audits: [], patients: [], encounters: [], tickets: [],
+    invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [],
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
   };
   let queue = Promise.resolve();
@@ -21,7 +22,9 @@ function createHarness(overrides = {}) {
     const snapshot = structuredClone({
       medicine: state.medicine, batches: state.batches, movements: state.movements,
       audits: state.audits, patients: state.patients, encounters: state.encounters,
-      tickets: state.tickets, currentCall: state.currentCall,
+      tickets: state.tickets, invoiceDrafts: state.invoiceDrafts, invoices: state.invoices,
+      invoiceLines: state.invoiceLines, batchAllocations: state.batchAllocations,
+      returnQuotas: state.returnQuotas, currentCall: state.currentCall,
       nextSequence: state.nextSequence, claims: state.claims, completed: state.completed
     });
     try {
@@ -35,6 +38,26 @@ function createHarness(overrides = {}) {
   }
 
   const repo = {
+
+    async lockCheckoutContext() {
+      return {
+        encounter: { encounterId: "enc-checkout", patientId: "pat-1", cashierUserId: "cashier-1", shiftId: "shift-1", businessDate: "2026-11-17" },
+        shift: { shiftId: "shift-1", cashierUserId: "cashier-1", status: "open" }
+      };
+    },
+    async buildAuthoritativeCheckoutSnapshot() {
+      return {
+        invoice: { number: "N20261117-0001", total: "6000" },
+        lines: [{ name: "Obat Uji", medicineId: "med-1", quantity: "4", price: "1500", hpp: "1000" }],
+        inventoryRequirements: [{ medicineId: "med-1", quantity: "4" }]
+      };
+    },
+    async createInvoiceDraft() { const id = "invoice-" + (state.invoiceDrafts.length + 1); state.invoiceDrafts.push({ id, status: "draft" }); return id; },
+    async insertInvoiceLines(_c, id, lines) { state.invoiceLines.push({ invoiceId: id, lines }); },
+    async insertSaleBatchAllocations(_c, id, rows) { state.batchAllocations.push({ invoiceId: id, rows }); },
+    async postInvoice(_c, id, totals) { state.invoices.push({ invoiceId: id, ...totals, status: "posted" }); },
+    async createReturnQuotas(_c, id, lines) { state.returnQuotas.push({ invoiceId: id, lineCount: lines.length }); },
+    async markEncounterCompleted(_c, id, invoiceId) { state.encounterCompleted = { id, invoiceId }; },
     async previewMedicine() { return { ...state.medicine }; },
     async lockSaleIssueSource(_c, id) { return { invoiceId: id, cashierUserId: "cashier-1", businessDate: "2026-11-17", status: "ready_for_stock_posting" }; },
     async lockMedicine() { return state.medicine; },
@@ -229,4 +252,43 @@ test("supplier payment and refund payout fail closed until their owner policies 
   await assert.rejects(commands.payRefund({
     actor: lead, payout: payment, idempotencyKey: "refund-pay-1", requestId: "refund-pay-req"
   }), { code: "REFUND_PAYOUT_POLICY_PENDING" });
+});
+
+test("checkout posts invoice, batch movements, allocations and encounter completion in one transaction", async () => {
+  const { state, commands } = createHarness();
+  const result = await commands.postCheckout({
+    actor: cashier, encounterId: "enc-checkout", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "4" }],
+    idempotencyKey: "checkout-key-1", requestId: "checkout-req-1"
+  });
+  assert.equal(result.body.data.total, "6000");
+  assert.equal(state.medicine.stockQty, "1");
+  assert.equal(state.batches[0].remainingQty, "1");
+  assert.equal(state.movements.length, 1);
+  assert.equal(state.invoiceLines.length, 1);
+  assert.equal(state.batchAllocations.length, 1);
+  assert.equal(state.invoices[0].status, "posted");
+  assert.equal(state.returnQuotas.length, 1);
+  assert.equal(state.encounterCompleted.invoiceId, result.body.data.invoiceId);
+});
+
+test("checkout failure after invoice draft and stock deduction rolls back the complete transaction", async () => {
+  const { state, commands } = createHarness({
+    async createReturnQuotas() { throw Object.assign(new Error("quota write failed"), { code: "RETURN_QUOTA_WRITE_FAILED" }); }
+  });
+  await assert.rejects(commands.postCheckout({
+    actor: cashier, encounterId: "enc-checkout", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "4" }],
+    idempotencyKey: "checkout-failure-1", requestId: "checkout-failure-req"
+  }), { code: "RETURN_QUOTA_WRITE_FAILED" });
+  assert.equal(state.medicine.stockQty, "5");
+  assert.equal(state.batches[0].remainingQty, "5");
+  assert.equal(state.movements.length, 0);
+  assert.equal(state.invoiceDrafts.length, 0);
+  assert.equal(state.invoices.length, 0);
+  assert.equal(state.invoiceLines.length, 0);
+  assert.equal(state.batchAllocations.length, 0);
+  assert.equal(state.returnQuotas.length, 0);
+  assert.equal(state.encounterCompleted, undefined);
+  assert.equal(state.audits.length, 0);
 });
