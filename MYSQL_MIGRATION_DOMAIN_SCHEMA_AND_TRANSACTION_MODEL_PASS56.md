@@ -1,181 +1,192 @@
-# Clinic Domain Relational Model & Transaction Contract — Pass 56
+# Klinik Assalaam — Domain Schema and Transaction Model (Pass 56)
 
 **Branch:** migration/tidb-foundation  
-**Status:** logical model + tested command contracts; physical DDL intentionally not registered or executed  
-**Production source of truth:** Firebase  
-**Latest CI:** 89/89 tests passed (synthetic/unit layer; TiDB runtime tests are still a separate gate)
+**Status:** logical schema, validators and command contracts; physical DDL is not approved or applied  
+**Production authority:** Firebase remains active
 
-## 1. Safety and scope
+## 1. Safety boundary
 
-This pass defines a unified domain model and atomic command boundaries for medicine, batches, inventory movements, purchasing, supplier returns, patients, encounters, queue, finance, payments, payables, refunds, cash and reconciliation.
+This package defines the relational model and command boundaries for:
+- Medicine, batch, inventory movements, purchase receipts and supplier returns.
+- Patient master, encounters, queue tickets, call events and display projection.
+- Sales invoices, payment events, supplier payables/payments, refund obligations/payouts, cash and journals.
+- Atomic transactions, rollback, concurrency and reconciliation.
 
-Executable validations and dependency-injected commands are present in:
+Executable source is in:
 - lib/clinic-domain-model.js
 - lib/clinic-domain-contracts.js
 - lib/clinic-domain-commands.js
 
-No domain SQL migration has been registered with the migration runner. No domain DDL was run, no operational records were imported, no Firebase/Auth data or protected accounts were changed, and no production code or deployment was changed. The SQL repository adapter and UI route integration remain blocked until the physical schema and policy gates are closed.
+There is deliberately no domain migration 004 registered in the active migration runner. No domain DDL was run, no operational data imported, and no Firebase, production, protected account, main branch or production deployment was changed.
 
-## 2. Logical relational model
+## 2. Logical tables
 
-Existing foundation tables remain: users, role_assignments, active_role_slots, firebase_identities, audit_events, idempotency_requests, outbox_jobs, tariffs and suppliers.
+Existing foundation tables are retained: users, role_assignments, active_role_slots, firebase_identities, audit_events, idempotency_requests, outbox_jobs, tariffs and suppliers.
 
-### A. Medicine / purchase / batch / inventory
+### Inventory and purchasing
 
-| Candidate table | Core fields | Invariants |
+| Candidate table | Main fields | Critical invariants |
 |---|---|---|
-| medicines | public ID, legacy ID, name, canonical unit, approved quantity scale, sell price, minimum stock, active, version | Unit and precision are explicit per medicine; browser cannot overwrite stock/HPP |
-| purchase_invoices | supplier, invoice number/date, total, payment-term snapshot, source ID, status | Unique identity within supplier only after source rule verification |
-| purchase_lines | invoice, medicine, ordered quantity, received quantity, original unit cost, line total, version | Received quantity cannot exceed ordered quantity; invoice-time values are immutable |
-| purchase_receipts | purchase line, receipt reference, receipt/business date, quantity, receipt value, actor | Idempotent retry; split-receipt cardinality must be verified from source |
-| medicine_batches | medicine, source receipt/line, batch number, expiry, received timestamp, original quantity, remaining quantity, disposition, version | No batch without purchase-receipt lineage; balance cannot be negative or exceed original quantity |
-| inventory_movements | medicine, batch, movement type/direction, positive quantity, source, actor, reason, time, reversal reference | Append-only; correction uses a linked reversal, never a direct stock edit |
-| medicine_stock_projections | medicine, physical/sellable quantity, HPP projection, version, projection timestamp | Derived from batch/movement ledger; not an independent source of truth |
-| supplier_returns | purchase line, batch, requested quantity, reason, approval/dispatch state, evidence, settlement state | Must point to original batch; request does not move stock; dispatch posts negative movement |
-| inventory_losses | batch, loss type, quantity, HPP snapshot, approver, evidence, movement ID | Loss creates immutable negative movement and cannot double-reduce sale HPP |
+| medicines | public/legacy ID, name, canonical unit, approved quantity scale, price, minimum stock, active, version | Unit/precision is explicit per medicine; never accept stock/HPP from a master edit |
+| purchase_invoices | supplier, supplier invoice number/date, total, status, source ID | Source identity and uniqueness require source verification |
+| purchase_lines | invoice, medicine, ordered qty, received qty, unit cost, line total | Receipt never exceeds ordered qty; preserve original invoice facts |
+| purchase_receipts | source line, receipt reference, business date, UTC time, qty, receipt value, actor | Idempotent; split receipt cardinality remains a source gate |
+| medicine_batches | medicine, source receipt/line, batch no, expiry, received time, original qty, remaining qty, disposition, version | Never create a batch without receipt lineage; quantity bounds enforced |
+| inventory_movements | medicine, batch, movement type/direction, positive qty, source, actor, reason, UTC time, reversal link | Append-only; correction is a linked reversal, not an overwrite |
+| medicine_stock_projections | medicine, physical/sellable qty, HPP, version, projection time | Derived projection only; batch and movement ledgers remain the source |
+| supplier_returns | source purchase line/batch, qty, reason, request/approval/dispatch status, evidence, settlement state | Request is stock-neutral; dispatch posts one negative movement |
+| inventory_losses | batch, loss type, qty, HPP snapshot, approver/evidence, movement ID | Loss creates immutable movement |
 
-Movement types supported by the model: purchase receipt, sale issue, patient return, supplier return, loss, stocktake increase/decrease, opening balance and reversal.
+Movement vocabulary: purchase_receipt, sale_issue, patient_return, supplier_return, loss, stocktake increase/decrease, opening_balance and reversal.
 
-Quantity arithmetic is exact and string/BigInt based. The physical SQL precision must support the explicitly approved per-medicine scale. Database capacity for decimals is not permission to dispense fractional tablets or strips. D01 remains an owner gate.
+Quantities are calculated using string/BigInt-safe exact arithmetic. Physical SQL capacity for decimal precision does not decide whether a clinic may dispense fractional tablets/strips. D01 remains an owner policy gate.
 
-FEFO command order is expiry date, received UTC timestamp and stable batch ID, after filtering non-sellable/expired/empty batches. It calculates a full allocation before writing; insufficient quantity means no partial movement. Batch rows are revalidated and decremented in the same transaction.
+FEFO order is expiry date, received UTC timestamp, then stable batch ID after filtering expired, empty or non-sellable batches. The command computes the complete allocation before writing. Insufficient quantity means no partial allocation. The final SQL adapter must re-lock and revalidate the batch rows before commit.
 
-Purchase receipt writes receipt, batch, positive movement, stock/HPP projection and received quantity on purchase line together. Weighted moving-average HPP is calculated using exact integer Rupiah arithmetic. Freight, rebate, tax, opening HPP evidence and source split-receipt behavior remain open source/policy gates.
+Purchase receipt is one transaction: receipt, batch, positive movement, stock/HPP projection, received quantity and payable upsert. Weighted-average HPP uses exact integer Rupiah arithmetic. Landed cost, split receipt source behavior and opening HPP evidence remain unresolved source/policy gates.
 
-Supplier return is staged: create request without stock effect, then dispatch only after an approved state. Dispatch posts negative movement and does not rewrite historical invoice/payment totals or recognize a supplier credit. Credit note/refund/offset accounting remains D10/D11.
+Supplier return is staged: request without stock effect, then dispatch only from an approved state. Dispatch records a negative movement and evidence; it does not rewrite historical invoices or invent a credit note/payment. D10 and D11 remain open.
 
-### B. Patient / encounter / queue / display
+### Patient, encounter and queue
 
-| Candidate table | Core fields | Invariants |
+| Candidate table | Main fields | Critical invariants |
 |---|---|---|
-| patients | stable ID, name, optional phone, active, timestamps, version | Name/phone suggestions are not automatic identity matching |
-| patient_identity_links | patient ID, source system/collection/document ID, link status/evidence | Preserve legacy identity; quarantine ambiguous links |
-| encounters | patient, service, business date, registered/served times, original cashier/shift, lifecycle, version | Each visit is separate; invoice must reference matching patient/encounter/cashier/shift |
-| queue_prefix_policies | prefix, description/meaning, enabled, version, approval evidence | A/B prefix cannot be activated until operational meaning is approved |
-| queue_counters | business date, prefix, next sequence, version | Unique by date+prefix; allocation is atomic/idempotent |
-| queue_tickets | encounter, date, prefix, sequence, public number, status | Number unique per date/prefix; retries return same ticket |
-| queue_call_guards | guard scope/key, current ticket, version | Global or per-lane guard only after D16 policy approval |
-| queue_call_events | ticket, call/recall/cancel-call event, actor, request ID, server time | Append-only event history |
+| patients | stable ID, name, optional phone, active, version | No fuzzy auto-merge using name/phone |
+| patient_identity_links | patient, source system/collection/document ID, link evidence/status | Preserve source IDs; quarantine ambiguous matches |
+| encounters | patient, service, business date, registered/served time, cashier, shift, lifecycle | Every visit is distinct; invoice must match encounter/patient/cashier/shift |
+| queue_prefix_policies | prefix, meaning/description, enabled, approval evidence, version | A/B mapping is not inferred |
+| queue_counters | date, prefix, next sequence, version | Atomic unique sequence per business date/prefix |
+| queue_tickets | encounter, date, prefix, sequence, public number, status | Unique, idempotent and history-preserving |
+| queue_call_guards | scope and scope key, current ticket, version | Global or per-lane policy only after D16 |
+| queue_call_events | ticket, call/recall/cancel event, actor, request ID, server time | Append-only event history |
 | queue_display_config | display mode, running text, active prefix view, version | TV receives sanitized projection only |
-| queue_audio_assets | object key, MIME, byte count, checksum, version, actor/time, active | Audio bytes are in private object storage, not SQL |
+| queue_audio_assets | object key, MIME, size, checksum, actor/time, version | MP3 bytes live in private object storage, not SQL |
 
-Encounter registration gets business date and timestamp from the server, locks an open shift owned by the authenticated cashier, creates or selects a stable patient identity, creates one encounter, allocates a date+prefix sequence and creates one queue ticket in a single transaction. It does not fuzzy-match patients.
+Encounter registration uses server business date/time, locks an open shift owned by the authenticated cashier, creates or selects a stable patient ID, creates a new encounter, allocates a date/prefix sequence and creates its ticket in one transaction. It does not infer patient identity from name/phone.
 
-Queue call/recall/cancel locks the configured guard, checks current call, appends an event and updates the current-call projection within one transaction. The active-call policy is read inside that transaction. Queue prefix activation fails closed unless a prefix policy is approved. D16 remains open for A/B meaning, active-call exclusivity, transfer and completion semantics.
+Queue call events lock the configured active-call guard, validate the ticket/current call, append the event and update the current-call projection in the same transaction. Policy is read inside the transaction. Prefix creation fails closed without an approved prefix policy. D16 remains open for A/B meanings, global/per-lane exclusivity, transfers and completion semantics.
 
-Preserve A/B display switching, digit-by-digit spoken queue number and independent voice/chime customization. TV payload cannot expose patient phone or clinical data. “Batal Berobat” preserves visit and ticket history.
+Preserve separate A/B TV views and switching, digit-by-digit voice announcement, and independent voice/chime configuration. TV data must not contain patient phone or clinical data. Batal Berobat keeps the visit and ticket history.
 
-### C. Finance / payments / payables / refund / cash
+### Finance, payments, payables, refunds and cash
 
-| Candidate table | Core fields | Invariants |
+| Candidate table | Main fields | Critical invariants |
 |---|---|---|
-| sales_invoices | encounter, patient snapshot, cashier, shift, business date, total, status, source ID | Immutable invoice; cancellation is reversal, not deletion |
-| sales_invoice_lines | sale-time name/unit/quantity/price/discount/HPP and package snapshot | Master edits never reprice history |
-| sales_batch_allocations | invoice line, medicine, batch, allocated quantity, HPP snapshot | Allocations sum to sold quantity; return follows original lineage |
-| payment_events | source invoice, method, amount, business date, settlement status/reference, actor/time | Payment and settlement are separate from revenue recognition |
-| supplier_payables | purchase invoice, original amount, recognized credit, outstanding amount, status | Legacy paid boolean is not a payment ledger |
-| supplier_payments | payable, amount, method, paid/settled time, cash/bank reference, actor | Partial/multiple allocation remains D11; no fabricated history |
-| supplier_payment_allocations | payment, payable, allocated amount | Allocation cannot exceed payment or payable balance |
-| refund_obligations | original return, approved amount, outstanding amount, approval actor/time, status | Approval creates obligation, not cash outflow |
-| refund_payouts | obligation, amount, method, cash/bank account, payout date, evidence, Pimpinan | Payout separate, idempotent and Pimpinan-only |
-| cash_accounts | cash drawer/bank identity, currency, active, version | Cashier drawer, management cash and bank are separate |
-| cash_ledger_entries | account, shift, direction, amount, source, event/business date, actor, reversal | Immutable; opening float is custody, not revenue |
-| expense_requests | amount, category, requester, approver, status, evidence | Self-approval and threshold policy D08 |
-| petty_cash_events | account, category, advance/reimbursement, amount, source, actor, reversal | D09 classification; avoid duplicate expense |
-| journal_entries / journal_lines | business date, source, actor, account, debit/credit | Every posted journal must balance |
-| accounting_periods | date range, state, closed by/at | No posting into a closed period |
-| shift_cash_closes | shift, opening float, expected/count cash, variance, verifier/evidence | Verification authority D12 |
+| sales_invoices | encounter, patient snapshot, cashier, shift, business date, total, status | Immutable; cancellation is a reversal, not deletion |
+| sales_invoice_lines | sale-time name/unit/qty/price/discount/HPP/package snapshot | Current masters never re-price old notes |
+| sales_batch_allocations | invoice line, medicine, batch, qty, HPP snapshot | Return uses exact original batch lineage |
+| payment_events | invoice/source, method, amount, business date, settlement status/ref, actor/time | Payment is distinct from revenue recognition |
+| supplier_payables | purchase invoice, original amount, recognized credit, outstanding | Legacy paid boolean is not a payment ledger |
+| supplier_payments | payable, amount, method, paid/settled time, bank/cash ref, actor | Partial/multiple allocations gated by D11 |
+| supplier_payment_allocations | payment, payable, allocated amount | Cannot exceed payment or payable |
+| refund_obligations | original return, approved amount, outstanding, approver/time, status | Approval creates an obligation, not cash outflow |
+| refund_payouts | obligation, amount, method, cash/bank account, payout date/evidence, Pimpinan | Separate, idempotent and Pimpinan-only |
+| cash_accounts | cash drawer/bank identity, active, version | Cashier drawer, management cash and bank are separate |
+| cash_ledger_entries | account, shift, direction, amount, source, dates, actor, reversal | Immutable; opening float is custody, not revenue |
+| expense_requests | amount, category, requester, approver, status, evidence | D08 self-approval/threshold policy |
+| petty_cash_events | account, classification, advance/reimbursement, amount, source, actor | D09 classification; prevent duplicate expense |
+| journal_entries / journal_lines | date, source, actor, account, debit/credit | Posted journal must balance |
+| accounting_periods | date range, open/closed, actor/time | Closed period rejects posting |
+| shift_cash_closes | shift, opening float, expected/count cash, variance, verifier/evidence | D12 authority gate |
 
 Compatibility rules:
-- Invoice total is already after existing package/discount logic; do not subtract the discount twice.
-- Approved returns reduce revenue on approval/business date.
-- Refund outflow uses actual payout date; an unpaid refund remains an obligation.
-- Service returns create no stock movement.
-- Opening shift float never enters omzet or operating profit.
-- Supplier payment settles payable and is not a second expense.
-- Purchase is inventory/HPP, not a second expense when paid.
-- Non-cash receipt must follow D14 settlement rules; QRIS/transfer invoice alone is not bank settlement.
-- Reports come from posted events, not browser cache.
+- Invoice total already reflects legacy package/discount logic; never subtract discount twice.
+- Approved returns adjust revenue on approval date.
+- Refund payment reduces cash only on payout date; unpaid approved refunds remain obligations.
+- Service return creates no inventory movement.
+- Opening shift float is not omzet/profit.
+- Supplier payment settles payable, not a second expense.
+- Purchase enters inventory/HPP and is not expensed again when paid.
+- Non-cash receipt follows D14; invoice method alone does not prove bank settlement.
+- Reports aggregate posted events, not mutable browser state.
 
-## 3. Atomic command boundaries
+## 3. Atomic command contracts
 
-| Command | Locks and validates | Writes committed together |
+| Command | Required locking/validation | Same-transaction writes |
 |---|---|---|
-| Create medicine | Approved unit/precision policy | Medicine master + audit + idempotency |
+| Create medicine | Approved unit/precision policy | Master + audit + idempotency |
 | Purchase receipt | Purchase line, medicine and receipt policy | Receipt + batch + positive movement + stock/HPP projection + purchase line + payable upsert |
-| Sale issue/checkout stock | Invoice/encounter/shift, medicine and FEFO batch candidates | Batch allocations + negative sale movements + batch/stock projections; final checkout must include invoice completion and return quota in the same aggregate transaction |
-| Supplier return request | Purchase line, source batch and remaining quantity | Request only; no movement |
-| Supplier return dispatch | Approved request, purchase line, batch, medicine | Batch decrement + negative movement + stock projection + dispatch evidence; no supplier credit recognition until D10/D11 |
-| Encounter + queue ticket | Authenticated cashier/open shift, patient, approved prefix and counter | Optional patient + encounter + counter allocation + ticket |
-| Queue call/recall/cancel | Approved policy, guard, ticket and current call | Append event + current-call projection |
-| Payment event | Source invoice/payable + approved method policy | Payment event + relevant cash/bank event |
+| Checkout | Active encounter/open shift; server-computed catalog/package/discount snapshot; medicine and FEFO batches | Invoice draft + allocations + negative movements + batch/stock projections + invoice posting + return quota + encounter completion |
+| Supplier return request | Purchase line, source batch, return quota | Request only; no stock change |
+| Supplier return dispatch | Approved request, line, batch and medicine | Batch decrement + negative movement + stock projection + dispatch evidence; no credit recognition pending D10/D11 |
+| Encounter + ticket | Authenticated cashier/open shift, patient, approved prefix and counter | Optional patient + encounter + counter + ticket |
+| Queue call | Approved policy, guard, ticket/current call | Event append + current-call projection |
+| Payment event | Source and approved method policy | Payment event + applicable cash/bank event |
 | Supplier payment | Payable and D11-approved policy | Payment + allocation + payable projection + cash/bank event |
-| Refund payout | Approved obligation + D13 policy + Pimpinan | Payout + cash/bank outflow + obligation state |
-| Journal post | Open period + balanced lines | Journal header + lines + audit/idempotency |
+| Refund payout | Approved obligation, D13 policy, Pimpinan | Payout + cash/bank outflow + obligation state |
+| Journal post | Open period and balanced lines | Journal header + lines + audit/idempotency |
 
-All commands derive actor from verified server identity, use idempotency and server-authored audit, and must use a deterministic row-lock order. Any failure before commit must leave no partial inventory, encounter, queue, payment, cash or journal side effect.
+The command layer derives actor from verified server identity, uses idempotency and server-authored audit, and expects deterministic lock order. Checkout is one aggregate transaction: there is no separate stock-only sale command exposed by the domain command interface.
 
-## 4. Executable source status
+## 4. Executable coverage
 
-The command layer currently covers medicine validation, batch validation, movement validation, purchase receipt, weighted HPP, FEFO issue, supplier return request/dispatch, encounter/ticket registration, queue call events, balanced journal validation/posting, payment event, supplier payment and refund payout gates.
+Implemented command/validation contracts include:
+- Medicine master validation blocks stock/HPP edits and requires explicit unit precision.
+- Batch and movement provenance/direction validation.
+- Purchase receipt with weighted HPP and supplier payable upsert boundary.
+- Atomic checkout that computes sale snapshots server-side and writes invoice, FEFO allocations, movements, return quotas and encounter completion together.
+- Supplier return request (no movement) and dispatch (negative movement only after approved state).
+- Stable patient/encounter registration with atomic date/prefix counter and ticket.
+- Queue call/recall/cancel with policy read inside the guard transaction.
+- Balanced journals, payment method gate, supplier payment gate and Pimpinan refund payout gate.
+- Inventory and finance reconciliation helpers.
 
-The command layer uses an injected repository contract. The production SQL adapter/API routes and database tables are not yet connected; this is intentional until physical schema/FK/runtime approval. Do not expose new operational UI actions to these commands until the TiDB repository exists and runtime tests pass.
+The domain command layer uses a dependency-injected repository contract. SQL repository/API handlers and domain tables are not connected yet; do not wire operational UI buttons to these commands before the approved physical schema and real TiDB acceptance tests exist.
 
-## 5. Owner and source gates still blocking physical DDL or full posting
+## 5. Policy/source gates remain closed
 
-| Gate | Blocked action |
+| Gate | Blocked behavior pending approval/evidence |
 |---|---|
-| D01 | Activate a medicine unit and fractional precision policy |
-| D05 | Restore returned medicine to sellable stock before inspection/quarantine policy |
-| D06 | Finalize package discount/refund allocation; legacy largest-remainder is compatibility evidence only |
-| D08 | Expense self-approval and threshold policy |
-| D09 | Petty-cash categories, advances/reimbursement and expense recognition |
-| D10 | Recognize supplier credit note/refund/offset |
-| D11 | Enable partial/multiple supplier payments; never convert legacy paid boolean |
-| D12 | Approve shift-close authority and exceptions |
-| D13 | Finalize refund payout method, evidence and cash/bank source |
-| D14 | Non-cash settlement and recognition dates |
-| D15 | Opening stock/HPP valuation evidence |
-| D16 | A/B prefix meaning, transfer and global/per-lane call rule |
-| D17 | Malformed/missing legacy timestamps |
-| D18 | Clinical record retention, correction and legal hold |
+| D01 | Medicine unit, fractional quantity, precision/rounding |
+| D05 | Returned medicine inspection, quarantine and resale |
+| D06 | Package refund allocation; legacy largest-remainder is evidence only |
+| D08 | Expense threshold and self-approval |
+| D09 | Petty-cash classification/advances/reimbursements |
+| D10 | Supplier credit note/refund/offset recognition |
+| D11 | Partial/multiple supplier payments; no inference from old paid boolean |
+| D12 | Shift verification roles/exceptions |
+| D13 | Refund payout method, evidence and source cash/bank account |
+| D14 | Non-cash settlement and recognition timing |
+| D15 | Opening stock/HPP evidence |
+| D16 | A/B prefix meaning, transfers and active-call policy |
+| D17 | Malformed/missing historical timestamps |
+| D18 | Clinical record retention/correction/legal hold |
 | D19 | Audit retention/export/legal hold |
-| D20 | Long-term auth/bootstrap/recovery strategy |
+| D20 | Long-term auth/bootstrap/recovery |
 
-Source evidence gates: deployed Firebase Functions release source, deployed Firestore Rules snapshot, read-only Auth UID/profile exports, split receipt cardinality, historical batch lineage exceptions, exact TiDB FK types/actions/parent keys/child indexes and runtime compatibility.
+Source evidence gates: deployed Firebase Functions source, deployed Firestore Rules snapshot, read-only Auth UID/profile exports, split receipt behavior, historic batch-lineage exceptions, and exact TiDB FK types/actions/parent keys/child indexes/runtime compatibility.
 
-## 6. Test and reconciliation matrix
+## 6. Acceptance matrix
 
-### Synthetic CI layer
-- Exact quantity scale and integer Rupiah safety.
-- Deterministic FEFO and no partial allocation on shortage.
-- Weighted-average HPP with integer and explicit fractional quantity scale.
-- Supplier return follows purchase batch and rejects over-return.
-- Two concurrent issues competing for one batch cannot create negative stock.
-- Idempotent retry returns original response without a second movement.
-- Injected mid-command failure rolls back batch, stock projection, movement, audit and idempotency completion.
-- Simultaneous encounter registration returns distinct patient/encounter and unique queue sequences.
-- Concurrent call events serialize under configured guard policy.
-- Journal debit/credit totals balance.
-- Non-cash, supplier-payment and refund policies fail closed until approved.
-- Prefix and active-call policy must be explicitly approved.
+Synthetic CI covers:
+- Exact decimal quantities, integer Rupiah and per-medicine precision.
+- FEFO deterministic allocation and all-or-nothing shortage.
+- Weighted-average HPP.
+- Supplier return source-batch matching and over-return prevention.
+- Competing checkouts against the last batch; only one can commit.
+- Same idempotency key returns original invoice without duplicate movement.
+- Forced checkout/receipt failure rolls back invoice, batch, movement, projection, quota, audit and idempotency state.
+- Concurrent encounter registration produces distinct encounters and unique date/prefix numbers.
+- Concurrent queue calls serialize under an approved guard policy.
+- Journal balance, refund obligations, supplier payable, cash and stock reconciliation.
+- Unapproved non-cash, supplier payment, refund and queue policies fail closed.
 
-### Real TiDB Preview gates (not yet claimed as passed)
-- Two independent connections with overlapping transactions using SELECT FOR UPDATE, unique-key conflict and CAS/version conflict.
-- Duplicate/retried receipt and stock issue under process restart.
-- Rollback injection at receipt, batch, movement, projection, payable, encounter, counter, ticket, payment and journal writes.
-- Two checkouts competing for final batch; simultaneous calls; cancellation-vs-return.
-- Inventory reconciliation: medicine physical projection = batch remaining sum plus explicitly approved adjustments; stock projection = opening/reconciliation events + posted movement net.
-- Payable reconciliation: source invoice/receipt amount − recognized credits − allocated supplier payments = outstanding.
-- Cash reconciliation per account/shift: opening float + inflows − outflows = expected balance; compare with physical count and variance.
-- Financial reconciliation: active invoices − approved returns; HPP and returned HPP; refund obligations vs actual payouts; all journals balanced.
-- Two-device role tests for Kasir 1, Kasir 2, Admin and Pimpinan.
-- Backup, isolated restore, dry-run import, orphan/duplicate report and rollback drill.
+Still required against real TiDB with two independent connections:
+- SELECT FOR UPDATE, unique key and CAS conflicts on the exact serverless version.
+- Restart/retry idempotency for purchase, checkout and refund.
+- Failure injection after each persistent write in receipt, checkout, queue and finance commands.
+- Checkout last-batch race, same-ticket re-call race, cancellation-vs-return race.
+- Inventory reconciliation: medicine projection = batch sum plus approved adjustments; projection = opening events plus posted movement net.
+- Payable reconciliation: original liability minus approved credits and allocated payments.
+- Cash reconciliation per account/shift: opening + inflows − outflows vs counted cash.
+- Financial reconciliation across invoices, approved returns, HPP, refund obligations/payouts and balanced journals.
+- Two-device UI tests across protected roles.
+- Backup, isolated restore, dry-run import and rollback drill.
 
 ## 7. DDL and deployment disposition
 
-No migration 004 is in the active migration runner and no physical domain DDL was executed. The current active schema remains the previously verified foundation only.
+No domain migration is in the active runner and no domain DDL was executed. Current database remains the verified foundation only.
 
-The Vercel migration branch auto-deployment remains paused in vercel.json; Preview Deployments are disabled on the operational klinikassalaam project. GitHub Actions remains the CI runner. When policy, source, FK and runtime gates close, create one versioned domain migration, test against isolated TiDB, implement the SQL adapter, complete the real TiDB acceptance matrix, then remove the Vercel branch pause for one consolidated Preview deployment.
+Vercel automatic deployments for migration/tidb-foundation remain paused in root vercel.json. Preview Deployments remain disabled on operational project klinikassalaam. GitHub Actions remains CI. Only after policy, source, FK and TiDB runtime gates close should one versioned domain migration be created, tested, wired to SQL commands, and deployed as one consolidated Preview build.
 
-Firebase remains production source of truth until data reconciliation, backup/restore, rollback and explicit owner cutover approval all pass.
+Firebase remains production source of truth until reconciliation, backup/restore, rollback and explicit owner cutover approval pass.
