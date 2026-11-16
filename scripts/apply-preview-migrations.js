@@ -32,7 +32,7 @@ async function main() {
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
-const { runOperationalSmokeTest } = require("../lib/operational-smoke-test");
+  const { runOperationalSmokeTest } = require("../lib/operational-smoke-test");
   const pool = getPool();
   let connection;
   try {
@@ -45,7 +45,8 @@ const { runOperationalSmokeTest } = require("../lib/operational-smoke-test");
       applied: result.applied,
       alreadyApplied: result.alreadyApplied,
       current: result.current,
-      syntheticSmokeTest: smoke
+      foundationSmokeTest: smoke,
+      operationalSmokeTest: operationalSmoke
     });
   } catch (error) {
     console.error("[ASSALAM-MIGRATION] Preview migration failed", {
