@@ -413,3 +413,56 @@ test("supplier return request reserves no stock; approved dispatch posts one neg
   assert.equal(state.movements[0].direction, "out");
   assert.equal(state.supplierReturnStatus.settlementStatus, "owner_policy_pending");
 });
+
+
+test("queue transfer requires a reason and records old/new cashier and shift ownership", async () => {
+  const { state, commands } = createHarness({
+    async lockQueueTicket() {
+      return { ticketId: "ticket-1", currentCashierUserId: "cashier-1", currentShiftId: "shift-morning", version: "3" };
+    },
+    async assertQueueTransferAllowed() {},
+    async lockTargetOpenShift(_c, shiftId, cashierUserId) {
+      return shiftId === "shift-evening" && cashierUserId === "cashier-2"
+        ? { shiftId, cashierUserId } : null;
+    },
+    async transferQueueTicket(_c, input) {
+      state.transfer = input;
+      return "transfer-event-1";
+    }
+  });
+  await assert.rejects(commands.transferQueue({
+    actor: cashier, ticketId: "ticket-1", toCashierUserId: "cashier-2",
+    toShiftId: "shift-evening", reason: " ",
+    idempotencyKey: "queue-transfer-empty", requestId: "queue-transfer-empty-req"
+  }), { code: "QUEUE_TRANSFER_REASON_REQUIRED" });
+  const result = await commands.transferQueue({
+    actor: cashier, ticketId: "ticket-1", toCashierUserId: "cashier-2",
+    toShiftId: "shift-evening", reason: "Pelimpahan ke kasir sore",
+    idempotencyKey: "queue-transfer-valid", requestId: "queue-transfer-valid-req"
+  });
+  assert.equal(result.body.data.transferEventId, "transfer-event-1");
+  assert.equal(state.transfer.fromCashierUserId, "cashier-1");
+  assert.equal(state.transfer.fromShiftId, "shift-morning");
+  assert.equal(state.transfer.toCashierUserId, "cashier-2");
+  assert.equal(state.transfer.toShiftId, "shift-evening");
+  assert.equal(state.transfer.reason, "Pelimpahan ke kasir sore");
+  assert.equal(state.audits.at(-1).actionCode, "QUEUE_TICKET_TRANSFERRED");
+});
+
+test("queue transfer requires an active target shift and rolls back on invalid target", async () => {
+  const { state, commands } = createHarness({
+    async lockQueueTicket() {
+      return { ticketId: "ticket-1", currentCashierUserId: "cashier-1", currentShiftId: "shift-morning", version: "1" };
+    },
+    async assertQueueTransferAllowed() {},
+    async lockTargetOpenShift() { return null; },
+    async transferQueueTicket() { state.transfer = true; return "transfer-event-2"; }
+  });
+  await assert.rejects(commands.transferQueue({
+    actor: cashier, ticketId: "ticket-1", toCashierUserId: "cashier-2",
+    toShiftId: "shift-closed", reason: "Kasir sore mengambil alih",
+    idempotencyKey: "queue-transfer-closed", requestId: "queue-transfer-closed-req"
+  }), { code: "QUEUE_TRANSFER_TARGET_SHIFT_INVALID" });
+  assert.equal(state.transfer, undefined);
+  assert.equal(state.audits.length, 0);
+});
