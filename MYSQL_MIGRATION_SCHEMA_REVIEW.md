@@ -215,7 +215,7 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 
 ## O. Normalized dictionary and FK manifest — pass 3
 
-See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). It contains 99 numbered entries (F01–F99), some of which group multiple FK tuples; the earlier prose count of 104 individual candidate relationships remains to be verified by expanding every grouped entry. Pass 6 [FK reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) is a preliminary first-tuple static comparison only: 86 textual matches, 11 entries with supplemental fields/tables absent from Pass 4, 2 not mechanically comparable, and no explicit mismatch among directly compared first tuples. It is not full-manifest or runtime proof. User identity is VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. No DDL or TiDB runtime test is claimed.
+See [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). The corrected manifest contains 104 numbered rows (F01–F104), expanded in Pass 7 to 116 literal candidate tuples. Pass 6's first-tuple metrics (86/11/2) are withdrawn as incomplete and must not be used as a pass rate. Pass 28 now records 256/256 type strings after F76 normalization; Passes 31–36 separately audit child indexes, parent keys, nullability and FK actions. These remain static proposal findings, not live TiDB proof. No DDL or TiDB runtime test is claimed.
 
 
 ## P. Exact physical column dictionary — pass 4
