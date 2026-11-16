@@ -23,15 +23,18 @@ async function main() {
     require("../lib/migrations/003_catalog_masters")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
+  const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
   const pool = getPool();
   let connection;
   try {
     connection = await pool.getConnection();
     const result = await applyMigrations(connection, migrations);
+    const smoke = await runFoundationSmokeTest(connection);
     console.log("[ASSALAM-MIGRATION] Preview foundation migration verified", {
       applied: result.applied,
       alreadyApplied: result.alreadyApplied,
-      current: result.current
+      current: result.current,
+      syntheticSmokeTest: smoke
     });
   } catch (error) {
     console.error("[ASSALAM-MIGRATION] Preview migration failed", {
