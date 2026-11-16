@@ -6,7 +6,7 @@ const migration = require("../lib/migrations/006_inventory_purchasing_v1");
 
 test("inventory migration defines traceable purchasing and stock ledgers", () => {
   assert.equal(migration.version, "006_inventory_purchasing_v1");
-  assert.equal(migration.expectedTables.length, 10);
+  assert.equal(migration.expectedTables.length, 11);
   const sql = migration.statements.join("\n");
   for (const table of migration.expectedTables) assert.ok(sql.includes("CREATE TABLE IF NOT EXISTS " + table));
   assert.match(sql, /UNIQUE KEY uq_batch_source_receipt_line \(source_receipt_line_id\)/);
