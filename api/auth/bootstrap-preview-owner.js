@@ -22,6 +22,10 @@ module.exports = async function handler(req, res) {
 
   try {
     const identity = await verifyFirebaseRequest(req);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (!identity.authTime || identity.authTime < nowSeconds - 600 || identity.authTime > nowSeconds + 60) {
+      return res.status(401).json({ ok: false, code: "BOOTSTRAP_RECENT_LOGIN_REQUIRED" });
+    }
     const allowedEmail = String(process.env.TIDB_PREVIEW_OWNER_EMAIL || "").trim().toLowerCase();
     if (!allowedEmail || identity.email !== allowedEmail) {
       return res.status(403).json({ ok: false, code: "BOOTSTRAP_IDENTITY_NOT_ALLOWED" });
