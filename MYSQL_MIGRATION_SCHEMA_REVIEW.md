@@ -300,3 +300,8 @@ Added source-backed reports for patient identity/visit continuity (Pass 20), que
 ## Pass 26 — consolidated decision register
 
 [Pass 26 decision register](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md) now acts as the consolidated decision source across Passes 1–25. It separates confirmed owner instructions from engineering closures, source verification and genuine owner policy gates. Confirmed instructions include clinic identity, protected five accounts, staged Firebase preservation, shift float not omzet, controlled return/refund flow, and A/B queue view/switching. Remaining owner policy and source gates are listed explicitly. This does not approve schema v1 or DDL.
+
+
+## Pass 27 — physical FK manifest count reconciliation
+
+[Pass 27](./MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md) corrects stale document arithmetic: Pass 3 contains 104 numbered rows F01–F104; ten grouped rows expand to 22 tuple candidates, adding 12 and yielding 116 literal candidates. Pass 3's old 99-row conclusion and Pass 7's “104 + 11” arithmetic were corrected; Pass 4 wording now distinguishes rows from expanded tuples. These are not approved physical constraints. Exact type, signedness, charset/collation, parent unique, child index, null tuple, ownership and FK action closure remains open. No DDL or TiDB runtime test.
