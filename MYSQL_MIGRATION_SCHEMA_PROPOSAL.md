@@ -115,7 +115,7 @@ audio_asset_id BIGINT UNSIGNED PK; clip_id VARCHAR(64) NOT NULL UNIQUE; clip_typ
 
 ### 2.8 Composite-key requirements
 
-For integrity constraints described above, add these parent keys before child FKs: `user_emails UNIQUE(email_id,user_id)`; `role_assignments UNIQUE(role_assignment_id,user_id)`; `cashier_shifts UNIQUE(shift_id,cashier_user_id)`. `inventory_batches.supplier_invoice_line_id` must NOT be frozen as UNIQUE until split/partial receipt behavior is confirmed. If one receipt line can produce multiple lots/deliveries, use `supplier_invoice_line_batch_allocations` from v1. `sales_return_lines.return_quota_subject_id` is mandatory and references the component-aware quota subject, preventing a return line from bypassing its reserved quota.
+For integrity constraints described above, add these parent keys before child FKs: `user_emails UNIQUE(email_id,user_id)`; `role_assignments UNIQUE(role_assignment_id,user_id)`; `cashier_shifts UNIQUE(shift_id,cashier_user_id)`. `inventory_batches.supplier_invoice_line_id` must NOT be frozen as UNIQUE until split/partial receipt behavior is confirmed. If one receipt line can produce multiple lots/deliveries, use `supplier_invoice_line_batch_allocations` from v1. `sales_return_lines.return_quota_subject_id` is mandatory and references the component-aware quota subject, preventing a return line from bypassing its reserved quota. This is a scalar FK to `return_quota_subjects.return_quota_subject_id`; the server transaction must additionally assert that `sales_return_lines.invoice_line_id` and nullable `invoice_component_id` equal the referenced quota subject's identity. Do not rely on a composite FK containing nullable `invoice_component_id` to prove ownership.
 
 ## 3. Domain patient, encounter dan queue
 
@@ -575,6 +575,7 @@ This addendum applies the technical design candidates in [MYSQL_MIGRATION_SCHEMA
 - Snapshot/cleanup remains a separate pre-release activity: private encrypted snapshot, verified restore, read-only five-account identity check, path-level deletion dry-run, explicit final approval, then selective deletion of approved dummy operational documents. No cleanup or Auth bulk deletion is authorized now.
 
 ### 11.3 Queue concurrency
+- Physical guard table candidate: `queue_prefix_guards(prefix VARCHAR(4) PRIMARY KEY, version BIGINT UNSIGNED NOT NULL DEFAULT 1, updated_at_utc DATETIME(3) NOT NULL)`, with fixed rows A and B. `VARCHAR(4)` is selected to match the already declared `queue_counters.prefix`, `cashier_queue_assignments.prefix`, and `queue_tickets.prefix`; final charset/collation must be identical across all four tables and verified in TiDB.
 - Add `queue_prefix_guards(prefix PRIMARY KEY, version, updated_at_utc)` with fixed guard rows for A and B. Assignment commands lock affected user and prefix guards in deterministic order, reject overlapping validity ranges, and append an assignment event in the same transaction.
 - First queue-counter initialization must be race-safe (serialized daily initialization or insert-if-absent + duplicate retry + locking read). Do not depend on locking a missing row.
 - Ticket allocation, counter update, encounter association, idempotency and audit are one transaction. Cancelled numbers remain consumed. Reissue creates a new ticket linked to the prior ticket; it never recycles a number.
