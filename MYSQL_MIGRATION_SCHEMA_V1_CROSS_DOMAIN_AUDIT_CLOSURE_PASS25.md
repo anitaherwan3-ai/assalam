@@ -53,3 +53,8 @@
 
 ## Safety statement
 No application source was edited. No schema DDL, live Firebase/Auth read or write, patient data extraction, import, cleanup, deployment, merge to `main`, PR13 merge or production operation was performed. These reports are static source audits and design synthesis only.
+
+
+## Follow-on decision consolidation — Pass 26
+
+The owner/engineering/source decision register is consolidated in [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). Pass 26 does not change this readiness verdict: schema v1 remains unapproved and no DDL or migration is authorized.
