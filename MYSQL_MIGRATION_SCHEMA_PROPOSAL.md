@@ -747,3 +747,7 @@ See [MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.md](./MYSQL_MIGRATION
 ## 40. TiDB foreign-key capability and runtime gate — Pass 38
 
 See [MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md](./MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md). Official TiDB documentation states FK constraints are GA from v8.5.0, child indexes are automatically created when absent, parent referenced indexes are required, and FK checks may lock referenced parent rows. The actual `assalamklinik` version and session settings are not yet verified; a disposable preview compatibility probe is mandatory before DDL. No DDL or database mutation.
+
+## 41. Schema v1 pre-DDL readiness consolidation — Pass 39
+
+See [MYSQL_MIGRATION_SCHEMA_V1_PRE_DDL_READINESS_CONSOLIDATION_PASS39.md](./MYSQL_MIGRATION_SCHEMA_V1_PRE_DDL_READINESS_CONSOLIDATION_PASS39.md). The FK inventory and documentation contradictions are reconciled, but parent composite keys, per-FK actions, one child nullability, owner policies and TiDB runtime evidence remain open. The next executable step is a read-only TiDB version/settings baseline, followed by disposable compatibility tests; application DDL is not yet authorized.
