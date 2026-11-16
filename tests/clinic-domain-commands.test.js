@@ -44,6 +44,8 @@ function createHarness(overrides = {}) {
 
   const repo = {
 
+    async lockPaymentSource() { return { sourceId: "invoice-1", status: "posted" }; },
+    async appendPaymentEvent() { return "payment-1"; },
     async lockCheckoutContext(_c, encounterId, shiftId) {
       return {
         encounter: { encounterId: String(encounterId), patientId: "patient-" + encounterId, cashierUserId: "cashier-1", shiftId: String(shiftId), businessDate: "2026-11-17" },
