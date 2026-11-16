@@ -41,3 +41,10 @@ test("audit and idempotency actor links restrict user deletion", () => {
   assert.equal((sql.match(/on delete restrict on update restrict/g) || []).length, 2);
   assert.doesNotMatch(sql, /on delete cascade/);
 });
+
+test("active role slots do not impose a one-role-per-user schema constraint", () => {
+  const sql = migration.statements.join("\n").toLowerCase();
+  const activeSlots = sql.slice(sql.indexOf("create table if not exists active_role_slots"), sql.indexOf("create table if not exists firebase_identities"));
+  assert.match(activeSlots, /primary key \(role_assignment_id\)/);
+  assert.doesNotMatch(activeSlots, /primary key \(user_id\)|unique key[^\n]*\(user_id\)/);
+});

@@ -38,6 +38,7 @@ test("accepts a correctly signed Firebase token for the configured project", asy
   const token = makeToken(pair.privateKey);
   const identity = await verifyFirebaseIdToken(token, projectId, {
     nowMs,
+    resolveAccountStatus: accountStatus,
     resolvePublicKey: async kid => {
       assert.equal(kid, "test-key");
       return pair.publicKey;
