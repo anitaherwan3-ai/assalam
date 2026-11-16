@@ -15,7 +15,9 @@
 5. `lib/migrations/002_audit_idempotency_outbox.js` defines append-oriented `audit_events`, command `idempotency_requests`, and `outbox_jobs`. It does not apply retention or financial policy.
 6. `api/db-migrate.js` is a POST-only, exact-preview-branch, exact-database, feature-flagged migration runner. It requires a 32-character-or-longer secret header and a literal confirmation phrase. It verifies the expected tables after each migration and never seeds user, role or UID records.
 7. `lib/with-transaction.js` enforces UTC session time, checks session FK enforcement, and guarantees commit/rollback/release behavior.
-8. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature, transaction commit/rollback, FK enforcement and migration FK invariants. A GitHub Actions workflow runs `npm test` on this migration branch.
+8. `lib/idempotency.js` provides canonical request hashing, duplicate-key claim/replay and mismatch rejection. `lib/audit.js` writes append-oriented audit events and blocks credential-like fields from snapshots.
+9. `lib/migration-runner.js` applies migrations in order, verifies each expected table set and records applied versions. The Vercel build hook is inert by default and requires the exact preview branch, database, enable flag and confirmation string before it can execute DDL. `/api/db-schema-status` provides a read-only schema verification endpoint.
+10. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature, transaction commit/rollback, FK enforcement, migration idempotency, request replay and audit snapshot protection. GitHub Actions runs the tests and the guarded build step.
 
 ## Preview configuration
 
@@ -36,4 +38,4 @@ The migration runner remains disabled because `TIDB_MIGRATIONS_ENABLED` and `ASS
 
 ## Verification status
 
-Automated test source and CI workflow have been added. The first CI pass verified the token and identity-migration tests (7 passed) but exposed a test-isolation issue: importing the transaction helper eagerly loaded the production MySQL driver. The helper now loads the driver only when a real pool transaction is requested, so its mock-connection tests run without a database package or live DB. The corrected CI run is pending. No live TiDB migration was run. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.
+Automated test source and CI workflow have been added. The corrected CI run passed all 12 tests on commit `9d87fef`. Additional tests for migration-runner idempotency, audit writes and idempotency replay have since been added; their CI run is pending. The live TiDB migration remains gated for the final preview build. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.

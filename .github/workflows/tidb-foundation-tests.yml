@@ -20,3 +20,5 @@ jobs:
           node-version: 20
       - name: Run backend foundation tests
         run: npm test
+      - name: Verify guarded build step is inert outside Vercel preview
+        run: npm run build
