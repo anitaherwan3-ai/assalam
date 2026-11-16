@@ -17,6 +17,11 @@ function mockConnection(options = {}) {
   let nextRoleId = 100;
   return {
     calls,
+    async beginTransaction() { calls.push(["begin"]); },
+    async rollback() {
+      calls.push(["rollback"]);
+      if (options.failCleanup) throw new Error("rollback fixture");
+    },
     async query(sql) {
       calls.push(["query", sql]);
       if (sql.includes("FOREIGN_KEY_CHECKS AS")) return [[{ fk_checks: 1 }]];
@@ -51,10 +56,12 @@ test("foundation smoke test exercises FK/unique constraints and cleans fixtures"
   assert.equal(result.synthetic, true);
   assert.ok(result.checks.includes("composite_owner_fk"));
   assert.ok(result.checks.includes("delete_restrict"));
-  assert.ok(connection.calls.some(call => call[1] && call[1].startsWith("DELETE FROM users WHERE user_id IN")));
+  assert.ok(connection.calls.some(call => call[0] === "begin"));
+  assert.ok(connection.calls.some(call => call[0] === "rollback"));
+  assert.ok(!connection.calls.some(call => call[1] && call[1].startsWith("DELETE FROM users")));
 });
 
-test("foundation smoke test fails closed when fixture cleanup fails", async () => {
+test("foundation smoke test fails closed when synthetic transaction rollback fails", async () => {
   const connection = mockConnection({ failCleanup: true });
   await assert.rejects(
     runFoundationSmokeTest(connection),
