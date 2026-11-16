@@ -371,6 +371,12 @@ module.exports = async function handler(req, res) {
         parentColumn: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
         childColumn: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci",
         parentIndex: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
+      },
+      {
+        key: "varchar_length",
+        parentColumn: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        childColumn: "VARCHAR(48) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        parentIndex: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
       }
     ];
     for (const item of mismatchCases) {
