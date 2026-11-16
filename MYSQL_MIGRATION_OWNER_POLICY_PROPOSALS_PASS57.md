@@ -75,6 +75,18 @@ Sources:
 7. Keep Firebase Auth as the interim identity provider and preserve protected users.
 8. Keep all operational endpoints/UI cutover disabled until the approved schema, SQL adapter and real TiDB tests are complete.
 
+## D17 engineering primitive added in this pass
+
+`lib/legacy-timestamp-normalizer.js` implements a conservative source-time conversion helper:
+
+- RFC 3339/ISO timestamps are normalized only when an explicit `Z` or numeric UTC offset exists.
+- Numeric epoch values require an explicit source declaration of seconds or milliseconds; the code does not guess from digit count.
+- Firestore-style `{ seconds, nanoseconds }` values are supported with range validation.
+- Missing, malformed, date-only, local-time-without-offset or undeclared numeric values retain the raw source value and return `needs_review`; migration time is never substituted.
+- Fractional timestamp digits are preserved in the normalized UTC value where supplied.
+
+The helper is intentionally not wired to live import routes. Source-specific collection mapping and raw timestamp profile remain required before use in a migration run. Tests cover explicit offsets, epoch units, Firestore nanos and ambiguous values.
+
 ## Source evidence still required
 
 - Deployed Firestore Rules snapshot and version.
