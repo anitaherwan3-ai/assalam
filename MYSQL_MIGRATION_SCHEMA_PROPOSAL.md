@@ -763,3 +763,7 @@ See [MYSQL_MIGRATION_TIDB_FK_MATRIX_HARNESS_GAP_AUDIT_PASS41.md](./MYSQL_MIGRATI
 ## 44. TiDB preview guard hardening — Pass 42A
 
 See [MYSQL_MIGRATION_TIDB_PREVIEW_GUARD_HARDENING_PASS42A.md](./MYSQL_MIGRATION_TIDB_PREVIEW_GUARD_HARDENING_PASS42A.md). The synthetic compatibility endpoint now requires an explicit server-side enable switch, exact `assalam_db` database allowlist, token, and explicit form confirmation; it also verifies session/global `foreign_key_checks` before any test DDL. The finalizer now closes connections without silently repeating table drops. This is source-only and statically re-fetched, not deployed, syntax-checked, or executed. The FK matrix cases remain outstanding; no application DDL or migration is authorized.
+
+## 45. TiDB FK matrix harness implementation — Pass 42B
+
+See [MYSQL_MIGRATION_TIDB_FK_MATRIX_HARNESS_IMPLEMENTATION_PASS42B.md](./MYSQL_MIGRATION_TIDB_FK_MATRIX_HARNESS_IMPLEMENTATION_PASS42B.md). The synthetic endpoint now includes composite parent-index order, missing parent-index rejection, child auto-index metadata, signedness/DECIMAL/collation mismatch, composite NULL/orphan behavior, ON UPDATE RESTRICT, FK metadata joins, and registry-based reverse-order cleanup. Static source checks only; Node syntax check, deployment, live TiDB execution, and cleanup verification remain pending. VARCHAR length mismatch remains an open matrix case. No application DDL or data import is authorized.
