@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 1,
+  "documentStatus": "PROPOSAL_ONLY_NOT_OWNER_APPROVAL",
+  "doNotUseAsRuntimeConfig": true,
+  "policyActivationAllowed": false,
+  "effectiveAtUtc": null,
+  "sourceOfTruth": "firebase",
+  "targetDatabase": "tidb-cloud",
+  "ownerApproval": {
+    "approvedBy": null,
+    "approvedAtUtc": null,
+    "changeReference": null
+  },
+  "confirmedGuardrails": [
+    "Keep Firebase and production unchanged until migration, reconciliation, backup/restore and cutover are separately accepted.",
+    "Keep the five protected account identities unchanged; do not infer the role of nursalim422@gmail.com.",
+    "Cashier submits a return; Admin performs first-stage review; Pimpinan makes the final return decision; refund payout is separate and Pimpinan-only.",
+    "No patient-return stock restoration before valid approval and recorded disposition.",
+    "Preserve separate A/B display views and switching; spoken queue numbers are digit-by-digit; voice and chime settings remain independent.",
+    "A cancelled visit is preserved as Batal Berobat, not deleted.",
+    "Opening shift float is cash custody, not omzet."
+  ],
+  "protectedAccounts": [
+    {
+      "email": "assalamkasir1@gmail.com",
+      "role": "kasir",
+      "label": "Kasir Pagi"
+    },
+    {
+      "email": "assalamkasir2@gmail.com",
+      "role": "kasir",
+      "label": "Kasir Sore"
+    },
+    {
+      "email": "assalamadmin@gmail.com",
+      "role": "admin",
+      "label": "Admin"
+    },
+    {
+      "email": "praktekrose@gmail.com",
+      "role": "pimpinan",
+      "label": "Pimpinan"
+    },
+    {
+      "email": "nursalim422@gmail.com",
+      "role": "unknown_must_verify",
+      "label": "Protected account; role not inferred"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D01",
+      "area": "Medicine units, fractional stock and precision",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "canonicalUnit": "Smallest unit actually dispensed or measured for each medicine; define per medicine, not globally.",
+        "countableForms": "Default integer quantities for tablets, capsules, strips, vials and bottles unless that medicine is explicitly approved for fractional dispensing.",
+        "liquidsAndMeasuredForms": "Use an explicit measurable base unit such as mL; configure allowed scale per medicine.",
+        "packageConversion": "Store explicit integer conversion factors (for example pack-to-tablet) with effective date; snapshot conversion on every purchase and sale.",
+        "rounding": "No implicit rounding. Reject quantities with more fractional digits than the medicine's approved scale.",
+        "stockStorage": "Store exact scaled integer quantities; SQL precision is a storage choice, not permission to dispense fractions."
+      },
+      "ownerMustConfirm": [
+        "Canonical unit and allowed fractional quantities for each medicine category",
+        "Who may approve a medicine's unit conversion/precision change"
+      ],
+      "blocks": [
+        "Domain schema freeze for medicine quantity precision",
+        "Operational stock migration for affected medicines"
+      ],
+      "evidence": [
+        "Current medicine master export",
+        "Examples of real package contents and dispensing practice",
+        "Signed per-medicine unit/scale approval"
+      ]
+    },
+    {
+      "id": "D05",
+      "area": "Patient-return medicine disposition",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "defaultDisposition": "inspection_pending_then_quarantined",
+        "sellableRule": "Returned medicine is never sellable by default. It can re-enter sellable batch stock only after documented inspection confirms unopened/sealed packaging, intact condition, traceable original batch, acceptable storage history and valid expiry.",
+        "decisionMaker": "A Pimpinan-designated medicine-responsible person records inspection; approval authority and eligible staff list must be configured.",
+        "failedInspection": "Keep quarantined or record rejected/expired/loss with a reason; never silently delete or re-stock.",
+        "lineage": "Return must reference original invoice line and original batch allocation."
+      },
+      "ownerMustConfirm": [
+        "Named/role-based person authorized to certify resale",
+        "Whether any opened or patient-held medicine can ever be resold",
+        "Inspection evidence required"
+      ],
+      "blocks": [
+        "Sellable stock restoration from patient returns"
+      ],
+      "evidence": [
+        "Written clinic SOP",
+        "Role/approval matrix",
+        "Return inspection form/checklist"
+      ]
+    },
+    {
+      "id": "D06",
+      "area": "Package discount and refund allocation",
+      "status": "source_parity_then_owner_approval",
+      "recommendation": {
+        "candidate": "Snapshot each package component's gross charge and discount allocation at checkout. Use exact integer-Rupiah allocation with a deterministic largest-remainder tie-break only if source audit confirms it matches the existing clinic calculation.",
+        "returnBasis": "Partial component return reverses its original snapshot allocation; never recalculate using current package prices.",
+        "constraint": "The sum of component allocations must equal the invoice/package discount exactly."
+      },
+      "ownerMustConfirm": [
+        "Approve source-matched allocation as the rule for new invoices",
+        "Conditions for refunding already-delivered service components"
+      ],
+      "blocks": [
+        "Final package return/refund allocation"
+      ],
+      "evidence": [
+        "Legacy app.js discount logic",
+        "Representative package receipts and partial-return examples",
+        "Source-parity tests"
+      ]
+    },
+    {
+      "id": "D08",
+      "area": "Expense approval and self-approval",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "default": "Maker-checker: requester cannot approve their own expense.",
+        "threshold": "Make approval thresholds configurable; until approved, require a separate approver for every expense.",
+        "audit": "Store requester, approver, decision time, amount, category, evidence and reversal link."
+      },
+      "ownerMustConfirm": [
+        "Approver roles and monetary thresholds",
+        "Emergency exception and evidence procedure"
+      ],
+      "blocks": [
+        "Final expense authorization matrix"
+      ],
+      "evidence": [
+        "Written expense SOP",
+        "Role/approval threshold matrix"
+      ]
+    },
+    {
+      "id": "D09",
+      "area": "Petty cash and reimbursements",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "classification": "Separate opening float, cash advance, expense evidence, reimbursement and repayment.",
+        "advance": "An advance remains an outstanding accountable advance until receipts/settlement are submitted; do not immediately count it as an expense.",
+        "reimbursement": "Link reimbursement payment to an approved expense so it is not recorded twice.",
+        "reporting": "Petty cash is not omzet; opening float is not revenue or profit."
+      },
+      "ownerMustConfirm": [
+        "Allowed categories",
+        "Advance settlement deadlines",
+        "Who approves and who holds petty cash"
+      ],
+      "blocks": [
+        "Final petty-cash posting and reporting policy"
+      ],
+      "evidence": [
+        "Current petty-cash categories and sample records",
+        "Written cash-advance/reimbursement SOP"
+      ]
+    },
+    {
+      "id": "D10",
+      "area": "Supplier-return credit recognition",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "stock": "Supplier-return request has no stock effect; approved dispatch posts one negative movement against the original batch.",
+        "creditRecognition": "Do not reduce supplier payable merely because goods were dispatched. Recognize a supplier credit only after supplier-issued credit note or other approved settlement evidence.",
+        "paidInvoice": "For a previously paid invoice, record a supplier receivable/credit balance until cash refund or offset is evidenced; do not rewrite historical payment."
+      },
+      "ownerMustConfirm": [
+        "Accepted proof for credit note/refund/offset",
+        "How long a dispatched return can remain unsettled",
+        "Who approves settlement evidence"
+      ],
+      "blocks": [
+        "Supplier credit recognition and payable reduction"
+      ],
+      "evidence": [
+        "Supplier credit note examples",
+        "Supplier return SOP",
+        "Sample paid and unpaid supplier return cases"
+      ]
+    },
+    {
+      "id": "D11",
+      "area": "Supplier partial and multiple payments",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "targetModel": "Allow multiple payment events and partial allocations through a payment-to-payable allocation ledger.",
+        "invariants": "An allocation cannot exceed the payment amount or the remaining payable balance; each payment needs date, method, source account and evidence/reference.",
+        "legacy": "A legacy lunas/paid boolean is status evidence only; never synthesize missing payment events or dates."
+      },
+      "ownerMustConfirm": [
+        "Whether partial and combined payments occur in practice",
+        "Required settlement evidence and allocation workflow"
+      ],
+      "blocks": [
+        "Final supplier payment UI/authorization workflow"
+      ],
+      "evidence": [
+        "Supplier payment samples",
+        "Bank/cash proof samples",
+        "Reconciliation to open invoices"
+      ]
+    },
+    {
+      "id": "D12",
+      "area": "Shift close verification",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "default": "The cashier who closes a shift cannot verify their own close.",
+        "workflow": "Preserve opening float, expected cash, counted cash, variance reason, verifier identity and timestamp as separate fields/events.",
+        "authority": "Verifier role allowlist and exception path must be configured; do not infer whether Admin, Pimpinan or both can verify."
+      },
+      "ownerMustConfirm": [
+        "Which role verifies morning/evening shifts",
+        "Who can resolve variances and reopen a shift"
+      ],
+      "blocks": [
+        "Final shift-close permissions"
+      ],
+      "evidence": [
+        "Existing shift verification workflow",
+        "Written role matrix"
+      ]
+    },
+    {
+      "id": "D13",
+      "area": "Patient refunds and payout evidence",
+      "status": "workflow_confirmed_method_details_open",
+      "recommendation": {
+        "confirmedWorkflow": "Cashier submits; Admin performs first-stage review; Pimpinan makes the final refund decision; payout is a separate Pimpinan-only action.",
+        "obligation": "Approval creates a refund obligation, not a cash outflow.",
+        "payout": "Record actual payout date/time, amount, method, source cash drawer/bank account, recipient/reference and evidence. Require a transfer reference for bank transfer.",
+        "method": "Prefer returning through the original payment channel where feasible; record an authorized exception and reason otherwise."
+      },
+      "ownerMustConfirm": [
+        "Allowed refund methods",
+        "Cash drawer/bank account used for each method",
+        "Evidence/recipient details required for cash refund"
+      ],
+      "blocks": [
+        "Final refund payout method and source-account configuration"
+      ],
+      "evidence": [
+        "Return/refund SOP",
+        "Cash and transfer evidence examples"
+      ]
+    },
+    {
+      "id": "D14",
+      "area": "Non-cash settlement and cash-flow timing",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "revenue": "Keep posted invoice/service revenue distinct from whether the payment has settled.",
+        "cash": "Cash receipt enters the relevant cash drawer only when actually received.",
+        "nonCash": "Transfer/QRIS/card payment starts as reported or pending_settlement; it enters bank/clearing balance only when verified by bank/provider evidence.",
+        "fees": "Record provider fees separately so gross patient payment, fee and net bank settlement reconcile.",
+        "failedOrReversed": "Preserve failed/reversed payment events; do not leave them counted as settled funds."
+      },
+      "ownerMustConfirm": [
+        "Methods supported by the clinic",
+        "Settlement proof/source and expected reconciliation process",
+        "Treatment of provider fees and settlement delays"
+      ],
+      "blocks": [
+        "Final non-cash settlement policy and bank reconciliation"
+      ],
+      "evidence": [
+        "Settlement statements",
+        "QRIS/transfer samples",
+        "Current payment workflow"
+      ]
+    },
+    {
+      "id": "D15",
+      "area": "Opening stock and HPP",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "openingCount": "Use a dated, approved physical count by medicine and batch; capture quantity, unit, batch number, expiry and counter/approver.",
+        "valuation": "Use documented supplier purchase cost or another explicitly approved valuation source; never infer HPP from selling price.",
+        "missingLineage": "Do not invent batch or supplier history. Quarantine untraceable quantities for review; keep unknown HPP visibly unknown instead of presenting false profit.",
+        "legacyDataset": "The prior migration decision register records the old Firebase operational dataset as dummy/testing data. Classify and reconfirm each source before importing it as genuine history; do not silently promote fixtures to opening balances."
+      },
+      "ownerMustConfirm": [
+        "Cutover count date and responsible counters",
+        "Approved HPP valuation for items without purchase evidence",
+        "Disposition of untraceable/expired stock"
+      ],
+      "blocks": [
+        "Opening-balance posting and live stock cutover"
+      ],
+      "evidence": [
+        "Signed stocktake sheets",
+        "Batch/expiry photographs or source records",
+        "Purchase invoices/HPP evidence",
+        "Source dataset classification"
+      ]
+    },
+    {
+      "id": "D16",
+      "area": "Queue A/B and active-call concurrency",
+      "status": "lane_views_confirmed_lane_meaning_and_call_policy_open",
+      "recommendation": {
+        "confirmed": "Keep A and B as separate selectable/displayable lanes; do not merge PR13 behavior without separate review.",
+        "candidateCallPolicy": "One active call per lane (per_lane) is the preferred candidate so A and B can progress independently; implement only after confirming the operational meaning of each lane.",
+        "events": "Call, recall, cancel-call and transfer are append-only events; recall preserves the same ticket; transfer records old/new lane and retains ticket identity.",
+        "display": "Changing the TV view must not reset calls or ticket counters."
+      },
+      "ownerMustConfirm": [
+        "Meaning/service scope of A and B",
+        "Whether one active call per lane is correct",
+        "Who may transfer/override and how completed/cancelled calls behave"
+      ],
+      "blocks": [
+        "Queue prefix activation and active-call guard policy"
+      ],
+      "evidence": [
+        "Current A/B service definitions",
+        "Queue operating SOP",
+        "Observed two-lane scenario tests"
+      ]
+    },
+    {
+      "id": "D17",
+      "area": "Malformed or missing historical timestamps",
+      "status": "engineering_rule_recommended_source_profile_required",
+      "recommendation": {
+        "preserveRaw": "Retain the exact original timestamp value and source field.",
+        "normalization": "Convert to UTC only when an offset/time zone or unambiguous source rule is proven.",
+        "missingOrAmbiguous": "Leave normalized timestamp/business date null and mark the record needs_review; never substitute migration time or guess WIB.",
+        "reporting": "Exclude unresolved timestamps from date-sensitive reports until reconciled; preserve original record and review trail."
+      },
+      "ownerMustConfirm": [
+        "Only record-specific exceptions where source evidence cannot determine the date"
+      ],
+      "blocks": [
+        "Date-sensitive historical reporting for affected records"
+      ],
+      "evidence": [
+        "Timestamp type/value profile by collection",
+        "Representative malformed/missing examples",
+        "Source runtime/time-zone behavior"
+      ]
+    },
+    {
+      "id": "D18",
+      "area": "Electronic medical record retention, correction and legal hold",
+      "status": "legal_minimum_confirmed_implementation_policy_open",
+      "recommendation": {
+        "minimumElectronicRetentionYears": 25,
+        "retentionAnchor": "date of patient's last visit",
+        "source": "Permenkes 24/2022 Article 39: electronic medical records at a healthcare facility are retained at least 25 years from the patient's last visit; after that they may still be retained if useful.",
+        "correction": "Correct clinical/identity errors by an attributable amendment/correction event; do not silently overwrite historical clinical facts.",
+        "legalHold": "Suspend deletion/destruction when a dispute, investigation, audit or legal hold applies. Destruction must follow applicable legal procedures.",
+        "privacy": "Apply purpose limitation, role-based access, patient rights and documented deletion/destruction handling under applicable personal-data law."
+      },
+      "ownerMustConfirm": [
+        "Who authorizes corrections and record release/export",
+        "Legal-hold activation/release roles",
+        "Retention handling for non-clinical operational data"
+      ],
+      "blocks": [
+        "Automated retention/destruction jobs and clinical correction workflow until approved"
+      ],
+      "evidence": [
+        "Clinic retention/correction SOP",
+        "Access/export matrix",
+        "Legal review of current applicable rules"
+      ]
+    },
+    {
+      "id": "D19",
+      "area": "Audit retention, export and legal hold",
+      "status": "awaiting_owner_approval",
+      "recommendation": {
+        "auditLog": "Server-authored append-only audit; operational roles cannot edit/delete authoritative events.",
+        "retention": "Use an approved retention schedule aligned to financial, employment, clinical and legal obligations; do not invent a single retention duration for all audit categories.",
+        "export": "Include date range, actor, event type, target, request/correlation ID, checksum and export audit event.",
+        "legalHold": "Pause purge for affected records while a legal hold/investigation exists."
+      },
+      "ownerMustConfirm": [
+        "Retention durations by audit category",
+        "Who can export and approve exports",
+        "Who can impose/release legal hold"
+      ],
+      "blocks": [
+        "Audit purge schedule and export privilege activation"
+      ],
+      "evidence": [
+        "Record-retention schedule",
+        "Export permission matrix",
+        "Legal-hold SOP"
+      ]
+    },
+    {
+      "id": "D20",
+      "area": "Authentication, identity mapping and recovery",
+      "status": "interim_firebase_auth_recommended_long_term_provider_open",
+      "recommendation": {
+        "interim": "Keep Firebase Authentication as the identity provider during the operational data migration; verify its bearer token on the server and map immutable provider UID to one internal user ID.",
+        "authority": "Resolve role and active state from the server-owned identity/role tables; never accept role, actor or UID asserted by browser payload.",
+        "protectedAccounts": "Keep the five protected email identities and linked records intact; verify UID/profile/role read-only before any identity migration.",
+        "recovery": "Implement email change, account recovery, disable/reactivate and UID rebind as explicit privileged workflows with approval and audit; no implicit provisioning or reactivation."
+      },
+      "ownerMustConfirm": [
+        "Authoritative UID and profile mapping for all five protected accounts",
+        "Role of nursalim422@gmail.com",
+        "Long-term identity provider and emergency recovery approver"
+      ],
+      "blocks": [
+        "Account seeding/rebinding and final identity-provider cutover"
+      ],
+      "evidence": [
+        "Read-only Firebase Auth UID export",
+        "Read-only profile/role export",
+        "Deployed Functions and Firestore Rules snapshots",
+        "Owner-approved account matrix"
+      ]
+    }
+  ],
+  "sourceEvidenceGates": [
+    "Deployed Firestore Rules snapshot and version",
+    "Deployed Firebase Functions source/version for transactional writes and bootstrap",
+    "Read-only Firebase Auth UID/profile/role export",
+    "Purchase-line to split-receipt to batch lineage samples",
+    "Historical timestamp/raw-value profile",
+    "Exact TiDB FK type/action/parent-key/child-index manifest and two-connection runtime tests"
+  ]
+}
