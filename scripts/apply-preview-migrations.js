@@ -14,7 +14,7 @@ async function main() {
     console.log("[ASSALAM-MIGRATION] Preview migration step skipped; deployment is not the explicitly enabled TiDB migration preview.");
     return;
   }
-  if (process.env.TIDB_MIGRATION_BUILD_CONFIRM !== "ASSALAM_OPERATIONAL_SCHEMA_V1_PASS65") {
+  if (process.env.TIDB_MIGRATION_BUILD_CONFIRM !== "ASSALAM_OPERATIONAL_SCHEMA_V1_PASS66") {
     throw new Error("Preview migration build confirmation is missing or invalid.");
   }
 
@@ -68,7 +68,9 @@ async function main() {
 
 main().catch(error => {
   console.error("[ASSALAM-MIGRATION] Build stopped; database migration was not confirmed.", {
-    code: error && error.code ? error.code : "UNKNOWN"
+    code: error && error.code ? error.code : "UNKNOWN",
+    message: error && error.message ? String(error.message).slice(0, 500) : "Unknown error",
+    stack: error && error.stack ? String(error.stack).slice(0, 1200) : undefined
   });
   process.exitCode = 1;
 });
