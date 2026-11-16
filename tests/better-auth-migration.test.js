@@ -16,6 +16,7 @@ test("Better Auth migration defines the four isolated core models", () => {
   assert.match(sql, /UNIQUE KEY uq_ba_session_token \(token\)/);
   assert.match(sql, /UNIQUE KEY uq_ba_account_provider_identity \(providerId, accountId\)/);
   assert.match(sql, /KEY idx_ba_verification_identifier \(identifier\)/);
+  assert.ok(sql.includes("uq_ba_rate_limit_key"));
 });
 
 test("Better Auth sessions and accounts reference provider users, not clinic role tables", () => {
