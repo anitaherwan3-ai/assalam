@@ -7,7 +7,7 @@ const { createClinicDomainCommands } = require("../lib/clinic-domain-commands");
 function createFinanceHarness(overrides = {}) {
   const state = { payment: null, expense: null, refund: null, supplier: null, events: [] };
   const repository = {
-    async getPaymentRecognitionPolicy(method) { return method === "cash" ? { approved: true } : { approved: false, requiresPimpinanReview: true }; },
+    async getPaymentRecognitionPolicy(_connection, method) { return method === "cash" ? { approved: true } : { approved: false, requiresPimpinanReview: true }; },
     async lockPaymentSource() { return { sourceId: "10", status: "posted" }; },
     async appendPaymentEvent(_c, input) { state.payment = { ...input, paymentId: "20", reviewStatus: input.paymentMethod === "cash" ? "not_required" : "pending" }; return "20"; },
     async appendCashLedgerMovement(_c, input) { state.events.push({ type: "cash", ...input }); },
