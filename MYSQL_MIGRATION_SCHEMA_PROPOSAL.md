@@ -699,6 +699,11 @@ The parallel audit wave is documented in Passes 20–25: patient/visit continuit
 See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). This register consolidates confirmed owner requirements, engineering closures, source verification gates, unresolved owner policy gates D01–D20, and v1 scope boundaries. Do not ask the owner to repeat confirmed requirements or choose technical internals. Do not silently resolve clinical/accounting/authorization/retention policy. Schema v1 remains review-only; no DDL approved.
 
 
+## 30. Physical FK tuple matrix — Pass 28
+
+See [MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md) and its machine-readable [CSV](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv). Pass 28 expands the 104 numbered source rows into 116 unique candidate tuple rows. It extracts exact Pass 4 type strings for 244/258 column references but does not claim charset/collation or runtime compatibility. Statuses: 101 UNRESOLVED, 10 OWNERSHIP_BLOCKED, 5 POLYMORPHIC_POLICY_BLOCKED; zero approved physical constraints. Schema v1 remains BLOCKED; no DDL or database mutation.
+
+
 ## 29. Physical FK manifest reconciliation — Pass 27
 
 See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md). Corrected the Pass 3/4/7 document count wording: 104 numbered manifest rows (F01–F104), ten grouped rows expanded by 12 additional tuples, 116 literal candidate tuples; zero approved/applied physical constraints. Exact per-tuple type/index/nullability/ownership/action reconciliation remains incomplete. No DDL approval.
