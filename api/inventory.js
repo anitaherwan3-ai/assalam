@@ -53,6 +53,8 @@ module.exports = async function handler(req, res) {
       result = await commands.receivePurchase(value);
     } else if (body.action === "supplier_return_request") {
       result = await commands.createSupplierReturnRequest(value);
+    } else if (body.action === "supplier_return_approve") {
+      result = await commands.approveSupplierReturn(value);
     } else if (body.action === "supplier_return_dispatch") {
       result = await commands.dispatchSupplierReturn(value);
     } else {
