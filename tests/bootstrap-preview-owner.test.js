@@ -28,11 +28,11 @@ test("preview owner bootstrap creates only the allowlisted identity and role", a
     displayName: "Pimpinan Preview"
   }, "praktekrose@gmail.com");
   assert.equal(result.status, "provisioned");
-  assert.equal(connection.calls.length, 4);
+  assert.equal(connection.calls.length, 5);
   assert.match(connection.calls[0].sql, /FOR UPDATE/);
   assert.equal(connection.calls[1].params[1], "Pimpinan Preview");
   assert.equal(connection.calls[2].params[0], connection.calls[1].params[0]);
-  assert.equal(connection.calls[3].params[0], "preview-firebase-uid");
+  assert.equal(connection.calls[4].params[0], "preview-firebase-uid");
 });
 
 test("preview owner bootstrap never overwrites an existing conflicting identity", async () => {

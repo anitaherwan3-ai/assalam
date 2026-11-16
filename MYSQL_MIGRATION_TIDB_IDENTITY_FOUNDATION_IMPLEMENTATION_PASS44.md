@@ -18,7 +18,7 @@
 8. `lib/idempotency.js` provides canonical request hashing, duplicate-key claim/replay and mismatch rejection. `lib/audit.js` writes append-oriented audit events and blocks credential-like fields from snapshots.
 9. `lib/migration-runner.js` applies migrations in order, verifies each expected table set and records applied versions. The Vercel build hook is inert by default and requires the exact preview branch, database, enable flag and confirmation string before it can execute DDL. `/api/db-schema-status` provides a read-only schema verification endpoint.
 10. `api/auth/bootstrap-preview-owner.js` can create only the explicitly allowlisted preview Pimpinan identity after Firebase token verification. It is disabled unless a separate Preview-only flag is enabled; it never touches the operational Firebase project or protected production account records.
-11. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature, transaction commit/rollback, FK enforcement, migration idempotency, request replay and audit snapshot protection. GitHub Actions runs the tests and the guarded build step.
+12. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature, transaction commit/rollback, FK enforcement, migration idempotency, request replay, audit snapshot protection and preview-owner bootstrap boundaries. GitHub Actions runs the tests and the guarded build step.
 
 ## Preview configuration
 
