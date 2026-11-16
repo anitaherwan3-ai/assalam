@@ -8,11 +8,11 @@
 
 ## Implemented on the preview branch
 
-- Firebase ID-token signature and claim verification against the isolated preview Firebase project.
+- Firebase ID-token signature and claim verification against the isolated preview Firebase project, plus Identity Toolkit account-status lookup to reject disabled users and tokens revoked after their authentication time (30-second in-process status cache).
 - Server-side Firebase UID mapping and TiDB role resolution; browser-supplied role/email/profile is never used as authorization.
 - A no-store session endpoint.
 - Three versioned migration sets:
-  - `001_identity_foundation`: users, role assignments, active role slots, Firebase UID mappings.
+  - `001_identity_foundation`: users, role assignments, active role slots, Firebase UID mappings. The active-slot table permits multiple assignments per user without imposing a single-role policy; API authentication rejects ambiguous multiple active roles.
   - `002_audit_idempotency_outbox`: audit events, idempotency records and outbox jobs.
   - `003_catalog_masters`: tariffs and suppliers.
 - A TiDB transaction wrapper that sets UTC, verifies foreign-key enforcement, and commits/rolls back/release safely.

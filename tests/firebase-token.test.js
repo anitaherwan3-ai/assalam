@@ -8,6 +8,10 @@ const { verifyFirebaseIdToken } = require("../lib/firebase-token");
 const projectId = "assalam-preview-test";
 const nowMs = 1794862800000;
 
+function accountStatus(token, projectId, claims) {
+  return { uid: claims.sub, disabled: false, validSince: claims.auth_time - 30, email: claims.email };
+}
+
 function base64url(value) {
   return Buffer.from(typeof value === "string" ? value : JSON.stringify(value)).toString("base64url");
 }
@@ -48,7 +52,7 @@ test("rejects a token whose audience belongs to another Firebase project", async
   const pair = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const token = makeToken(pair.privateKey, { aud: "another-project" });
   await assert.rejects(
-    verifyFirebaseIdToken(token, projectId, { nowMs, resolvePublicKey: async () => pair.publicKey }),
+    verifyFirebaseIdToken(token, projectId, { nowMs, resolveAccountStatus: accountStatus, resolvePublicKey: async () => pair.publicKey }),
     error => error.statusCode === 401
   );
 });
@@ -69,5 +73,35 @@ test("rejects invalid signatures", async () => {
   await assert.rejects(
     verifyFirebaseIdToken(token, projectId, { nowMs, resolvePublicKey: async () => other.publicKey }),
     error => error.statusCode === 401
+  );
+});
+
+test("rejects Firebase accounts disabled after token issuance", async () => {
+  const pair = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const token = makeToken(pair.privateKey);
+  await assert.rejects(
+    verifyFirebaseIdToken(token, projectId, {
+      nowMs,
+      resolvePublicKey: async () => pair.publicKey,
+      resolveAccountStatus: async (_token, _project, claims) => ({
+        uid: claims.sub, disabled: true, validSince: claims.auth_time, email: claims.email
+      })
+    }),
+    error => error.code === "AUTH_ACCOUNT_REVOKED" && error.statusCode === 401
+  );
+});
+
+test("rejects Firebase tokens issued before the account revocation timestamp", async () => {
+  const pair = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const token = makeToken(pair.privateKey);
+  await assert.rejects(
+    verifyFirebaseIdToken(token, projectId, {
+      nowMs,
+      resolvePublicKey: async () => pair.publicKey,
+      resolveAccountStatus: async (_token, _project, claims) => ({
+        uid: claims.sub, disabled: false, validSince: claims.auth_time + 1, email: claims.email
+      })
+    }),
+    error => error.code === "AUTH_ACCOUNT_REVOKED" && error.statusCode === 401
   );
 });
