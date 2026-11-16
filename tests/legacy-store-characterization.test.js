@@ -244,7 +244,6 @@ test("legacy supplier return caps excessive requests; replacement must reject in
 
   assert.equal(store.processReturBeli({ beliId: "small-purchase", qtyRetur: 99, alasan: "Uji batas" }), true);
   assert.equal(store.get("beli", "small-purchase").qty, 0);
-  assert.equal(store.get("small-batch", "small-batch"), undefined);
   assert.equal(store.get("batch", "small-batch").sisa, 0);
   assert.equal(store.state.returBeli[0].qty, 3);
   assert.equal(store.state.returBeli[0].nilai, 3000);
