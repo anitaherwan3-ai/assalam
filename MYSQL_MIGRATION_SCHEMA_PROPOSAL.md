@@ -724,3 +724,7 @@ See [MYSQL_MIGRATION_FK_CHILD_INDEX_EVIDENCE_AUDIT_PASS31.md](./MYSQL_MIGRATION_
 ## 34. FK parent PK/UNIQUE evidence audit — Pass 32
 
 See [MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_AUDIT_PASS32.md](./MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_AUDIT_PASS32.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_PASS32.csv). Pass 32 finds missing/integrated parent composite keys, plus the F70 ordered-key mismatch between the FK tuple (invoice_id, invoice_line_id) and the proposed UNIQUE (invoice_line_id, invoice_id). These are static text findings, not live TiDB metadata. Schema v1 remains blocked.
+
+## 35. F70 parent composite-key order correction — Pass 33
+
+See [MYSQL_MIGRATION_F70_PARENT_KEY_ORDER_CORRECTION_PASS33.md](./MYSQL_MIGRATION_F70_PARENT_KEY_ORDER_CORRECTION_PASS33.md). The F70 child/parent tuple, required parent UNIQUE and sales_invoice_lines table definition are now aligned in the same order `(invoice_id,invoice_line_id)`. This is proposal-level only; TiDB runtime verification remains open.
