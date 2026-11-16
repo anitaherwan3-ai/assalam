@@ -9,7 +9,7 @@ function createHarness(overrides = {}) {
     medicine: { medicineId: "med-1", quantityScale: 0, stockQty: "5", hpp: "1000", version: "1" },
     batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", version: "1" }],
     movements: [], audits: [], patients: [], encounters: [], tickets: [],
-    invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [],
+    invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [], encounterCompleted: null,
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
   };
   let queue = Promise.resolve();
@@ -24,7 +24,7 @@ function createHarness(overrides = {}) {
       audits: state.audits, patients: state.patients, encounters: state.encounters,
       tickets: state.tickets, invoiceDrafts: state.invoiceDrafts, invoices: state.invoices,
       invoiceLines: state.invoiceLines, batchAllocations: state.batchAllocations,
-      returnQuotas: state.returnQuotas, currentCall: state.currentCall,
+      returnQuotas: state.returnQuotas, encounterCompleted: state.encounterCompleted, currentCall: state.currentCall,
       nextSequence: state.nextSequence, claims: state.claims, completed: state.completed
     });
     try {
@@ -289,6 +289,6 @@ test("checkout failure after invoice draft and stock deduction rolls back the co
   assert.equal(state.invoiceLines.length, 0);
   assert.equal(state.batchAllocations.length, 0);
   assert.equal(state.returnQuotas.length, 0);
-  assert.equal(state.encounterCompleted, undefined);
+  assert.equal(state.encounterCompleted, null);
   assert.equal(state.audits.length, 0);
 });
