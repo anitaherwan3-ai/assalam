@@ -8,7 +8,7 @@ const expected = [
   "user", "session", "account", "verification", "rateLimit",
   "cashier_shifts", "active_shift_slots", "patients", "patient_encounters", "queue_counters",
   "cashier_queue_assignments", "queue_tickets", "queue_call_guards", "queue_call_events",
-  "queue_transfer_events", "queue_display_configs",
+  "queue_transfer_events",
   "medicines", "supplier_invoices", "supplier_invoice_lines", "purchase_receipts", "purchase_receipt_lines",
   "inventory_batches", "inventory_movements", "medicine_stock_projections", "stocktakes", "stocktake_lines",
   "sales_invoices", "sales_invoice_lines", "sales_batch_allocations", "invoice_payments", "return_quota_subjects",
