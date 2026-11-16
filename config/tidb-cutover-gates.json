@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sourceOfTruth": "firebase",
+  "targetDatabase": "tidb-cloud",
+  "productionCutoverAllowed": false,
+  "ownerApproval": {
+    "approvedBy": null,
+    "approvedAtUtc": null,
+    "changeReference": null
+  },
+  "gates": {
+    "ownerPolicyClosure": { "passed": false, "evidence": [] },
+    "schemaV1Approval": { "passed": false, "evidence": [] },
+    "tidbDdlAndRuntimeCompatibility": { "passed": false, "evidence": [] },
+    "firebaseSourceInventoryClosure": { "passed": false, "evidence": [] },
+    "backupAndExtractionVerification": { "passed": false, "evidence": [] },
+    "dryRunImportAndReconciliation": { "passed": false, "evidence": [] },
+    "moduleParityAcrossRoles": { "passed": false, "evidence": [] },
+    "concurrencyAndMultiDeviceValidation": { "passed": false, "evidence": [] },
+    "securityAndAuthorizationValidation": { "passed": false, "evidence": [] },
+    "backupRestoreAndRollbackDrill": { "passed": false, "evidence": [] },
+    "productionCutoverApproval": { "passed": false, "evidence": [] }
+  }
+}
