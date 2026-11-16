@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
   if (!safeEqual(suppliedToken, expectedToken)) {
     return res.status(403).json({ ok: false, code: "MIGRATION_TOKEN_INVALID" });
   }
-  if (!req.body || req.body.confirm !== "APPLY_ASSALAM_IDENTITY_V1") {
+  if (!req.body || req.body.confirm !== "APPLY_ASSALAM_FOUNDATION_V1") {
     return res.status(400).json({ ok: false, code: "MIGRATION_CONFIRMATION_REQUIRED" });
   }
 

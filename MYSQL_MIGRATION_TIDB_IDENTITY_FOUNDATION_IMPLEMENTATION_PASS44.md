@@ -11,9 +11,11 @@
 1. `lib/firebase-token.js` validates Firebase ID-token RS256 signatures against Google's Secure Token signing certificates and checks issuer, audience, subject, expiry, issue time and auth time.
 2. `lib/require-auth.js` resolves authorization only by the immutable Firebase UID mapping in TiDB and the server-owned active role slot. Browser-supplied email, role, user ID or profile is not authorization evidence.
 3. `api/auth/session.js` exposes a no-store, read-only authenticated session probe.
-4. `lib/migrations/001_identity_foundation.js` defines the first identity-only DDL: `users`, `role_assignments`, `active_role_slots`, and `firebase_identities`. Foreign keys use RESTRICT; active role ownership is a composite FK.
-5. `api/db-migrate.js` is a POST-only, exact-preview-branch, exact-database, feature-flagged migration runner. It requires a 32-character-or-longer secret header and a literal confirmation phrase. It never seeds user, role or UID records.
-6. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature and core migration FK invariants. A GitHub Actions workflow runs `npm test` on this migration branch.
+4. `lib/migrations/001_identity_foundation.js` defines `users`, `role_assignments`, `active_role_slots`, and `firebase_identities`. Foreign keys use RESTRICT; active role ownership is a composite FK.
+5. `lib/migrations/002_audit_idempotency_outbox.js` defines append-oriented `audit_events`, command `idempotency_requests`, and `outbox_jobs`. It does not apply retention or financial policy.
+6. `api/db-migrate.js` is a POST-only, exact-preview-branch, exact-database, feature-flagged migration runner. It requires a 32-character-or-longer secret header and a literal confirmation phrase. It verifies the expected tables after each migration and never seeds user, role or UID records.
+7. `lib/with-transaction.js` enforces UTC session time, checks session FK enforcement, and guarantees commit/rollback/release behavior.
+8. Node's built-in test runner covers signed token acceptance, wrong audience, expired token, invalid signature, transaction commit/rollback, FK enforcement and migration FK invariants. A GitHub Actions workflow runs `npm test` on this migration branch.
 
 ## Preview configuration
 
@@ -34,4 +36,4 @@ The migration runner remains disabled because `TIDB_MIGRATIONS_ENABLED` and `ASS
 
 ## Verification status
 
-Automated test source and CI workflow have been added. Tests are **pending CI execution**; no local Node runtime or live TiDB migration was run in this pass. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.
+Automated test source and CI workflow have been added. Tests are **pending CI execution**; the repository Actions API currently reports no workflow run for this branch. No local Node runtime or live TiDB migration was run in this pass. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.

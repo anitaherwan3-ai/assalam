@@ -23,3 +23,21 @@ test("active role slot enforces that the selected assignment belongs to the same
   const sql = migration.statements.join("\n").toLowerCase();
   assert.match(sql, /foreign key \(role_assignment_id, user_id\)[\s\S]*references role_assignments \(role_assignment_id, user_id\)/);
 });
+
+const auditMigration = require("../lib/migrations/002_audit_idempotency_outbox");
+
+test("audit/idempotency/outbox migration declares its complete table set", () => {
+  assert.deepEqual(auditMigration.expectedTables.slice().sort(), [
+    "audit_events", "idempotency_requests", "outbox_jobs"
+  ]);
+  const sql = auditMigration.statements.join("\n").toLowerCase();
+  for (const table of auditMigration.expectedTables) {
+    assert.match(sql, new RegExp("create table if not exists " + table));
+  }
+});
+
+test("audit and idempotency actor links restrict user deletion", () => {
+  const sql = auditMigration.statements.join("\n").toLowerCase();
+  assert.equal((sql.match(/on delete restrict on update restrict/g) || []).length, 2);
+  assert.doesNotMatch(sql, /on delete cascade/);
+});
