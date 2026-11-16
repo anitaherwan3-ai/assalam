@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const manifest = require("../config/schema-v1-manifest.json");
 
 test("schema v1 dictionary covers all 71 physical tables and their keys", () => {
-  assert.equal(manifest.tableCount, 71);
+  assert.equal(manifest.tableCount, 72);
   assert.equal(Object.keys(manifest.tables).length, manifest.tableCount);
   assert.ok(manifest.tables.user && manifest.tables.session && manifest.tables.account && manifest.tables.verification);
   assert.equal(manifest.tables.patient_handoffs, undefined);
