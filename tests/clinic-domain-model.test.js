@@ -6,19 +6,33 @@ const model = require("../lib/clinic-domain-model");
 
 test("medicine master requires explicit unit precision and blocks direct stock/HPP edits", () => {
   const valid = model.validateMedicineMaster({
-    name: "Amoxicillin", canonicalUnit: "strip", quantityScale: 0,
+    name: "Amoxicillin", canonicalUnit: "tablet", quantityScale: 0,
     minimumStock: "2", sellingPrice: "15000"
   });
-  assert.equal(valid.canonicalUnit, "strip");
+  assert.equal(valid.canonicalUnit, "tablet");
   assert.equal(valid.quantityScale, 0);
   assert.throws(() => model.validateMedicineMaster({
     name: "X", canonicalUnit: "tablet", quantityScale: 0,
     minimumStock: "0", sellingPrice: "1000", stockQty: "20"
   }), { code: "MEDICINE_PROJECTION_WRITE_BLOCKED" });
   assert.throws(() => model.validateMedicineMaster({
+    name: "X", canonicalUnit: "strip", quantityScale: 0,
+    minimumStock: "0", sellingPrice: "1000"
+  }), { code: "MEDICINE_UNIT_NOT_APPROVED" });
+  assert.throws(() => model.validateMedicineMaster({
+    name: "X", canonicalUnit: "tablet", quantityScale: 1,
+    minimumStock: "0", sellingPrice: "1000"
+  }), { code: "MEDICINE_WHOLE_UNIT_REQUIRED" });
+  assert.throws(() => model.validateMedicineMaster({
     name: "X", canonicalUnit: "tablet",
     minimumStock: "0", sellingPrice: "1000"
   }), { code: "INVALID_QUANTITY_SCALE" });
+  for (const unit of ["tablet", "kapsul", "botol", "pcs"]) {
+    assert.equal(model.validateMedicineMaster({
+      name: "Uji", canonicalUnit: unit, quantityScale: 0,
+      minimumStock: "0", sellingPrice: "1000"
+    }).canonicalUnit, unit);
+  }
 });
 
 test("batch requires source purchase, explicit disposition and bounded quantities", () => {

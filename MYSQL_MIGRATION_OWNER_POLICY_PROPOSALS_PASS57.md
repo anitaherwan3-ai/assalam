@@ -53,10 +53,28 @@ It is not read by the application or migration runner. The production cutover ma
 - Opening shift float is not omzet.
 - No production data cutover before reconciliation, backup/restore, rollback and explicit owner approval.
 
+## Owner decisions recorded — 17 November 2026
+
+The following decisions were confirmed in the owner conversation and are recorded separately from overall cutover approval:
+
+| Decision | Confirmed direction | Remaining item |
+|---|---|---|
+| D01 | Canonical units are `tablet`, `kapsul`, `botol`, and `pcs`; quantities are whole units (`quantityScale = 0`). | Source-verified conversion for legacy `strip`, box or carton records; no automatic relabeling. |
+| D05 | Admin and Pimpinan approvals are both required. Returned quantity first enters quarantine; it is not sellable stock. | Physical inspection/release authority and checklist. |
+| D13 | Refund requires Pimpinan approval. Admin review may remain as first review stage; payout is separate. | Approved methods, source account and cash-refund evidence. |
+| D14 | Non-cash payments remain pending until reviewed and approved by Pimpinan; then they enter recognized income. | Settlement remains a separate clearing/bank step; supported channels and matching evidence must be configured. |
+| D16 | A and B are independent lanes, one per shift, with one active call per lane. | Configure which shift maps to A and which maps to B; do not infer this mapping. |
+| D17 | Conservative timestamp preservation/normalization accepted. | Source collection/field profile still required to declare epoch units. |
+| D18 | This application is administrative/financial, not the clinical medical-record application. | Field-level retention schedule; separate clinic RME obligations remain outside this app. |
+| D19 | Append-only audit, category-specific retention, integrity-checked export and legal hold framework accepted. | Exact duration and authority by audit category. |
+
+These decisions do **not** approve physical schema, live data import, production cutover or Firebase disconnection. Overall cutover gates remain closed.
+
 ## Legal baseline checked
 
-- **Permenkes No. 24 Tahun 2022 tentang Rekam Medis**, Article 39(1) sets a minimum 25-year storage period for electronic medical record data from the patient's last visit. Article 39(2) allows continued retention after that point where the data will still be used. The BPK regulation portal currently lists this regulation as **Berlaku**.
-- **UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi**, Articles 43–47 address deletion/destruction and related controller duties. This means the system must not implement either unconditional indefinite retention or automatic erasure without checking the applicable retention schedule, purpose, legal hold and statutory rules.
+- **PP No. 50 Tahun 2022**, Article 11(1), requires books, records and supporting documents forming the basis of bookkeeping/accounting—including electronic and online application outputs—to be retained for 10 years where the rule applies to the relevant taxpayer.
+- **UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi**, Articles 42–44 govern termination of processing, erasure and destruction of personal data. Administrative patient identity/contact fields need purpose-based classification; the 10-year accounting rule must not be indiscriminately applied to every personal-data field.
+- **Permenkes No. 24 Tahun 2022**, Article 3 requires health facilities including clinics to organize Electronic Medical Records. This migration app is not being designed as the clinical RME, and it must not store diagnoses, clinical notes, treatment plans or examination results. The clinic's separate RME obligation is not waived by this scope decision.
 
 Sources:
 - BPK regulation record: https://peraturan.bpk.go.id/Details/245544/p

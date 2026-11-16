@@ -37,6 +37,19 @@ test("FEFO allocation orders by expiry, receipt time and stable batch ID", () =>
   assert.equal(result.mutatedSource, false);
 });
 
+test("FEFO never allocates quarantined, inspection-pending or rejected returned medicine", () => {
+  const result = domain.allocateFefo({
+    quantityScale: 0, businessDate: "2026-11-17", requestedQty: "2",
+    batches: [
+      { batchId: "quarantine", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "20", disposition: "quarantined" },
+      { batchId: "inspection", expiryDate: "2027-02-01", receivedAtUtc: "2026-10-02T00:00:00Z", remainingQty: "20", disposition: "inspection_pending" },
+      { batchId: "rejected", expiryDate: "2027-03-01", receivedAtUtc: "2026-10-03T00:00:00Z", remainingQty: "20", disposition: "rejected" },
+      { batchId: "sellable", expiryDate: "2027-04-01", receivedAtUtc: "2026-10-04T00:00:00Z", remainingQty: "2", disposition: "sellable" }
+    ]
+  });
+  assert.deepEqual(result.allocations, [{ batchId: "sellable", qty: "2" }]);
+});
+
 test("FEFO shortage rejects the whole plan without returning partial allocations", () => {
   assert.throws(() => domain.allocateFefo({
     quantityScale: 0,

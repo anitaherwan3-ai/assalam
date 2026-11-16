@@ -51,53 +51,57 @@
     {
       "id": "D01",
       "area": "Medicine units, fractional stock and precision",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_unit_vocabulary_and_integer_stock",
       "recommendation": {
-        "canonicalUnit": "Smallest unit actually dispensed or measured for each medicine; define per medicine, not globally.",
-        "countableForms": "Default integer quantities for tablets, capsules, strips, vials and bottles unless that medicine is explicitly approved for fractional dispensing.",
-        "liquidsAndMeasuredForms": "Use an explicit measurable base unit such as mL; configure allowed scale per medicine.",
-        "packageConversion": "Store explicit integer conversion factors (for example pack-to-tablet) with effective date; snapshot conversion on every purchase and sale.",
-        "rounding": "No implicit rounding. Reject quantities with more fractional digits than the medicine's approved scale.",
-        "stockStorage": "Store exact scaled integer quantities; SQL precision is a storage choice, not permission to dispense fractions."
+        "canonicalUnits": [
+          "tablet",
+          "kapsul",
+          "botol",
+          "pcs"
+        ],
+        "quantityScale": 0,
+        "quantityRule": "All four approved canonical stock units are counted as whole units; fractional quantity is rejected.",
+        "conversion": "Any outer packaging (for example strip, box or carton) must have an explicit per-medicine conversion factor to the approved canonical unit, proven from the package label/source. No automatic or assumed conversion.",
+        "migration": "Legacy quantities in unsupported units are preserved and quarantined for an explicit conversion map; no silent relabeling."
       },
       "ownerMustConfirm": [
-        "Canonical unit and allowed fractional quantities for each medicine category",
-        "Who may approve a medicine's unit conversion/precision change"
+        "Source-verified conversion factors for any medicine currently recorded as strip/box/carton or another unit"
       ],
       "blocks": [
-        "Domain schema freeze for medicine quantity precision",
-        "Operational stock migration for affected medicines"
+        "Automatic conversion of legacy unsupported units until the medicine-specific factor is evidenced"
       ],
       "evidence": [
-        "Current medicine master export",
-        "Examples of real package contents and dispensing practice",
-        "Signed per-medicine unit/scale approval"
-      ]
+        "Approved unit list and whole-unit rule from owner",
+        "Per-medicine package conversion evidence where required"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D05",
       "area": "Patient-return medicine disposition",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_dual_approval_quarantine_workflow",
       "recommendation": {
-        "defaultDisposition": "inspection_pending_then_quarantined",
-        "sellableRule": "Returned medicine is never sellable by default. It can re-enter sellable batch stock only after documented inspection confirms unopened/sealed packaging, intact condition, traceable original batch, acceptable storage history and valid expiry.",
-        "decisionMaker": "A Pimpinan-designated medicine-responsible person records inspection; approval authority and eligible staff list must be configured.",
-        "failedInspection": "Keep quarantined or record rejected/expired/loss with a reason; never silently delete or re-stock.",
-        "lineage": "Return must reference original invoice line and original batch allocation."
+        "submission": "Cashier submits a patient-return request tied to the original invoice line and original batch allocation.",
+        "approvals": [
+          "Admin review/approval",
+          "Pimpinan approval is mandatory before any return quantity is restored to inventory"
+        ],
+        "afterApproval": "After both approvals, returned quantity is recorded in a separate quarantined balance; it is not available to FEFO checkout.",
+        "release": "Only after a documented physical inspection confirms traceability, intact condition, acceptable storage and unexpired status may an authorized release decision move it from quarantine to sellable stock.",
+        "rejection": "Rejected, opened, damaged, expired or untraceable medicine remains non-sellable and is recorded with its disposition reason.",
+        "accounting": "Refund decision and inventory disposition are separate; approving a refund does not automatically make medicine sellable."
       },
       "ownerMustConfirm": [
-        "Named/role-based person authorized to certify resale",
-        "Whether any opened or patient-held medicine can ever be resold",
-        "Inspection evidence required"
+        "Who is the named/role-based person authorized to perform the physical inspection and record release from quarantine"
       ],
       "blocks": [
-        "Sellable stock restoration from patient returns"
+        "Sellable stock release until inspection and explicit release event"
       ],
       "evidence": [
-        "Written clinic SOP",
-        "Role/approval matrix",
-        "Return inspection form/checklist"
-      ]
+        "Owner-confirmed Admin + Pimpinan dual approval",
+        "Inspection and quarantine record with original invoice/batch link"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D06",
@@ -234,50 +238,49 @@
     {
       "id": "D13",
       "area": "Patient refunds and payout evidence",
-      "status": "workflow_confirmed_method_details_open",
+      "status": "owner_confirmed_pimpinan_approval_required",
       "recommendation": {
-        "confirmedWorkflow": "Cashier submits; Admin performs first-stage review; Pimpinan makes the final refund decision; payout is a separate Pimpinan-only action.",
-        "obligation": "Approval creates a refund obligation, not a cash outflow.",
-        "payout": "Record actual payout date/time, amount, method, source cash drawer/bank account, recipient/reference and evidence. Require a transfer reference for bank transfer.",
-        "method": "Prefer returning through the original payment channel where feasible; record an authorized exception and reason otherwise."
+        "approval": "No refund obligation may be approved without an explicit Pimpinan decision. Admin may perform the existing first-stage review, but cannot replace Pimpinan approval.",
+        "obligation": "Pimpinan approval creates a refund obligation; it does not by itself record that money has been paid.",
+        "payout": "Payout is a separate Pimpinan-authorized event with actual date, amount, method, source cash/bank account, recipient/reference and evidence.",
+        "partialPayout": "Not enabled until a partial payout policy is explicitly approved."
       },
       "ownerMustConfirm": [
-        "Allowed refund methods",
-        "Cash drawer/bank account used for each method",
-        "Evidence/recipient details required for cash refund"
+        "Accepted payout methods and source cash/bank accounts",
+        "Minimum evidence for cash refund"
       ],
       "blocks": [
-        "Final refund payout method and source-account configuration"
+        "Refund payout until approved method/account and evidence are configured"
       ],
       "evidence": [
-        "Return/refund SOP",
-        "Cash and transfer evidence examples"
-      ]
+        "Pimpinan approval event",
+        "Separate payout evidence"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D14",
       "area": "Non-cash settlement and cash-flow timing",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_non_cash_pending_until_pimpinan_review",
       "recommendation": {
-        "revenue": "Keep posted invoice/service revenue distinct from whether the payment has settled.",
-        "cash": "Cash receipt enters the relevant cash drawer only when actually received.",
-        "nonCash": "Transfer/QRIS/card payment starts as reported or pending_settlement; it enters bank/clearing balance only when verified by bank/provider evidence.",
-        "fees": "Record provider fees separately so gross patient payment, fee and net bank settlement reconcile.",
-        "failedOrReversed": "Preserve failed/reversed payment events; do not leave them counted as settled funds."
+        "initialState": "Non-cash payment is recorded in pending_pimpinan_review and is not yet included in recognized income.",
+        "recognition": "After Pimpinan reviews and approves the payment, the amount is posted to recognized income.",
+        "settlement": "Income recognition and bank/provider settlement remain separate. Until settlement evidence exists, the amount remains in a pending/clearing balance, not available bank cash.",
+        "rejection": "Pimpinan rejection leaves the item out of recognized income and records the reason.",
+        "reversal": "A subsequent failed/reversed settlement creates an attributable reversal/adjustment; never erase the original review/payment event.",
+        "fees": "Provider fees are recorded separately so gross recognized income and net settlement can be reconciled."
       },
       "ownerMustConfirm": [
-        "Methods supported by the clinic",
-        "Settlement proof/source and expected reconciliation process",
-        "Treatment of provider fees and settlement delays"
+        "Supported non-cash channels and source evidence for later settlement matching"
       ],
       "blocks": [
-        "Final non-cash settlement policy and bank reconciliation"
+        "Non-cash income recognition endpoint until Pimpinan review is implemented"
       ],
       "evidence": [
-        "Settlement statements",
-        "QRIS/transfer samples",
-        "Current payment workflow"
-      ]
+        "Pimpinan review event",
+        "Settlement evidence kept separate"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D15",
@@ -307,98 +310,101 @@
     {
       "id": "D16",
       "area": "Queue A/B and active-call concurrency",
-      "status": "lane_views_confirmed_lane_meaning_and_call_policy_open",
+      "status": "owner_confirmed_separate_queue_lane_per_shift",
       "recommendation": {
-        "confirmed": "Keep A and B as separate selectable/displayable lanes; do not merge PR13 behavior without separate review.",
-        "candidateCallPolicy": "One active call per lane (per_lane) is the preferred candidate so A and B can progress independently; implement only after confirming the operational meaning of each lane.",
-        "events": "Call, recall, cancel-call and transfer are append-only events; recall preserves the same ticket; transfer records old/new lane and retains ticket identity.",
-        "display": "Changing the TV view must not reset calls or ticket counters."
+        "laneRule": "A and B are separate queue lanes, with one lane assigned to each active clinic shift.",
+        "assignment": "The lane-to-shift mapping is stored as explicit configuration; do not guess whether A means morning or evening until the clinic sets that mapping.",
+        "activeCall": "One active call per lane/shift; A and B may each have one active call at the same time.",
+        "events": "Call, recall, cancel-call and authorized transfer are append-only events; recall retains the ticket identity.",
+        "display": "Changing the TV view does not reset counters, active calls or ticket history."
       },
       "ownerMustConfirm": [
-        "Meaning/service scope of A and B",
-        "Whether one active call per lane is correct",
-        "Who may transfer/override and how completed/cancelled calls behave"
+        "Exact mapping: which shift is assigned to A and which to B",
+        "Who can transfer or override a call"
       ],
       "blocks": [
-        "Queue prefix activation and active-call guard policy"
+        "Production queue lane assignment until shift-to-lane mapping is configured"
       ],
       "evidence": [
-        "Current A/B service definitions",
-        "Queue operating SOP",
-        "Observed two-lane scenario tests"
-      ]
+        "Owner confirmation of separate lanes per shift",
+        "Approved shift-to-lane configuration"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D17",
       "area": "Malformed or missing historical timestamps",
-      "status": "engineering_rule_recommended_source_profile_required",
+      "status": "owner_confirmed_conservative_timestamp_handling",
       "recommendation": {
-        "preserveRaw": "Retain the exact original timestamp value and source field.",
-        "normalization": "Convert to UTC only when an offset/time zone or unambiguous source rule is proven.",
-        "missingOrAmbiguous": "Leave normalized timestamp/business date null and mark the record needs_review; never substitute migration time or guess WIB.",
-        "reporting": "Exclude unresolved timestamps from date-sensitive reports until reconciled; preserve original record and review trail."
+        "preserveRaw": "Retain exact raw source value and field.",
+        "normalize": "Convert to UTC only with explicit zone/offset or source-declared epoch unit.",
+        "ambiguous": "Missing, malformed, date-only or ambiguous local times remain unnormalized and are marked needs_review; never replace with migration time.",
+        "reporting": "Keep unresolved timestamps out of date-sensitive reporting until reviewed."
       },
-      "ownerMustConfirm": [
-        "Only record-specific exceptions where source evidence cannot determine the date"
-      ],
+      "ownerMustConfirm": [],
       "blocks": [
-        "Date-sensitive historical reporting for affected records"
+        "Date-sensitive historical reporting for affected ambiguous records"
       ],
       "evidence": [
-        "Timestamp type/value profile by collection",
-        "Representative malformed/missing examples",
-        "Source runtime/time-zone behavior"
-      ]
+        "Owner accepted conservative normalization proposal",
+        "Source collection/field profile still required to declare epoch units"
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D18",
-      "area": "Electronic medical record retention, correction and legal hold",
-      "status": "legal_minimum_confirmed_implementation_policy_open",
+      "area": "Application scope and retention for administrative patient/financial data (not clinical record content)",
+      "status": "owner_confirmed_application_is_administrative_financial_not_emr",
       "recommendation": {
-        "minimumElectronicRetentionYears": 25,
-        "retentionAnchor": "date of patient's last visit",
-        "source": "Permenkes 24/2022 Article 39: electronic medical records at a healthcare facility are retained at least 25 years from the patient's last visit; after that they may still be retained if useful.",
-        "correction": "Correct clinical/identity errors by an attributable amendment/correction event; do not silently overwrite historical clinical facts.",
-        "legalHold": "Suspend deletion/destruction when a dispute, investigation, audit or legal hold applies. Destruction must follow applicable legal procedures.",
-        "privacy": "Apply purpose limitation, role-based access, patient rights and documented deletion/destruction handling under applicable personal-data law."
+        "applicationScope": "This application handles administrative patient identity/basic visit administration, billing, payments, stock and clinic finances. It is not the clinical medical-record application.",
+        "excludedClinicalContent": [
+          "diagnosis",
+          "clinical notes",
+          "treatment plan",
+          "medical examination results",
+          "clinical prescriptions/clinical history"
+        ],
+        "accountingDocuments": "Books, records and documents forming the basis of bookkeeping/accounting and electronic processing outputs are retained for at least 10 years where PP 50/2022 Article 11 applies to the clinic/taxpayer.",
+        "personalData": "Patient identity/contact data follows the Personal Data Protection Law: stop processing when the retention period or purpose ends, and erase/destroy when statutory conditions apply, subject to other legal retention duties and legal hold.",
+        "noBlanketRule": "Do not impose the electronic medical-record 25-year rule on every administrative/financial field in this application. Classify retention by data purpose and legal basis.",
+        "separateClinicObligation": "This application does not replace any separate Electronic Medical Record system/process required of a clinic under Minister of Health Regulation 24/2022 Article 3."
       },
       "ownerMustConfirm": [
-        "Who authorizes corrections and record release/export",
-        "Legal-hold activation/release roles",
-        "Retention handling for non-clinical operational data"
+        "Classify each patient/admin field and financial record against its actual purpose and statutory retention basis",
+        "Confirm separate clinical medical-record system/process is maintained outside this application"
       ],
       "blocks": [
-        "Automated retention/destruction jobs and clinical correction workflow until approved"
+        "Automatic deletion/purge until a field-level retention schedule and legal hold process are approved"
       ],
       "evidence": [
-        "Clinic retention/correction SOP",
-        "Access/export matrix",
-        "Legal review of current applicable rules"
-      ]
+        "Owner-confirmed application scope",
+        "Data inventory and retention classification",
+        "Legal/accounting review before purge automation"
+      ],
+      "ownerApprovalStatus": "scope_confirmed_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D19",
       "area": "Audit retention, export and legal hold",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_append_only_audit_and_legal_hold_framework_duration_open",
       "recommendation": {
         "auditLog": "Server-authored append-only audit; operational roles cannot edit/delete authoritative events.",
-        "retention": "Use an approved retention schedule aligned to financial, employment, clinical and legal obligations; do not invent a single retention duration for all audit categories.",
-        "export": "Include date range, actor, event type, target, request/correlation ID, checksum and export audit event.",
-        "legalHold": "Pause purge for affected records while a legal hold/investigation exists."
+        "retention": "Use category-specific retention schedules (financial/accounting, security/authentication, application activity and approval events); do not use one unqualified duration for all.",
+        "export": "Include range, actor, event type, target, request/correlation ID and integrity checksum; exporting itself creates an audit event.",
+        "legalHold": "Suspend purge for affected records while an investigation, dispute, audit or legal hold applies.",
+        "purge": "No automatic purge until the schedule and authority for each category have been approved."
       },
       "ownerMustConfirm": [
-        "Retention durations by audit category",
-        "Who can export and approve exports",
-        "Who can impose/release legal hold"
+        "Retention durations and authorized exporter/legal-hold roles by audit category"
       ],
       "blocks": [
-        "Audit purge schedule and export privilege activation"
+        "Audit purge scheduling until category-specific schedule is approved"
       ],
       "evidence": [
-        "Record-retention schedule",
-        "Export permission matrix",
-        "Legal-hold SOP"
-      ]
+        "Owner acceptance of append-only/category-specific/hold framework",
+        "Approved category-specific retention schedule"
+      ],
+      "ownerApprovalStatus": "framework_accepted_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D20",
