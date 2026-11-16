@@ -8,7 +8,9 @@ const expected = [
   "user", "session", "account", "verification",
   "cashier_shifts", "active_shift_slots", "patients", "patient_encounters", "queue_counters",
   "cashier_queue_assignments", "queue_tickets", "queue_call_guards", "queue_call_events",
-  "queue_transfer_events", "queue_display_configs"
+  "queue_transfer_events", "queue_display_configs",
+  "medicines", "supplier_invoices", "supplier_invoice_lines", "purchase_receipts", "purchase_receipt_lines",
+  "inventory_batches", "inventory_movements", "medicine_stock_projections", "stocktakes", "stocktake_lines"
 ];
 
 module.exports = async function handler(req, res) {
