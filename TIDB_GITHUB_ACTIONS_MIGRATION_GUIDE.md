@@ -10,6 +10,9 @@ In GitHub repository settings, open **Secrets and variables → Actions → Envi
 - `TIDB_PORT`: TiDB Cloud port
 - `TIDB_USER`: dedicated preview database user
 - `TIDB_PASSWORD`: password for that preview user
+- `BETTER_AUTH_URL`: planned preview application base URL (HTTPS)
+- `BETTER_AUTH_SECRET`: a newly generated random secret of at least 32 characters
+- `BETTER_AUTH_TRUSTED_ORIGINS`: optional comma-separated HTTPS origins
 
 Use a dedicated TiDB user limited to the preview database. Do not use production credentials. The workflow enforces database name `assalam_db` and TLS 1.2 or newer. Never put credentials in repository files, commit messages, or logs.
 
