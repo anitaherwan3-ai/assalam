@@ -48,12 +48,14 @@ module.exports = async function handler(req, res) {
       throw new Error("TiDB foreign key checks are not enabled for this session.");
     }
 
-    await connection.query(\`CREATE TABLE IF NOT EXISTS schema_migrations (
-      version VARCHAR(120) NOT NULL,
-      description VARCHAR(255) NOT NULL,
-      applied_at_utc DATETIME(3) NOT NULL,
-      PRIMARY KEY (version)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin\`);
+    await connection.query(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (" +
+      "version VARCHAR(120) NOT NULL, " +
+      "description VARCHAR(255) NOT NULL, " +
+      "applied_at_utc DATETIME(3) NOT NULL, " +
+      "PRIMARY KEY (version)) " +
+      "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+    );
 
     const [existing] = await connection.execute(
       "SELECT version FROM schema_migrations WHERE version = ? LIMIT 1",
