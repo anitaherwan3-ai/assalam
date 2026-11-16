@@ -572,7 +572,7 @@ See [MYSQL_MIGRATION_FOREIGN_KEY_INDEX_RECONCILIATION_PASS2.md](./MYSQL_MIGRATIO
 
 ## R. Normalized dictionary and FK manifest — pass 3
 
-The column type-family dictionary and 99 numbered FK manifest entries (F01–F99) are captured in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Some entries bundle multiple individual FK tuples, so the earlier 104-relationship count still requires a field-by-field expansion; the first Pass 6 draft's claim that F100–F104 were missing has been withdrawn. See [Pass 6 FK type/ownership reconciliation](./MYSQL_MIGRATION_FK_TYPE_OWNERSHIP_RECONCILIATION_PASS6.md) for its preliminary first-tuple comparison and unresolved supplemental-table, composite ownership, index/action and nullable-pair blockers. Schema v1 remains blocked. This remains isolated migration-branch documentation.
+The corrected Pass 3 FK manifest contains 104 numbered rows (F01–F104), expanded by Pass 7 into 116 literal candidate tuples. Pass 6's preliminary 86/11/2 first-tuple metrics are withdrawn as incomplete. Pass 28/30 records 256/256 candidate column type strings and canonicalizes F76; Passes 31–36 audit child indexes, parent keys, nullability and action policies. The remaining blockers are tracked in the per-pass matrices; schema v1 remains blocked. This remains isolated migration-branch documentation.
 
 
 ## S. Exact column dictionary and signedness reconciliation — pass 4
