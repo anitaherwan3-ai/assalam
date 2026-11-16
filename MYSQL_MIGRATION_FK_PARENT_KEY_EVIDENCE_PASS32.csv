@@ -76,7 +76,7 @@ candidate_id,source_FK_ID,parent_table,parent_columns_ordered,required_parent_ke
 "F67","F67","sales_invoice_line_components","invoice_component_id","PK","invoice_component_id","invoice_line_id|component_no","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
 "F68","F68","inventory_batches","batch_id","PK","batch_id","","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
 "F69","F69","inventory_movements","inventory_movement_id","PK","inventory_movement_id","","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
-"F70","F70","sales_invoice_lines","invoice_id|invoice_line_id","UNIQUE(invoice_id,line_no) is NOT same tuple; add UNIQUE(invoice_line_id,invoice_id)","invoice_line_id","invoice_id|line_no","PARENT_UNIQUE_ORDER_MISMATCH","FK tuple order invoice_id|invoice_line_id differs from proposed added UNIQUE order invoice_line_id|invoice_id"
+"F70","F70","sales_invoice_lines","invoice_id|invoice_line_id","UNIQUE(invoice_id,invoice_line_id)","invoice_line_id","invoice_id|invoice_line_id","EXPLICIT_PARENT_UNIQUE","Exact ordered parent UNIQUE tuple now declared in sales_invoice_lines table section"
 "F71","F71","sales_invoices","invoice_id","PK","invoice_id","","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
 "F72","F72","users","user_id","PK","user_id","","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
 "F73","F73","sales_invoices","invoice_id","PK","invoice_id","","EXPLICIT_PARENT_PK","Exact parent PK column appears in proposal table section"
