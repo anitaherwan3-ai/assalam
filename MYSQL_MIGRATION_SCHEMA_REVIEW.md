@@ -295,3 +295,8 @@ Key schema implications: separate stable patient master from repeatable encounte
 ## Audit wave 20–25 — 2026-11-16
 
 Added source-backed reports for patient identity/visit continuity (Pass 20), queue and display state (Pass 21), medicine/tariff/package master versioning (Pass 22), supplier purchase/receipt/payable (Pass 23), settings/audit/export/backup (Pass 24), and consolidated schema readiness (Pass 25). Key blockers include A/B queue policy and server-side call locking, immutable master/invoice snapshots, atomic purchase receipt, supplier payment/credit policy, immutable server audit, and tested backup/restore. See the Pass 25 closure report. Static audit only; no runtime test, DDL, import or production operation.
+
+
+## Pass 26 — consolidated decision register
+
+[Pass 26 decision register](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md) now acts as the consolidated decision source across Passes 1–25. It separates confirmed owner instructions from engineering closures, source verification and genuine owner policy gates. Confirmed instructions include clinic identity, protected five accounts, staged Firebase preservation, shift float not omzet, controlled return/refund flow, and A/B queue view/switching. Remaining owner policy and source gates are listed explicitly. This does not approve schema v1 or DDL.
