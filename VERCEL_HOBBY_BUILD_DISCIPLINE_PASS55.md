@@ -40,3 +40,23 @@ The Vercel Project Settings documentation explains that a build skipped through 
 
 **Cost:** no plan upgrade or paid Vercel feature was enabled.  
 **Production data:** no Firebase/Auth/Firestore/TiDB operational data was modified by this configuration change.
+
+
+## 5. Automatic Git deployment pause during active migration work
+
+A root-level `vercel.json` now sets:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "migration/tidb-foundation": false
+    }
+  }
+}
+```
+
+This branch-specific rule prevents automatic Git deployments for migration commits on every Vercel project connected to this repository. It does not disable Production deployments from `main`, and it does not stop GitHub Actions CI.
+
+When a consolidated migration package is ready for one end-to-end Preview build, remove this branch rule in the final package commit. Since `klinikassalaam` Preview Deployments remain disabled, the final commit should build only on `assalam-mysql-preview`. This is the planned one-build release checkpoint; do not remove the rule for intermediate commits.
