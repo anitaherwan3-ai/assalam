@@ -186,6 +186,13 @@
             "role_code",
             "valid_to_utc"
           ]
+        },
+        {
+          "name": "idx_role_assignments_grantor",
+          "unique": false,
+          "columns": [
+            "granted_by_user_id"
+          ]
         }
       ],
       "foreignKeys": [
@@ -242,6 +249,14 @@
           "name": "idx_active_role_slots_user",
           "unique": false,
           "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "idx_active_role_slots_owner",
+          "unique": false,
+          "columns": [
+            "role_assignment_id",
             "user_id"
           ]
         }
@@ -1874,6 +1889,14 @@
           ]
         },
         {
+          "name": "idx_queue_ticket_current_shift_owner",
+          "unique": false,
+          "columns": [
+            "current_shift_id",
+            "current_cashier_user_id"
+          ]
+        },
+        {
           "name": "idx_queue_ticket_registered_by",
           "unique": false,
           "columns": [
@@ -2245,7 +2268,15 @@
       "primaryKey": [
         "config_id"
       ],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "idx_queue_display_updater",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
+          ]
+        }
+      ],
       "foreignKeys": [
         {
           "name": "fk_queue_display_updater",
@@ -2900,6 +2931,14 @@
             "medicine_id",
             "expiry_date"
           ]
+        },
+        {
+          "name": "idx_receipt_line_invoice_medicine",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_line_id",
+            "medicine_id"
+          ]
         }
       ],
       "foreignKeys": [
@@ -3046,6 +3085,14 @@
           "columns": [
             "disposition",
             "expiry_date"
+          ]
+        },
+        {
+          "name": "idx_batch_source_receipt_owner",
+          "unique": false,
+          "columns": [
+            "source_receipt_line_id",
+            "medicine_id"
           ]
         }
       ],
@@ -4784,6 +4831,13 @@
           "columns": [
             "transferred_by_user_id"
           ]
+        },
+        {
+          "name": "idx_refund_payment_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
+          ]
         }
       ],
       "foreignKeys": [
@@ -5302,6 +5356,13 @@
           ]
         },
         {
+          "name": "idx_bank_entry_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
+          ]
+        },
+        {
           "name": "idx_bank_entry_reversal",
           "unique": false,
           "columns": [
@@ -5460,6 +5521,13 @@
           "unique": false,
           "columns": [
             "approved_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_expense_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
           ]
         }
       ],
@@ -5699,6 +5767,13 @@
           "unique": false,
           "columns": [
             "dispatched_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_evidence",
+          "unique": false,
+          "columns": [
+            "dispatch_evidence_file_id"
           ]
         }
       ],
@@ -5952,6 +6027,13 @@
           "columns": [
             "recorded_by_user_id"
           ]
+        },
+        {
+          "name": "idx_supplier_credit_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
+          ]
         }
       ],
       "foreignKeys": [
@@ -6095,6 +6177,13 @@
           "unique": false,
           "columns": [
             "recorded_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_payment_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
           ]
         }
       ],
@@ -6323,6 +6412,27 @@
           "unique": false,
           "columns": [
             "actor_user_id"
+          ]
+        },
+        {
+          "name": "idx_quarantine_releaser",
+          "unique": false,
+          "columns": [
+            "released_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_quarantine_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
+          ]
+        },
+        {
+          "name": "idx_quarantine_return_line",
+          "unique": false,
+          "columns": [
+            "source_return_line_id"
           ]
         }
       ],
@@ -6734,6 +6844,20 @@
           "unique": false,
           "columns": [
             "active"
+          ]
+        },
+        {
+          "name": "idx_service_package_creator",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_service_package_updater",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
           ]
         }
       ],
@@ -7202,6 +7326,21 @@
           "unique": false,
           "columns": [
             "approved_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_loss_batch_owner",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_loss_evidence",
+          "unique": false,
+          "columns": [
+            "evidence_file_id"
           ]
         }
       ],
@@ -7738,6 +7877,13 @@
           "unique": false,
           "columns": [
             "requested_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_export_job_file",
+          "unique": false,
+          "columns": [
+            "file_id"
           ]
         }
       ],
