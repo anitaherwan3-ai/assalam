@@ -268,21 +268,21 @@ test("balanced journal posts while unbalanced journal is rejected before storage
   assert.equal(inserted, 1);
 });
 
-test("cash payment is blocked when non-cash settlement policy is still unresolved", async () => {
-  const { commands } = createHarness({
+test("non-cash payment is recorded pending review while recognition policy remains unresolved", async () => {
+  const { state, commands } = createHarness({
     async getPaymentRecognitionPolicy() { return null; }
   });
-  await assert.rejects(commands.recordPayment({
+  const result = await commands.recordPayment({
     actor: cashier, idempotencyKey: "payment-key-1", requestId: "payment-req-1",
     payment: {
       sourceType: "invoice", sourceId: "invoice-1", amount: "50000",
-      paymentMethod: "qris", paymentStatus: "settled",
-      businessDate: "2026-11-17", eventAtUtc: "2026-11-17T00:00:00Z",
-      settlementReference: "QRIS-REF-1"
+      paymentMethod: "qris", paymentStatus: "pending_settlement",
+      businessDate: "2026-11-17", eventAtUtc: "2026-11-17T00:00:00Z"
     }
-  }), { code: "PAYMENT_RECOGNITION_POLICY_PENDING" });
+  });
+  assert.equal(result.body.data.paymentStatus, "pending_settlement");
+  assert.equal(state.audits.length, 1);
 });
-
 test("supplier payment and refund payout fail closed until their owner policies are approved", async () => {
   const { commands } = createHarness({
     async getSupplierPaymentPolicy() { return null; },
