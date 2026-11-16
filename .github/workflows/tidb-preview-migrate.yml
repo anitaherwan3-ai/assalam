@@ -32,6 +32,10 @@ jobs:
       TIDB_MIGRATIONS_ENABLED: "true"
       TIDB_MIGRATION_BUILD_CONFIRM: ASSALAM_OPERATIONAL_SCHEMA_V1_PASS66
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/tidb-foundation
+
       - name: Validate explicit trigger and required secrets
         shell: bash
         run: |
@@ -47,10 +51,6 @@ jobs:
             echo "::error::Unexpected database target."
             exit 1
           fi
-
-      - uses: actions/checkout@v4
-        with:
-          ref: migration/tidb-foundation
 
       - uses: actions/setup-node@v4
         with:
