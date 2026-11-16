@@ -135,3 +135,61 @@ test("reconciliation reports stock-to-batch and stock-to-movement variance", () 
   assert.equal(report[0].balancedToBatches, true);
   assert.equal(report[0].balancedToMovementNet, true);
 });
+
+
+test("finance reconciliation separates revenue, refunds, supplier payables, cash and journals", () => {
+  const report = model.reconcileFinance({
+    invoices: [
+      { id: "i1", total: "100000", status: "posted" },
+      { id: "i2", total: "50000", status: "cancelled" }
+    ],
+    approvedReturns: [{ id: "r1", status: "approved", amount: "10000" }],
+    refundObligations: [{ id: "ro1", approvedAmount: "10000" }],
+    refundPayouts: [{ obligationId: "ro1", amount: "4000" }],
+    supplierPayables: [{ id: "sp1", originalAmount: "30000", recognizedCreditAmount: "5000" }],
+    supplierPaymentAllocations: [{ payableId: "sp1", amount: "10000" }],
+    cashAccounts: [{ id: "cash-1", openingBalance: "20000", countedBalance: "27000" }],
+    cashEntries: [
+      { accountId: "cash-1", direction: "in", amount: "10000" },
+      { accountId: "cash-1", direction: "out", amount: "3000" }
+    ],
+    journals: [{
+      id: "j1",
+      lines: [
+        { side: "debit", amount: "7000" },
+        { side: "credit", amount: "7000" }
+      ]
+    }]
+  });
+  assert.deepEqual(report.revenue, { gross: "100000", approvedReturns: "10000", net: "90000" });
+  assert.equal(report.refunds.outstanding, "6000");
+  assert.equal(report.supplierPayables.outstanding, "15000");
+  assert.equal(report.cashAccounts[0].expectedBalance, "27000");
+  assert.equal(report.cashAccounts[0].variance, "0");
+  assert.equal(report.allJournalsBalanced, true);
+});
+
+test("finance reconciliation rejects refund overpayment and payable over-settlement", () => {
+  const base = {
+    invoices: [], approvedReturns: [], refundObligations: [], refundPayouts: [],
+    supplierPayables: [], supplierPaymentAllocations: [], cashAccounts: [], cashEntries: [], journals: []
+  };
+  assert.throws(() => model.reconcileFinance({
+    ...base,
+    refundObligations: [{ id: "ro1", approvedAmount: "100" }],
+    refundPayouts: [{ obligationId: "ro1", amount: "101" }]
+  }), { code: "REFUND_PAYOUT_EXCEEDS_OBLIGATION" });
+  assert.throws(() => model.reconcileFinance({
+    ...base,
+    supplierPayables: [{ id: "sp1", originalAmount: "100", recognizedCreditAmount: "50" }],
+    supplierPaymentAllocations: [{ payableId: "sp1", amount: "51" }]
+  }), { code: "SUPPLIER_PAYABLE_OVER_SETTLED" });
+});
+
+test("inventory reconciliation rejects inconsistent medicine-specific quantity scales", () => {
+  assert.throws(() => model.reconcileInventory({
+    medicines: [{ id: "med-1", quantityScale: 0, stockQty: "5" }],
+    batches: [{ medicineId: "med-1", quantityScale: 1, remainingQty: "5.0" }],
+    movements: []
+  }), { code: "RECONCILIATION_SCALE_MISMATCH" });
+});
