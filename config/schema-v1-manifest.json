@@ -38,7 +38,7 @@
       "path": "lib/migrations/009_operational_controls_v1.js"
     }
   ],
-  "tableCount": 71,
+  "tableCount": 72,
   "tables": {
     "users": {
       "migration": "001_identity_foundation",
@@ -1077,6 +1077,44 @@
           "onUpdate": "RESTRICT"
         }
       ]
+    },
+    "rateLimit": {
+      "migration": "004_better_auth_core",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "key",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "count",
+          "type": "INT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "lastRequest",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_ba_rate_limit_key",
+          "unique": true,
+          "columns": [
+            "key"
+          ]
+        }
+      ],
+      "foreignKeys": []
     },
     "verification": {
       "migration": "004_better_auth_core",
