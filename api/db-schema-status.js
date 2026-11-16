@@ -12,7 +12,10 @@ const expected = [
   "medicines", "supplier_invoices", "supplier_invoice_lines", "purchase_receipts", "purchase_receipt_lines",
   "inventory_batches", "inventory_movements", "medicine_stock_projections", "stocktakes", "stocktake_lines",
   "sales_invoices", "sales_invoice_lines", "sales_batch_allocations", "invoice_payments", "return_quota_subjects",
-  "sales_returns", "sales_return_lines", "sales_return_events", "refund_obligations", "refund_payments"
+  "sales_returns", "sales_return_lines", "sales_return_events", "refund_obligations", "refund_payments",
+  "stored_files", "shift_reconciliations", "cash_accounts", "cash_ledger_entries", "bank_accounts", "bank_ledger_entries",
+  "expenses", "expense_events", "supplier_returns", "supplier_return_lines", "supplier_credit_notes",
+  "supplier_payments", "supplier_payment_allocations", "inventory_quarantine_events"
 ];
 
 module.exports = async function handler(req, res) {
