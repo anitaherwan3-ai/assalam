@@ -8,7 +8,7 @@ Status: **STATIC DOCUMENT RECONCILIATION ONLY — NOT DDL / NOT TiDB RUNTIME VAL
 
 Pass 6's statement that the Pass 3 manifest contains 99 entries (F01–F99) is incorrect. A fresh line-by-line read of the current Pass 3 file finds **104 numbered rows, F01–F104**. The earlier 99-row extraction was truncated before F100–F104. Consequently, Pass 6's assertion that the count discrepancy was merely grouped rows is incomplete and its 99-row inventory must not be used as a source of truth.
 
-The earlier prose count of 104 candidate relationships happens to equal the number of numbered rows, but that does **not** establish that it equals the number of individual FK tuples: ten rows group actor or polymorphic relationships. Expanding those groups adds 12 additional tuple candidates, giving **116 candidate FK tuples** on a literal expansion basis. This is a candidate count, not an approved/enforceable SQL constraint count. F63/F65 are nullable polymorphic alternatives and F76 remains an unresolved typed composite relationship.
+The earlier prose count of 104 candidate relationships happens to equal the number of numbered rows, but that does **not** establish that it equals the number of individual FK tuples: ten rows group actor or polymorphic relationships. Expanding those groups adds 12 additional tuple candidates, giving **116 candidate FK tuples** on a literal expansion basis. This is a candidate count, not an approved/enforceable SQL constraint count. F63/F65 are nullable polymorphic alternatives and F76's former undefined composite candidate is normalized in Pass 30 to a scalar FK on the mandatory return_quota_subject_id. The service must still verify invoice_line_id and nullable invoice_component_id against the referenced subject in the same transaction; the nullable component is not used as proof of ownership.
 
 ## 2. Reproducible cardinality
 
@@ -60,7 +60,7 @@ The ten grouped rows expand to 22 tuples (rather than ten), i.e. 12 additional t
 - `audit_events.event_uuid CHAR(36)` is an event UUID, not a user key.
 - Composite FK tuples require identical arity and ordered column lists, plus an actual parent PK/UNIQUE key in that same order.
 - Polymorphic F63/F65 alternatives cannot be treated as unconditional required FKs. They need explicit exactly-one target semantics and verified CHECK/service enforcement.
-- F76's quota subject tuple is not mechanically comparable: its target is written as “matching identity tuple” and does not define a concrete non-null key.
+- The original F76 target was written as “matching identity tuple” without a concrete key. Pass 30 reconciles it to the proposal's explicit scalar return_quota_subject_id PK reference; same-parent invoice-line/component consistency remains a service invariant and test gate.
 
 **Not yet verified:** a complete 116-row physical-type comparison including precision, signedness, character set/collation, nullability, defaults, actual parent UNIQUE/PK metadata, child-index order, and ON DELETE/UPDATE. No type-match percentage is reported in this pass.
 
