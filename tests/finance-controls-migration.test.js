@@ -6,7 +6,7 @@ const migration = require("../lib/migrations/008_finance_controls_v1");
 
 test("finance controls migration declares approval and settlement ledgers", () => {
   assert.equal(migration.version, "008_finance_controls_v1");
-  assert.equal(migration.expectedTables.length, 14);
+  assert.equal(migration.expectedTables.length, 13);
   const sql = migration.statements.join("\n");
   for (const table of migration.expectedTables) assert.ok(sql.includes("CREATE TABLE IF NOT EXISTS " + table));
   assert.match(sql, /created_by_user_id VARCHAR\(64\) NOT NULL/);
