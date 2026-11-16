@@ -329,3 +329,30 @@ test("legacy partial service returns reuse invoice discount allocation and canno
   }), false);
   assert.equal(store.state.returJual.length, 2);
 });
+
+
+test("legacy queue call clears same-day local active calls before marking the selected visit", () => {
+  const { store } = createLegacyStore();
+  seedMedicine(store);
+  const todayParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  const part = type => todayParts.find(entry => entry.type === type).value;
+  const today = part("year") + "-" + part("month") + "-" + part("day");
+  store.state.pasien = [
+    { id: "p-old-a", tgl: today, no: "A-001", calling: true, done: false, status: "aktif" },
+    { id: "p-old-b", tgl: today, no: "B-001", calling: true, done: false, status: "aktif" },
+    { id: "p-other-day", tgl: "2026-01-01", no: "A-009", calling: true, done: false, status: "aktif" },
+    { id: "p-done", tgl: today, no: "A-002", calling: false, done: true, status: "selesai" },
+    { id: "p-cancelled", tgl: today, no: "A-003", calling: false, done: false, status: "batal_berobat" },
+    { id: "p-selected", tgl: today, no: "A-004", calling: false, done: false, status: "aktif" }
+  ];
+
+  assert.equal(store.callPatient("p-selected"), true);
+  assert.equal(store.get("pasien", "p-old-a").calling, false);
+  assert.equal(store.get("pasien", "p-old-b").calling, false);
+  assert.equal(store.get("pasien", "p-other-day").calling, true);
+  assert.equal(store.get("pasien", "p-done").calling, false);
+  assert.equal(store.get("pasien", "p-cancelled").calling, false);
+  assert.equal(store.get("pasien", "p-selected").calling, true);
+});
