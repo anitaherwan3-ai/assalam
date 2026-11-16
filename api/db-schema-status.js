@@ -15,7 +15,10 @@ const expected = [
   "sales_returns", "sales_return_lines", "sales_return_events", "refund_obligations", "refund_payments",
   "stored_files", "shift_reconciliations", "cash_accounts", "cash_ledger_entries", "bank_accounts", "bank_ledger_entries",
   "expenses", "expense_events", "supplier_returns", "supplier_return_lines", "supplier_credit_notes",
-  "supplier_payments", "supplier_payment_allocations", "inventory_quarantine_events"
+  "supplier_payments", "supplier_payment_allocations", "inventory_quarantine_events",
+  "clinic_settings", "display_configs", "queue_audio_assets", "service_packages", "package_components",
+  "invoice_cancellation_requests", "invoice_cancellation_events", "loss_events", "accounting_periods",
+  "journal_entries", "journal_lines", "backup_jobs", "export_jobs"
 ];
 
 module.exports = async function handler(req, res) {
