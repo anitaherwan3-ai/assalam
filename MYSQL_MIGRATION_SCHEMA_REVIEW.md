@@ -290,3 +290,8 @@ Key schema implications: separate patient master from repeatable encounter; mode
 Static source audit: [MYSQL_MIGRATION_PATIENT_IDENTITY_VISIT_HISTORY_CONTINUITY_AUDIT_PASS20.md](MYSQL_MIGRATION_PATIENT_IDENTITY_VISIT_HISTORY_CONTINUITY_AUDIT_PASS20.md).
 
 Key schema implications: separate stable patient master from repeatable encounters; retain invoice-time patient snapshots and exact legacy queue IDs; autocomplete by name/phone is suggestion-only and must not silently merge identities; preserve cancellation/reactivation and demographic-change history; invoice must reference a valid encounter and matching patient. No structured longitudinal clinical-record model is evidenced in inspected source, so clinical scope and sensitive-field access must be explicitly decided before schema v1. Legacy rows should initially map one-to-one to provisional master/encounter records unless a reviewed identity-resolution process authorizes merging. Static inspection only; no patient data, DDL, import, or runtime tests.
+
+
+## Audit wave 20–25 — 2026-11-16
+
+Added source-backed reports for patient identity/visit continuity (Pass 20), queue and display state (Pass 21), medicine/tariff/package master versioning (Pass 22), supplier purchase/receipt/payable (Pass 23), settings/audit/export/backup (Pass 24), and consolidated schema readiness (Pass 25). Key blockers include A/B queue policy and server-side call locking, immutable master/invoice snapshots, atomic purchase receipt, supplier payment/credit policy, immutable server audit, and tested backup/restore. See the Pass 25 closure report. Static audit only; no runtime test, DDL, import or production operation.
