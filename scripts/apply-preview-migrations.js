@@ -19,7 +19,8 @@ async function main() {
   const { getPool } = require("../lib/tidb");
   const migrations = [
     require("../lib/migrations/001_identity_foundation"),
-    require("../lib/migrations/002_audit_idempotency_outbox")
+    require("../lib/migrations/002_audit_idempotency_outbox"),
+    require("../lib/migrations/003_catalog_masters")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const pool = getPool();

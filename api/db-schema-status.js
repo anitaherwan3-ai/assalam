@@ -4,7 +4,7 @@ const { getPool } = require("../lib/tidb");
 
 const expected = [
   "users", "role_assignments", "active_role_slots", "firebase_identities",
-  "audit_events", "idempotency_requests", "outbox_jobs"
+  "audit_events", "idempotency_requests", "outbox_jobs", "tariffs", "suppliers"
 ];
 
 module.exports = async function handler(req, res) {
