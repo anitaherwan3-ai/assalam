@@ -25,3 +25,7 @@ test("supplier validation allows optional phone/address and trims name", () => {
 test("supplier validation rejects empty name", () => {
   assert.throws(() => validateSupplierInput({ name: " " }), /Nama supplier wajib/);
 });
+
+test("catalog validation rejects non-text values", () => {
+  assert.throws(() => validateTariffInput({ name: { bad: true }, serviceType: "T", price: "10" }), /harus berupa teks/);
+});
