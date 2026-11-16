@@ -12,17 +12,15 @@ Each of the 116 current candidate tuples was checked against the matching parent
 
 | Evidence status | Rows | Meaning |
 |---|---:|---|
-| `PK_NOT_PROVEN` | 50 |
+| `EXPLICIT_PARENT_PK` | 101 |
 | `ADDENDUM_UNIQUE_REQUIRED_NOT_TABLE` | 5 |
 | `EXPLICIT_PARENT_UNIQUE` | 1 |
-| `EXPLICIT_PARENT_PK` | 51 |
 | `NO_PARENT_TABLE_SECTION` | 1 |
 | `CATALOGUE_COMPOSITE_KEY_NOT_TABLE` | 5 |
 | `PARENT_UNIQUE_ORDER_MISMATCH` | 1 |
 | `PARENT_PK_COVERS_UNIQUE` | 2 |
 
 Single-column parent PKs count as unique and can satisfy a single-column FK even if the manifest labels the required key as UNIQUE. This applies to F81 and F94.
-
 ## 3. Material blockers
 
 - **F04:** `user_emails(email_id,user_id)` is explicitly required as a composite UNIQUE in proposal §2.7, but it is not integrated into the table's own physical definition.
