@@ -656,3 +656,8 @@ The six-part audit wave is recorded in:
 - `MYSQL_MIGRATION_SCHEMA_V1_CROSS_DOMAIN_AUDIT_CLOSURE_PASS25.md`
 
 The closure report consolidates cross-domain blockers and required pre-DDL gates. The current source still uses visit rows as patient identity, A-only queue allocation, client-side call state/logging, mutable master data, local multi-entity purchase writes, boolean supplier settlement, and shallow whole-state JSON restore. These findings define target constraints; they are not runtime or live-data test results. Schema v1 remains unapproved. No DDL, import, Firebase/Auth mutation, deployment, merge or production change occurred.
+
+
+## AG. Consolidated schema decision register — Pass 26
+
+See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). This is the single consolidated register for confirmed owner requirements, engineering closures, source gates, owner policy gates D01–D20, v1 core/conditional scope and readiness verdict. It prevents repeated owner questions and prevents unresolved business policy from being guessed in schema. No DDL, import, production deployment or account change is authorized.
