@@ -1,5 +1,7 @@
 "use strict";
 
+const { execFileSync } = require("node:child_process");
+
 function migrationBuildEnabled() {
   return process.env.VERCEL_ENV === "preview" &&
     process.env.VERCEL_GIT_COMMIT_REF === "migration/tidb-foundation" &&
@@ -12,7 +14,7 @@ async function main() {
     console.log("[ASSALAM-MIGRATION] Preview migration step skipped; deployment is not the explicitly enabled TiDB migration preview.");
     return;
   }
-  if (process.env.TIDB_MIGRATION_BUILD_CONFIRM !== "ASSALAM_FOUNDATION_V1") {
+  if (process.env.TIDB_MIGRATION_BUILD_CONFIRM !== "ASSALAM_OPERATIONAL_SCHEMA_V1_PASS62") {
     throw new Error("Preview migration build confirmation is missing or invalid.");
   }
 
@@ -36,7 +38,8 @@ async function main() {
     connection = await pool.getConnection();
     const result = await applyMigrations(connection, migrations);
     const smoke = await runFoundationSmokeTest(connection);
-    console.log("[ASSALAM-MIGRATION] Preview foundation migration verified", {
+    execFileSync("npm", ["run", "auth:schema-check"], { stdio: "inherit", env: process.env });
+    console.log("[ASSALAM-MIGRATION] Preview operational schema and Better Auth schema verified", {
       applied: result.applied,
       alreadyApplied: result.alreadyApplied,
       current: result.current,
