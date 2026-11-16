@@ -608,6 +608,9 @@ The reconciliation also requires one canonical user ID type (`VARCHAR(64)`), com
 
 ## 28. Normalized column dictionary and FK manifest — pass 3
 
+The corrected Pass 3 manifest contains 104 numbered rows (F01–F104). Pass 7 expands ten grouped rows into 22 tuples, producing 116 literal candidate tuples. Pass 30 normalizes F76 to the scalar quota-subject PK FK with separate server-side same-subject ownership validation. The Pass 28 matrix now contains 256/256 typed column references after the F76 arity correction. These remain static candidates, not approved physical constraints; NULL semantics, charset/collation, keys/indexes, actions, ownership enforcement and TiDB runtime validation remain open.
+
+<!-- historical paragraph superseded -->
 The normalized type-family dictionary, table/PK inventory, and 99 numbered FK manifest entries (F01–F99) are recorded in [MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md](./MYSQL_MIGRATION_NORMALIZED_COLUMN_DICTIONARY_FK_MANIFEST_PASS3.md). Earlier prose referred to 104 candidate relationships; because several numbered entries group multiple FK tuples, the actual one-row-per-constraint count still requires expansion and verification. Pass 6 is a preliminary first-tuple comparison only; it withdraws the incorrect claim that F100–F104 are missing. User identity remains VARCHAR(64); audit_events.event_uuid CHAR(36) is an event UUID. These are static documents, not executable DDL; exact NULL/default/collation, ownership enforcement and runtime TiDB validation remain open.
 
 
@@ -623,7 +626,7 @@ See [MYSQL_MIGRATION_NULL_DEFAULT_COMPLETENESS_MATRIX_PASS5.md](./MYSQL_MIGRATIO
 
 ## 31. FK field-level expansion and cardinality correction — pass 7
 
-See [MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md](./MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md). A complete line scan confirms that Pass 3 has 104 numbered rows (F01–F104); Pass 6's 99-row count was caused by truncated extraction and is withdrawn. Ten grouped rows expand to 22 tuple candidates, so the literal expansion is 116 candidate tuples. This is not 116 approved constraints: F63/F65 are mutually exclusive polymorphic alternatives, F76 remains an undefined typed composite, and all tuples still require exact type/collation/nullability, parent unique key, child index, action, ownership and TiDB positive/negative test evidence. Pass 6's 86/11/2 counts are not a complete-manifest metric. Schema v1 remains BLOCKED; no DDL or data mutation was performed.
+See [MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md](./MYSQL_MIGRATION_FK_FIELD_LEVEL_EXPANSION_PASS7.md). Pass 7 establishes 104 numbered rows and 116 expanded candidate tuples; its original F76 wording is superseded by Pass 30's scalar quota-subject FK correction. F63/F65 remain polymorphic alternatives requiring exactly-one target enforcement. All candidates still require physical key/index, NULL, charset/collation, action, ownership and TiDB positive/negative test evidence. Schema v1 remains BLOCKED; no DDL or data mutation was performed.
 
 
 ## 32. Schema scope control and anti-overfitting — pass 8
@@ -702,7 +705,7 @@ See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGR
 
 ## 30. Physical FK tuple matrix — Pass 28
 
-See [MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md) and its machine-readable [CSV](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv). Pass 28 expands the 104 numbered source rows into 116 unique candidate tuple rows. It extracts exact Pass 4 type strings for 244/258 column references but does not claim charset/collation or runtime compatibility. Statuses: 101 UNRESOLVED, 10 OWNERSHIP_BLOCKED, 5 POLYMORPHIC_POLICY_BLOCKED; zero approved physical constraints. Schema v1 remains BLOCKED; no DDL or database mutation.
+See [MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md) and its machine-readable [CSV](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv). Pass 28 expands the 104 numbered source rows into 116 unique candidate tuple rows. After Pass 30's F76 normalization, the current matrix has 256/256 typed column references; charset/collation and runtime compatibility remain unverified. Statuses: 101 UNRESOLVED, 10 OWNERSHIP_BLOCKED, 5 POLYMORPHIC_POLICY_BLOCKED; zero approved physical constraints. Schema v1 remains BLOCKED; no DDL or database mutation.
 
 
 ## 29. Physical FK manifest reconciliation — Pass 27
@@ -711,7 +714,7 @@ See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGR
 
 ## 31. Supplemental FK type/source reconciliation — Pass 29
 
-See [MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md](./MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md). Pass 29 supplements 12 column type references from explicit proposal definitions, raising Pass 28 matrix coverage from 244/258 to 256/258. It leaves queue_prefix_guards.prefix type unspecified and F76's parent identity tuple undefined; F76 likely needs a canonical scalar quota-subject FK plus separate ownership enforcement, but the manifest must be reconciled before DDL. All 116 FK candidates remain unapproved; no DDL/runtime/data mutation.
+See [MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md](./MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md). At the time of Pass 29, 12 additional type references were supplemented and two remained unresolved. Pass 30 supersedes those two gaps by defining queue_prefix_guards.prefix as candidate VARCHAR(4) and normalizing F76 to the scalar quota-subject PK FK. The current matrix has 256/256 typed references, but all candidates remain unapproved pending indexes, parent keys, NULL/actions, ownership and runtime tests. All 116 FK candidates remain unapproved; no DDL/runtime/data mutation.
 
 ## 32. FK candidate canonicalization and queue guard — Pass 30
 
