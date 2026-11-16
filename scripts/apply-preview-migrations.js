@@ -32,12 +32,14 @@ async function main() {
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
+const { runOperationalSmokeTest } = require("../lib/operational-smoke-test");
   const pool = getPool();
   let connection;
   try {
     connection = await pool.getConnection();
     const result = await applyMigrations(connection, migrations);
     const smoke = await runFoundationSmokeTest(connection);
+    const operationalSmoke = await runOperationalSmokeTest(connection);
     execFileSync("npm", ["run", "auth:schema-check"], { stdio: "inherit", env: process.env });
     console.log("[ASSALAM-MIGRATION] Preview operational schema and Better Auth schema verified", {
       applied: result.applied,
