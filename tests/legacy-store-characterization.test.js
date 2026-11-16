@@ -248,3 +248,84 @@ test("legacy supplier return caps excessive requests; replacement must reject in
   assert.equal(store.state.returBeli[0].qty, 3);
   assert.equal(store.state.returBeli[0].nilai, 3000);
 });
+
+
+test("legacy package return restores only its original medicine batch allocations after approval", () => {
+  const { store, window } = createLegacyStore();
+  seedMedicine(store);
+  store.state.trx = [{
+    id: "trx-package",
+    no: "NOTA-PKG-01",
+    nama: "Pasien Paket Uji",
+    metode: "tunai",
+    items: [{
+      nama: "Paket Perawatan",
+      t: "Paket",
+      qty: 1,
+      harga: 90000,
+      hpp: 20000,
+      items: [{
+        id: "med-1",
+        oid: "med-1",
+        type: "obat",
+        nama: "Obat Uji",
+        qty: 2,
+        batchDeductions: [{ bid: "pkg-batch-1", qty: 2, batchNo: "PKG-1", ed: "2028-01-01" }]
+      }, {
+        id: "service-1",
+        type: "tarif",
+        nama: "Jasa Paket",
+        qty: 1,
+        harga: 50000
+      }]
+    }]
+  }];
+  store.state.batch = [{
+    id: "pkg-batch-1", oid: "med-1", no: "PKG-1",
+    ed: "2028-01-01", qty: 2, sisa: 0
+  }];
+
+  assert.equal(store.processReturJual({
+    trxId: "trx-package", itemIndex: 0, qtyRetur: 1, alasan: "Paket dikembalikan"
+  }), true);
+  const proposal = store.state.returJual[0];
+  assert.equal(proposal.status, "menunggu");
+  assert.equal(proposal.total, 90000);
+  assert.equal(proposal.batchRestores.length, 1);
+  assert.equal(proposal.batchRestores[0].bid, "pkg-batch-1");
+  assert.equal(proposal.batchRestores[0].qty, 2);
+  assert.equal(store.getObat("med-1").stok, 0);
+
+  window.currentUser = { u: "owner-test", role: "pimpinan" };
+  assert.equal(store.approveReturJual(proposal.id), true);
+  assert.equal(store.getObat("med-1").stok, 2);
+  assert.equal(store.get("batch", "pkg-batch-1").sisa, 2);
+});
+
+test("legacy partial service returns reuse invoice discount allocation and cannot exceed sold quantity", () => {
+  const { store } = createLegacyStore();
+  seedMedicine(store);
+  store.state.trx = [{
+    id: "trx-discount",
+    no: "NOTA-DISC-01",
+    nama: "Pasien Diskon Uji",
+    items: [
+      { nama: "Tindakan Uji", t: "Tindakan", qty: 2, harga: 10000, hpp: 0 },
+      { nama: "Diskon", t: "Diskon", qty: 1, harga: -3000, hpp: 0 }
+    ]
+  }];
+
+  assert.equal(store.processReturJual({
+    trxId: "trx-discount", itemIndex: 0, qtyRetur: 1, alasan: "Pengembalian sebagian"
+  }), true);
+  assert.equal(store.state.returJual[0].total, 8500);
+  assert.equal(store.processReturJual({
+    trxId: "trx-discount", itemIndex: 0, qtyRetur: 1, alasan: "Sisa pengembalian"
+  }), true);
+  assert.equal(store.state.returJual[0].total, 8500);
+  assert.equal(store.state.returJual.reduce((sum, item) => sum + item.total, 0), 17000);
+  assert.equal(store.processReturJual({
+    trxId: "trx-discount", itemIndex: 0, qtyRetur: 1, alasan: "Melebihi kuota"
+  }), false);
+  assert.equal(store.state.returJual.length, 2);
+});
