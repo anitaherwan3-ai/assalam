@@ -22,9 +22,11 @@ The companion CSV `MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv` contains
 
 | Status | Rows | Meaning |
 |---|---:|---|
-| `UNRESOLVED` | 110 | Candidate is not approved; see CSV reason field |
-| `POLYMORPHIC_POLICY_BLOCKED` | 5 | Candidate is not approved; see CSV reason field |
-| `OWNERSHIP_BLOCKED` | 1 | Candidate is not approved; see CSV reason field |
+| `UNRESOLVED` | 101 | Parent key/index/action/nullability or other physical evidence remains open |
+| `OWNERSHIP_BLOCKED` | 10 | Composite ownership tuple requires ordered parent key, child index and NULL semantics |
+| `POLYMORPHIC_POLICY_BLOCKED` | 5 | Exactly-one target invariant is not proven |
+
+Exact Pass 4 types were extracted for **244 of 258** child/parent column references; 14 references remain unresolved. This is only a static type-string extraction, not an exact collation/signedness/runtime proof.
 
 No row is marked `MATCH_CANDIDATE`: the proposal and catalogue provide candidate index/key descriptions, but do not prove the complete final DDL, exact collation, null tuple semantics, explicit per-FK actions, or TiDB positive/negative runtime evidence. A false green status would be misleading.
 
@@ -40,7 +42,7 @@ No row is marked `MATCH_CANDIDATE`: the proposal and catalogue provide candidate
 
 ## 5. What this pass does not claim
 
-This matrix is a static audit inventory, not proof that all columns, indexes or keys exist physically. Pass 4 covers 56 base tables / 566 extracted columns, while several integrity tables are supplemental or incompletely defined. Type vectors are populated only when an exact type can be extracted from Pass 4; missing values remain unresolved. Charset/collation and nullability are not inferred.
+The CSV has 116 data rows and 22 audit columns. Its first and last candidate IDs were verified as F01 and F104, with grouped IDs using letter suffixes. This matrix is a static audit inventory, not proof that all columns, indexes or keys exist physically. Pass 4 covers 56 base tables / 566 extracted columns, while several integrity tables are supplemental or incompletely defined. Type vectors are populated only when an exact type can be extracted from Pass 4; missing values remain unresolved. Charset/collation and nullability are not inferred.
 
 ## 6. Exit criteria before DDL
 
