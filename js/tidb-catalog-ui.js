@@ -4,13 +4,12 @@
   const state = { loaded: false, loading: false, promise: null, error: null, tariffs: [], suppliers: [] };
 
   function enabled() {
-    return window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true &&
-      !!(window.ASSALAM_FIREBASE_CONFIG && window.ASSALAM_FIREBASE_CONFIG.projectId === "assalam-preview-test");
+    return window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true;
   }
 
   function requirePreview() {
     if (!enabled()) {
-      const error = new Error("Katalog TiDB hanya diaktifkan pada Firebase Preview terpisah.");
+      const error = new Error("Katalog TiDB hanya diaktifkan pada deployment TiDB Preview terpisah.");
       error.code = "TIDB_CATALOG_PREVIEW_ONLY";
       throw error;
     }
