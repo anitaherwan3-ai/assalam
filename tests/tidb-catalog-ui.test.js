@@ -16,12 +16,12 @@ function installCatalogUI({ projectId = "assalam-preview-test", api = {} } = {})
   return window;
 }
 
-test("TiDB catalog UI is enabled only for the isolated preview Firebase project", () => {
+test("TiDB catalog UI is enabled only for the isolated preview Firebase project", async () => {
   const preview = installCatalogUI();
   const production = installCatalogUI({ projectId: "assalam-db" });
   assert.equal(preview.assalamTiDBCatalog.enabled(), true);
   assert.equal(production.assalamTiDBCatalog.enabled(), false);
-  assert.throws(() => production.assalamTiDBCatalog.ensureLoaded(), /hanya diaktifkan/);
+  await assert.rejects(production.assalamTiDBCatalog.ensureLoaded(), /hanya diaktifkan/);
 });
 
 test("TiDB catalog UI loads session, tariffs and suppliers from TiDB and maps app fields", async () => {
