@@ -221,6 +221,24 @@ async function doLogin() {
   try {
     const profile = await backend.login(email, password);
     applyFirebaseSession(profile);
+
+    // Bootstrap hanya identitas Pimpinan pada project Firebase preview terpisah.
+    // Tidak mengubah Firebase Auth/Firestore dan tidak pernah berjalan pada project operasional.
+    if (profile.role === 'pimpinan' &&
+        String(profile.email || email).toLowerCase() === 'praktekrose@gmail.com' &&
+        window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true &&
+        window.assalamTiDBApi &&
+        !window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED) {
+      window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = true;
+      window.assalamTiDBApi.bootstrapPreviewOwner()
+        .then(() => window.assalamTiDBApi.getSession())
+        .then(session => {
+          window.ASSALAM_TIDB_PREVIEW_SESSION = session;
+          console.info('[TiDB Preview] Identitas Pimpinan preview terverifikasi.');
+        })
+        .catch(err => console.warn('[TiDB Preview] Bootstrap belum selesai:', err.code || err.message));
+    }
+
     store.logActivity('Masuk', 'Sesi', `${profile.role}: ${profile.nama} login melalui Firebase`);
   } catch (err) {
     console.error('Login Firebase gagal:', err);

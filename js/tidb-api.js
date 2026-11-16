@@ -56,6 +56,8 @@
     return payload;
   }
 
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.ASSALAM_FIREBASE_CONFIG && window.ASSALAM_FIREBASE_CONFIG.projectId === "assalam-preview-test");
+
   window.assalamTiDBApi = Object.freeze({
     request,
     newIdempotencyKey: newRequestId,
