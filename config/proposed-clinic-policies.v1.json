@@ -356,7 +356,7 @@
       "area": "Application scope and retention for administrative patient/financial data (not clinical record content)",
       "status": "owner_confirmed_application_is_administrative_financial_not_emr",
       "recommendation": {
-        "applicationScope": "This application handles administrative patient identity/basic visit administration, billing, payments, stock and clinic finances. It is not the clinical medical-record application.",
+        "applicationScope": "This is an administrative and financial application for patient identity/basic visit administration, billing, payments, stock and clinic finances. It is not the clinical medical-record application.",
         "excludedClinicalContent": [
           "diagnosis",
           "clinical notes",
