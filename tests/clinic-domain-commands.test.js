@@ -57,6 +57,7 @@ function createHarness(overrides = {}) {
     async getServerNowUtc() { return "2026-11-17T00:00:00Z"; },
     async createPatient(_c, patient) { state.patients.push(patient); return "patient-" + state.patients.length; },
     async createEncounter(_c, data) { state.encounters.push(data); return { encounterId: "enc-" + state.encounters.length }; },
+    async getQueuePrefixPolicy() { return { approved: true }; },
     async allocateQueueSequence() { state.nextSequence++; return state.nextSequence; },
     async createQueueTicket(_c, data) { const ticket = { ticketId: "ticket-" + (state.tickets.length + 1), queueNumber: data.prefix + "-" + String(data.sequence).padStart(3, "0"), laneCode: data.prefix, ...data }; state.tickets.push(ticket); return ticket; },
     async readQueueActiveCallPolicy() { return { mode: "per_lane" }; },
