@@ -21,21 +21,14 @@
   async function request(path, options = {}) {
     const allowedPaths = new Set([
       "/api/auth/session",
-      "/api/auth/bootstrap-preview-owner",
       "/api/catalog/tariffs",
       "/api/catalog/suppliers"
     ]);
     if (!allowedPaths.has(path)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
     }
-    const backend = window.firebaseBackend;
-    const firebaseUser = backend && backend.auth && backend.auth.currentUser;
-    if (!firebaseUser) throw makeError("Silakan login melalui Firebase terlebih dahulu.", 401, "AUTH_REQUIRED");
-
     const method = String(options.method || "GET").toUpperCase();
-    const token = await firebaseUser.getIdToken();
     const headers = {
-      "Authorization": "Bearer " + token,
       "Accept": "application/json",
       "X-Request-ID": newRequestId()
     };
@@ -62,13 +55,12 @@
     return payload;
   }
 
-  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.ASSALAM_FIREBASE_CONFIG && window.ASSALAM_FIREBASE_CONFIG.projectId === "assalam-preview-test");
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.location && String(window.location.hostname || "").includes("assalam-mysql-preview"));
 
   window.assalamTiDBApi = Object.freeze({
     request,
     newIdempotencyKey: newRequestId,
     getSession: () => request("/api/auth/session"),
-    bootstrapPreviewOwner: () => request("/api/auth/bootstrap-preview-owner", { method: "POST", body: {} }),
     listTariffs: () => request("/api/catalog/tariffs"),
     createTariff: (data, key) => request("/api/catalog/tariffs", { method: "POST", body: data, idempotencyKey: key }),
     updateTariff: (data, key) => request("/api/catalog/tariffs", { method: "PATCH", body: data, idempotencyKey: key }),
