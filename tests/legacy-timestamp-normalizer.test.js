@@ -38,7 +38,7 @@ test("does not interpret a date-only field as an event timestamp", () => {
 });
 
 test("numeric epochs require a source-declared unit", () => {
-  const raw = 1794884400000;
+  const raw = 1794855600000;
   const missingUnit = normalizeLegacyTimestamp(raw);
   const explicitMilliseconds = normalizeLegacyTimestamp(raw, { epochUnit: "milliseconds" });
   assert.equal(missingUnit.status, "needs_review");
