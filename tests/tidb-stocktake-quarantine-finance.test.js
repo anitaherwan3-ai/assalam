@@ -65,7 +65,7 @@ test("quarantine release requires approved inspection and only changes sellable 
   const connection = {
     async execute(sql, params) {
       calls.push({ sql, params });
-      if (sql.startsWith("SELECT q.quarantine_event_id")) return [[{ eventId: 33, approverUserId: "owner-1" }]];
+      if (sql.startsWith("SELECT q.quarantine_event_id")) return [[{ eventId: 33, inspectionDecision: "release", approverUserId: "owner-1", releasedAtUtc: null }]];
       if (sql.startsWith("SELECT medicine_id AS medicineId")) return [[{
         medicineId: 7, remainingQuantity: "2", disposition: "quarantined",
         expiryDate: "2027-12-31", expiryVerified: 1, originVerified: 1
