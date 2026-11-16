@@ -692,3 +692,8 @@ Key schema implications: separate stable patient master from repeatable encounte
 ## Audit wave 20–25 closure (2026-11-16)
 
 The parallel audit wave is documented in Passes 20–25: patient/visit continuity, queue/display/call state, master data versioning, purchase/supplier/payable, settings/audit/backup, and cross-domain schema readiness. See `MYSQL_MIGRATION_SCHEMA_V1_CROSS_DOMAIN_AUDIT_CLOSURE_PASS25.md` for the consolidated blockers, target boundaries, and pre-DDL gates. This is static source review only; schema v1 remains unapproved and no DDL was applied.
+
+
+## 28. Schema v1 decision register closure — Pass 26
+
+See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). This register consolidates confirmed owner requirements, engineering closures, source verification gates, unresolved owner policy gates D01–D20, and v1 scope boundaries. Do not ask the owner to repeat confirmed requirements or choose technical internals. Do not silently resolve clinical/accounting/authorization/retention policy. Schema v1 remains review-only; no DDL approved.
