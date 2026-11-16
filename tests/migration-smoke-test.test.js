@@ -58,7 +58,7 @@ test("foundation smoke test exercises FK/unique constraints and cleans fixtures"
   assert.ok(result.checks.includes("delete_restrict"));
   assert.ok(connection.calls.some(call => call[0] === "begin"));
   assert.ok(connection.calls.some(call => call[0] === "rollback"));
-  assert.ok(!connection.calls.some(call => call[1] && call[1].startsWith("DELETE FROM users")));
+  assert.equal(connection.calls.filter(call => call[1] === "DELETE FROM users WHERE user_id = ?").length, 1);
 });
 
 test("foundation smoke test fails closed when synthetic transaction rollback fails", async () => {
