@@ -24,7 +24,7 @@ function harness() {
     async createSalesReturn(_c, x) { state.request = { ...x, status: "requested", returnId: "55" }; return "55"; },
     async createSalesReturnLine(_c, x) { state.lines.push({ ...x, returnLineId: String(state.lines.length + 1) }); return String(state.lines.length); },
     async appendSalesReturnEvent(_c, x) { state.events.push(x); },
-    async lockSalesReturn() { return { returnId: "55", status: state.request.status, requestedByUserId: "cashier-1", lines: state.lines.map((x, i) => ({ returnLineId: String(i + 1), quotaId: x.quotaId, quantity: x.quantity, refundAmount: x.refundAmount, batchId: "4", medicineId: "7" })) }; },
+    async lockSalesReturn() { return { returnId: "55", status: state.request.status, requestedByUserId: state.request.requestedByUserId || "cashier-1", lines: state.lines.map((x, i) => ({ returnLineId: String(i + 1), quotaId: x.quotaId, quantity: x.quantity, refundAmount: x.refundAmount, batchId: "4", medicineId: "7" })) }; },
     async reviewSalesReturn(_c, x) { state.reviewed = x; state.request.status = x.status; },
     async approveSalesReturn(_c, x) { state.approval = x; state.request.status = "pimpinan_approved"; },
     async createPatientReturnQuarantine(_c, x) { state.quarantined.push(x); },
