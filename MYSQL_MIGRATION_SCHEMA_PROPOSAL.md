@@ -697,3 +697,8 @@ The parallel audit wave is documented in Passes 20–25: patient/visit continuit
 ## 28. Schema v1 decision register closure — Pass 26
 
 See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). This register consolidates confirmed owner requirements, engineering closures, source verification gates, unresolved owner policy gates D01–D20, and v1 scope boundaries. Do not ask the owner to repeat confirmed requirements or choose technical internals. Do not silently resolve clinical/accounting/authorization/retention policy. Schema v1 remains review-only; no DDL approved.
+
+
+## 29. Physical FK manifest reconciliation — Pass 27
+
+See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md). Corrected the Pass 3/4/7 document count wording: 104 numbered manifest rows (F01–F104), ten grouped rows expanded by 12 additional tuples, 116 literal candidate tuples; zero approved/applied physical constraints. Exact per-tuple type/index/nullability/ownership/action reconciliation remains incomplete. No DDL approval.
