@@ -18,7 +18,10 @@
     "No patient-return stock restoration before valid approval and recorded disposition.",
     "Preserve separate A/B display views and switching; spoken queue numbers are digit-by-digit; voice and chime settings remain independent.",
     "A cancelled visit is preserved as Batal Berobat, not deleted.",
-    "Opening shift float is cash custody, not omzet."
+    "Opening shift float is cash custody, not omzet.",
+    "Patient-return medicine inspection/release is performed and recorded by Admin only after Pimpinan approval; quarantine remains non-sellable until both approval and Admin release event.",
+    "Morning shift queue A is assigned to Kasir 1 (assalamkasir1@gmail.com); evening shift queue B is assigned to Kasir 2 (assalamkasir2@gmail.com).",
+    "Audit retention minimum is one year, subject to longer legal/accounting retention and legal hold."
   ],
   "protectedAccounts": [
     {
@@ -79,7 +82,7 @@
     {
       "id": "D05",
       "area": "Patient-return medicine disposition",
-      "status": "owner_confirmed_dual_approval_quarantine_workflow",
+      "status": "owner_confirmed_admin_inspection_and_release_after_pimpinan_approval",
       "recommendation": {
         "submission": "Cashier submits a patient-return request tied to the original invoice line and original batch allocation.",
         "approvals": [
@@ -87,19 +90,17 @@
           "Pimpinan approval is mandatory before any return quantity is restored to inventory"
         ],
         "afterApproval": "After both approvals, returned quantity is recorded in a separate quarantined balance; it is not available to FEFO checkout.",
-        "release": "Only after a documented physical inspection confirms traceability, intact condition, acceptable storage and unexpired status may an authorized release decision move it from quarantine to sellable stock.",
+        "release": "Admin is the designated role to perform/record the physical inspection and quarantine release, but only after Pimpinan approval is recorded. The medicine remains quarantined until Admin records a passing inspection and release event.",
         "rejection": "Rejected, opened, damaged, expired or untraceable medicine remains non-sellable and is recorded with its disposition reason.",
         "accounting": "Refund decision and inventory disposition are separate; approving a refund does not automatically make medicine sellable."
       },
-      "ownerMustConfirm": [
-        "Who is the named/role-based person authorized to perform the physical inspection and record release from quarantine"
-      ],
+      "ownerMustConfirm": [],
       "blocks": [
-        "Sellable stock release until inspection and explicit release event"
+        "Sellable stock release until Pimpinan approval and Admin inspection/release event are both recorded"
       ],
       "evidence": [
-        "Owner-confirmed Admin + Pimpinan dual approval",
-        "Inspection and quarantine record with original invoice/batch link"
+        "Pimpinan approval event",
+        "Admin inspection and quarantine release record with original invoice/batch link"
       ],
       "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
@@ -238,19 +239,19 @@
     {
       "id": "D13",
       "area": "Patient refunds and payout evidence",
-      "status": "owner_confirmed_pimpinan_approval_required",
+      "status": "owner_confirmed_pimpinan_refund_approval_method_account_required",
       "recommendation": {
         "approval": "No refund obligation may be approved without an explicit Pimpinan decision. Admin may perform the existing first-stage review, but cannot replace Pimpinan approval.",
         "obligation": "Pimpinan approval creates a refund obligation; it does not by itself record that money has been paid.",
-        "payout": "Payout is a separate Pimpinan-authorized event with actual date, amount, method, source cash/bank account, recipient/reference and evidence.",
+        "payout": "Payout is a separate Pimpinan-authorized event with actual date, amount, selected refund method, source cash/bank account, recipient/reference and evidence. Method and source account must be selected and validated for each payout from configured clinic accounts; do not invent or hardcode an account.",
         "partialPayout": "Not enabled until a partial payout policy is explicitly approved."
       },
       "ownerMustConfirm": [
-        "Accepted payout methods and source cash/bank accounts",
+        "Register the actual clinic cash/bank accounts and enabled refund methods before payout can be posted",
         "Minimum evidence for cash refund"
       ],
       "blocks": [
-        "Refund payout until approved method/account and evidence are configured"
+        "Refund payout until actual refund method, source account and evidence are configured"
       ],
       "evidence": [
         "Pimpinan approval event",
@@ -261,7 +262,7 @@
     {
       "id": "D14",
       "area": "Non-cash settlement and cash-flow timing",
-      "status": "owner_confirmed_non_cash_pending_until_pimpinan_review",
+      "status": "owner_confirmed_pimpinan_review_then_income_recognition",
       "recommendation": {
         "initialState": "Non-cash payment is recorded in pending_pimpinan_review and is not yet included in recognized income.",
         "recognition": "After Pimpinan reviews and approves the payment, the amount is posted to recognized income.",
@@ -310,16 +311,15 @@
     {
       "id": "D16",
       "area": "Queue A/B and active-call concurrency",
-      "status": "owner_confirmed_separate_queue_lane_per_shift",
+      "status": "owner_confirmed_morning_A_evening_B_cashier_assignment",
       "recommendation": {
         "laneRule": "A and B are separate queue lanes, with one lane assigned to each active clinic shift.",
-        "assignment": "The lane-to-shift mapping is stored as explicit configuration; do not guess whether A means morning or evening until the clinic sets that mapping.",
+        "assignment": "Morning shift uses lane A and is assigned to Kasir 1 (assalamkasir1@gmail.com); evening shift uses lane B and is assigned to Kasir 2 (assalamkasir2@gmail.com). Assignment is explicit configuration; only the assigned cashier can register/call tickets for that shift, subject to Admin/Pimpinan overrides recorded in audit.",
         "activeCall": "One active call per lane/shift; A and B may each have one active call at the same time.",
         "events": "Call, recall, cancel-call and authorized transfer are append-only events; recall retains the ticket identity.",
         "display": "Changing the TV view does not reset counters, active calls or ticket history."
       },
       "ownerMustConfirm": [
-        "Exact mapping: which shift is assigned to A and which to B",
         "Who can transfer or override a call"
       ],
       "blocks": [
@@ -386,25 +386,23 @@
     {
       "id": "D19",
       "area": "Audit retention, export and legal hold",
-      "status": "owner_confirmed_append_only_audit_and_legal_hold_framework_duration_open",
+      "status": "owner_confirmed_minimum_one_year_audit_retention",
       "recommendation": {
         "auditLog": "Server-authored append-only audit; operational roles cannot edit/delete authoritative events.",
-        "retention": "Use category-specific retention schedules (financial/accounting, security/authentication, application activity and approval events); do not use one unqualified duration for all.",
+        "retention": "Retain audit events for at least 1 year. If another applicable law, accounting/tax requirement, dispute, investigation or legal hold requires longer retention, retain for the longer required period. Do not automatically delete events under an active legal hold.",
         "export": "Include range, actor, event type, target, request/correlation ID and integrity checksum; exporting itself creates an audit event.",
         "legalHold": "Suspend purge for affected records while an investigation, dispute, audit or legal hold applies.",
         "purge": "No automatic purge until the schedule and authority for each category have been approved."
       },
-      "ownerMustConfirm": [
-        "Retention durations and authorized exporter/legal-hold roles by audit category"
-      ],
+      "ownerMustConfirm": [],
       "blocks": [
-        "Audit purge scheduling until category-specific schedule is approved"
+        "Configure category-specific retention and longer legal/accounting holds; one year is a minimum, not permission to delete records subject to longer duties"
       ],
       "evidence": [
         "Owner acceptance of append-only/category-specific/hold framework",
         "Approved category-specific retention schedule"
       ],
-      "ownerApprovalStatus": "framework_accepted_by_owner_in_chat_2026-11-17"
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D20",
