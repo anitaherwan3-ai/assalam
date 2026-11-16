@@ -10,6 +10,8 @@ function createHarness(overrides = {}) {
     batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", version: "1" }],
     movements: [], audits: [], patients: [], encounters: [], tickets: [],
     invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [], encounterCompleted: null,
+    purchaseLine: { purchaseId: "purchase-1", purchaseLineId: "line-1", medicineId: "med-1", supplierId: "sup-1", quantityScale: 0, orderedQty: "5", receivedQty: "0", purchasedQty: "5", returnedQty: "0", originalBatchAllocations: [{ batchId: "batch-1" }] },
+    receipts: [], payableUpserts: [], supplierReturnRequests: [], supplierReturnStatus: null,
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
   };
   let queue = Promise.resolve();
@@ -24,7 +26,10 @@ function createHarness(overrides = {}) {
       audits: state.audits, patients: state.patients, encounters: state.encounters,
       tickets: state.tickets, invoiceDrafts: state.invoiceDrafts, invoices: state.invoices,
       invoiceLines: state.invoiceLines, batchAllocations: state.batchAllocations,
-      returnQuotas: state.returnQuotas, encounterCompleted: state.encounterCompleted, currentCall: state.currentCall,
+      returnQuotas: state.returnQuotas, encounterCompleted: state.encounterCompleted,
+      purchaseLine: state.purchaseLine, receipts: state.receipts, payableUpserts: state.payableUpserts,
+      supplierReturnRequests: state.supplierReturnRequests, supplierReturnStatus: state.supplierReturnStatus,
+      currentCall: state.currentCall,
       nextSequence: state.nextSequence, claims: state.claims, completed: state.completed
     });
     try {
@@ -59,6 +64,41 @@ function createHarness(overrides = {}) {
     async createReturnQuotas(_c, id, lines) { state.returnQuotas.push({ invoiceId: id, lineCount: lines.length }); },
     async markEncounterCompleted(_c, id, invoiceId) { state.encounterCompleted = { id, invoiceId }; },
     async previewMedicine() { return { ...state.medicine }; },
+    async previewPurchaseLine() { return { medicineId: "med-1", supplierId: "sup-1", quantityScale: 0 }; },
+    async lockPurchaseLine() { return state.purchaseLine; },
+    async getPurchaseReceiptPolicy() { return { mode: "split_receipts" }; },
+    async createPurchaseReceipt(_c, data) { state.receipts.push(data); return "receipt-" + state.receipts.length; },
+    async createBatch(_c, data) {
+      const batch = { batchId: "batch-new-" + state.batches.length, remainingQty: data.remainingQty, version: "1", ...data };
+      state.batches.push(batch);
+      return batch.batchId;
+    },
+    async updateMedicineProjection(_c, data) {
+      state.medicine.stockQty = data.stockQty;
+      state.medicine.hpp = data.hpp;
+      state.medicine.version = String(Number(state.medicine.version) + 1);
+    },
+    async updatePurchaseLineReceived(_c, data) { state.purchaseLine.receivedQty = data.receivedQty; },
+    async ensureSupplierPayable(_c, data) { state.payableUpserts.push(data); },
+    async previewSupplierReturnSource() {
+      return {
+        quantityScale: 0,
+        purchase: { purchasedQty: "5", returnedQty: "0", originalBatchAllocations: [{ batchId: "batch-1" }] },
+        batch: { batchId: "batch-1", remainingQty: "5" }
+      };
+    },
+    async createSupplierReturnRequest(_c, data) {
+      state.supplierReturnRequests.push({ supplierReturnId: "supplier-return-" + state.supplierReturnRequests.length, status: "requested", ...data });
+      return state.supplierReturnRequests[state.supplierReturnRequests.length - 1].supplierReturnId;
+    },
+    async lockBatch(_c, id) { return state.batches.find(b => String(b.batchId) === String(id)); },
+    async lockSupplierReturn(_c, id) { return state.supplierReturnRequests.find(r => r.supplierReturnId === id); },
+    async markSupplierReturnDispatched(_c, data) {
+      state.supplierReturnStatus = { ...data };
+      const row = state.supplierReturnRequests.find(r => r.supplierReturnId === data.supplierReturnId);
+      row.status = "dispatched";
+      state.purchaseLine.returnedQty = String(Number(state.purchaseLine.returnedQty) + Number(row.quantity));
+    },
     async lockSaleIssueSource(_c, id) { return { invoiceId: id, cashierUserId: "cashier-1", businessDate: "2026-11-17", status: "ready_for_stock_posting" }; },
     async lockMedicine() { return state.medicine; },
     async lockEligibleBatches() { return state.batches; },
@@ -291,4 +331,77 @@ test("checkout failure after invoice draft and stock deduction rolls back the co
   assert.equal(state.returnQuotas.length, 0);
   assert.equal(state.encounterCompleted, null);
   assert.equal(state.audits.length, 0);
+});
+
+test("purchase receipt atomically creates receipt, batch, movement, HPP and supplier payable", async () => {
+  const { state, commands } = createHarness();
+  const result = await commands.receivePurchase({
+    actor: { userId: "lead-1", role: "pimpinan" },
+    purchaseLineId: "line-1", receivedQty: "5", purchaseValue: "10000",
+    receiptReference: "GRN-001",
+    batch: {
+      batchNo: "BATCH-NEW", expiryDate: "2027-12-31",
+      receivedAtUtc: "2026-11-17T00:00:00Z", disposition: "sellable"
+    },
+    idempotencyKey: "purchase-receipt-1", requestId: "purchase-receipt-req"
+  });
+  assert.equal(result.body.data.receivedQty, "5");
+  assert.equal(result.body.data.stockQty, "10");
+  assert.equal(result.body.data.hpp, "1500");
+  assert.equal(state.receipts.length, 1);
+  assert.equal(state.batches.length, 2);
+  assert.equal(state.movements.length, 1);
+  assert.equal(state.purchaseLine.receivedQty, "5");
+  assert.equal(state.payableUpserts.length, 1);
+});
+
+test("purchase receipt failure rolls back receipt, batch, movement, stock and payable", async () => {
+  const { state, commands } = createHarness({
+    async updatePurchaseLineReceived() { throw Object.assign(new Error("line update failed"), { code: "PURCHASE_LINE_UPDATE_FAILED" }); }
+  });
+  await assert.rejects(commands.receivePurchase({
+    actor: { userId: "lead-1", role: "pimpinan" },
+    purchaseLineId: "line-1", receivedQty: "5", purchaseValue: "10000",
+    receiptReference: "GRN-ROLLBACK",
+    batch: {
+      batchNo: "BATCH-ROLLBACK", expiryDate: "2027-12-31",
+      receivedAtUtc: "2026-11-17T00:00:00Z", disposition: "inspection_pending"
+    },
+    idempotencyKey: "purchase-receipt-fail", requestId: "purchase-receipt-fail-req"
+  }), { code: "PURCHASE_LINE_UPDATE_FAILED" });
+  assert.equal(state.medicine.stockQty, "5");
+  assert.equal(state.medicine.hpp, "1000");
+  assert.equal(state.batches.length, 1);
+  assert.equal(state.receipts.length, 0);
+  assert.equal(state.movements.length, 0);
+  assert.equal(state.purchaseLine.receivedQty, "0");
+  assert.equal(state.payableUpserts.length, 0);
+  assert.equal(state.audits.length, 0);
+});
+
+test("supplier return request reserves no stock; approved dispatch posts one negative movement", async () => {
+  const { state, commands } = createHarness();
+  const requested = await commands.createSupplierReturnRequest({
+    actor: { userId: "lead-1", role: "pimpinan" },
+    purchaseLineId: "line-1", batchId: "batch-1", quantity: "2",
+    reason: "Barang rusak",
+    idempotencyKey: "supplier-return-request-1", requestId: "supplier-return-request-req"
+  });
+  assert.equal(requested.body.data.stockMovementPosted, false);
+  assert.equal(state.medicine.stockQty, "5");
+  assert.equal(state.movements.length, 0);
+  const row = state.supplierReturnRequests[0];
+  row.status = "approved_for_dispatch";
+  const dispatched = await commands.dispatchSupplierReturn({
+    actor: { userId: "lead-1", role: "pimpinan" },
+    supplierReturnId: row.supplierReturnId, dispatchReference: "DO-RET-001",
+    idempotencyKey: "supplier-return-dispatch-1", requestId: "supplier-return-dispatch-req"
+  });
+  assert.equal(dispatched.body.data.stockMovementPosted, true);
+  assert.equal(dispatched.body.data.supplierCreditRecognized, false);
+  assert.equal(state.medicine.stockQty, "3");
+  assert.equal(state.batches[0].remainingQty, "3");
+  assert.equal(state.movements.length, 1);
+  assert.equal(state.movements[0].direction, "out");
+  assert.equal(state.supplierReturnStatus.settlementStatus, "owner_policy_pending");
 });
