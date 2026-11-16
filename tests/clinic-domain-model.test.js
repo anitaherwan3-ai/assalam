@@ -43,6 +43,7 @@ test("batch requires source purchase, explicit disposition and bounded quantitie
     receivedQty: "10", remainingQty: "8", disposition: "sellable"
   }, 0);
   assert.equal(valid.receivedQty, "10");
+  assert.equal(valid.originVerified, false, "missing source verification must not be trusted");
   assert.throws(() => model.validateBatch({
     medicineId: "med-1", sourcePurchaseLineId: "line-1",
     batchNo: "AMX-001", expiryDate: "2027-06-30",
@@ -55,6 +56,12 @@ test("batch requires source purchase, explicit disposition and bounded quantitie
     receivedAtUtc: "2026-11-17T00:00:00Z",
     receivedQty: "10", remainingQty: "10"
   }, 0), { code: "BATCH_DISPOSITION_REQUIRED" });
+  const verified = model.validateBatch({
+    medicineId: "med-1", sourcePurchaseLineId: "line-1", batchNo: "AMX-002",
+    expiryDate: "2027-06-30", receivedAtUtc: "2026-11-17T00:00:00Z",
+    receivedQty: "10", remainingQty: "10", disposition: "sellable", originVerified: true
+  }, 0);
+  assert.equal(verified.originVerified, true);
 });
 
 test("movement ledger requires signed direction, exact source and actor", () => {
