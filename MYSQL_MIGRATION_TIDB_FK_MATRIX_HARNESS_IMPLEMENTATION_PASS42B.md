@@ -17,7 +17,7 @@ Updated `api/db-compatibility.js` to extend the synthetic test suite:
 4. Added a composite parent key test with FK column order `(a,b)`, while omitting the child index; the suite inspects `INFORMATION_SCHEMA.STATISTICS` for the child-side index.
 5. Added a negative test for a reversed parent composite index `(b,a)` when the FK references `(a,b)`.
 6. Added a negative test for a referenced parent column without a supporting index.
-7. Added negative DDL tests for FK column signedness, DECIMAL precision/scale, and string collation mismatch.
+7. Added negative DDL tests for FK column signedness, DECIMAL precision/scale, string collation mismatch, and VARCHAR length mismatch.
 8. Added a composite FK test with one NULL component and a fully non-NULL orphan rejection test.
 9. Replaced fixed three-table cleanup with registry-driven cleanup, both on the normal path and on runtime errors. Cleanup errors remain visible and block schema-v1 readiness.
 
@@ -37,7 +37,6 @@ The updated source was fetched again from the migration branch. Static checks co
 
 ## Open test limitations
 
-- The mismatch cases currently cover signedness, DECIMAL precision/scale, and collation; VARCHAR length mismatch still needs its own isolated case.
 - Expected-error classification must be confirmed against actual TiDB 8.5.3 error codes/messages. A failed pattern match should be treated as a test failure, not proof that the server accepted an incompatible FK.
 - The composite NULL case records TiDB's actual behavior; it is not yet runtime evidence.
 - Child-index metadata and cleanup are not yet runtime verified.
