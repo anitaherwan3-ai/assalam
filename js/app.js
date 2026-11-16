@@ -3,6 +3,22 @@
 
 const store = window.clinicStore;
 
+function isTiDBCatalogPreview() {
+  return !!(window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled());
+}
+
+function getMasterTariffs() {
+  return isTiDBCatalogPreview()
+    ? window.assalamTiDBCatalog.getTariffs()
+    : (store.state.tarif || []);
+}
+
+function findMasterTariff(id) {
+  return isTiDBCatalogPreview()
+    ? window.assalamTiDBCatalog.findTariff(id)
+    : store.get('tarif', id);
+}
+
 // State navigasi & form aktif
 let currentUser = null;
 let currentRole = null;
@@ -230,13 +246,18 @@ async function doLogin() {
         window.assalamTiDBApi &&
         !window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED) {
       window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = true;
-      window.assalamTiDBApi.bootstrapPreviewOwner()
-        .then(() => window.assalamTiDBApi.getSession())
-        .then(session => {
-          window.ASSALAM_TIDB_PREVIEW_SESSION = session;
-          console.info('[TiDB Preview] Identitas Pimpinan preview terverifikasi.');
-        })
-        .catch(err => console.warn('[TiDB Preview] Bootstrap belum selesai:', err.code || err.message));
+      try {
+        await window.assalamTiDBApi.bootstrapPreviewOwner();
+        window.ASSALAM_TIDB_PREVIEW_SESSION = await window.assalamTiDBApi.getSession();
+        if (window.assalamTiDBCatalog) await window.assalamTiDBCatalog.ensureLoaded(true);
+        console.info('[TiDB Preview] Identitas dan katalog Pimpinan preview terverifikasi.');
+        renderApp();
+      } catch (err) {
+        window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = false;
+        window.ASSALAM_TIDB_PREVIEW_SESSION = null;
+        console.warn('[TiDB Preview] Bootstrap/katalog belum selesai:', err.code || err.message);
+        showAlert('Sesi katalog TiDB Preview belum siap: ' + (err.message || 'Periksa koneksi.'), 'TiDB Preview');
+      }
     }
 
     store.logActivity('Masuk', 'Sesi', `${profile.role}: ${profile.nama} login melalui Firebase`);
@@ -270,6 +291,9 @@ function doLogout() {
     currentRole = null;
     activeTab = '';
     cartItems = [];
+    if (window.assalamTiDBCatalog) window.assalamTiDBCatalog.clear();
+    window.ASSALAM_TIDB_PREVIEW_SESSION = null;
+    window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = false;
     if (window.firebaseBackend && window.firebaseBackend.auth) {
       await window.firebaseBackend.performPush(store.state);
       await window.firebaseBackend.auth.signOut().catch(err => console.warn('Firebase signOut:', err));
@@ -1838,7 +1862,7 @@ function delPetty(id) {
 // -------------------------------------------------------------
 function viewMaster() {
   const obatList = store.state.obat || [];
-  const tarifList = store.state.tarif || [];
+  const tarifList = getMasterTariffs();
 
   const obatRows = obatList.map(o => {
     const isLow = (o.stok || 0) <= (o.min || 5);
@@ -1891,6 +1915,7 @@ function viewMaster() {
 
     <div class="card">
       <h2>Tarif Jasa Dokter & Tindakan Medis</h2>
+      ${isTiDBCatalogPreview() ? '<p style="color:var(--mu);font-size:12px;">Master tarif disimpan di TiDB Preview. POS dan paket pelayanan masih memakai Firebase sampai modul checkout dan paket dimigrasikan bersama.</p>' : ''}
       <div class="row">
         <label style="flex:1;min-width:220px;">Nama Layanan *
           <input id="m-t-nama" placeholder="Contoh: Konsultasi Dokter Umum">
@@ -1964,9 +1989,24 @@ function delObat(id) {
   });
 }
 
-function actionAddTarif() {
+async function actionAddTarif() {
   const nama = val('m-t-nama').trim();
   if (!nama) { showAlert('Nama tarif wajib diisi'); return; }
+  if (isTiDBCatalogPreview()) {
+    try {
+      await window.assalamTiDBCatalog.createTariff({
+        name: nama,
+        serviceType: val('m-t-jenis'),
+        price: String(numVal('m-t-harga'))
+      });
+      $('m-t-nama').value = '';
+      renderApp();
+      showAlert('Tarif berhasil disimpan ke TiDB Preview.', 'Sukses');
+    } catch (err) {
+      showAlert(err.message || 'Gagal menyimpan tarif ke TiDB Preview.', 'Gagal');
+    }
+    return;
+  }
   store.state.tarif.push({
     id: uid(),
     nama: nama,
@@ -1980,7 +2020,7 @@ function actionAddTarif() {
 }
 
 function editTarif(id) {
-  const t = store.get('tarif', id);
+  const t = findMasterTariff(id);
   if (!t) return;
   showFormModal('Edit Tarif Layanan', [
     ['nama', 'Nama Layanan', 'text', t.nama],
@@ -1990,28 +2030,49 @@ function editTarif(id) {
       { value: 'Laboratorium', label: 'Laboratorium' }
     ]],
     ['harga', 'Tarif (Rp)', 'number', t.harga]
-  ], res => {
-    Object.assign(t, res, {
-      harga: Number(res.harga),
-      _t: Date.now()
-    });
+  ], async res => {
+    if (isTiDBCatalogPreview()) {
+      try {
+        await window.assalamTiDBCatalog.updateTariff({
+          publicId: t.publicId || t.id,
+          expectedVersion: t.version,
+          name: String(res.nama || '').trim(),
+          serviceType: String(res.jenis || '').trim(),
+          price: String(res.harga)
+        });
+        renderApp();
+        showAlert('Perubahan tarif tersimpan di TiDB Preview.', 'Sukses');
+      } catch (err) {
+        showAlert(err.message || 'Gagal memperbarui tarif TiDB.', 'Gagal');
+      }
+      return;
+    }
+    Object.assign(t, res, { harga: Number(res.harga), _t: Date.now() });
     store.logActivity('Ubah', 'Master Tarif', t.nama);
     store.saveLocal();
   });
 }
 
 function delTarif(id) {
-  showConfirm('Hapus tarif layanan ini?', () => {
-    const t = store.get('tarif', id);
-    if (t) {
-      store.state.tarif = store.state.tarif.filter(x => x.id !== id);
-      store.logActivity('Hapus', 'Master Tarif', t.nama);
-      store.saveLocal();
+  showConfirm('Nonaktifkan tarif layanan ini? Riwayat nota lama tidak akan dihapus.', async () => {
+    const t = findMasterTariff(id);
+    if (!t) return;
+    if (isTiDBCatalogPreview()) {
+      try {
+        await window.assalamTiDBCatalog.deactivateTariff(t.publicId || t.id, t.version);
+        renderApp();
+        showAlert('Tarif dinonaktifkan di TiDB Preview. Riwayat nota tetap utuh.', 'Sukses');
+      } catch (err) {
+        showAlert(err.message || 'Gagal menonaktifkan tarif TiDB.', 'Gagal');
+      }
+      return;
     }
+    store.state.tarif = store.state.tarif.filter(x => x.id !== id);
+    store.logActivity('Hapus', 'Master Tarif', t.nama);
+    store.saveLocal();
   });
 }
 
-// -------------------------------------------------------------
 // MODULE: MASTER PAKET PELAYANAN (ADMIN / PIMPINAN)
 // -------------------------------------------------------------
 window.paketBuilderItems = [];
@@ -2314,6 +2375,86 @@ function viewPaketPelayanan() {
 }
 
 // -------------------------------------------------------------
+function renderTiDBSupplierManager() {
+  if (!isTiDBCatalogPreview()) return '';
+  const suppliers = window.assalamTiDBCatalog.getSuppliers();
+  const rows = suppliers.map(s => [
+    esc(s.nama),
+    esc(s.phone || '-'),
+    esc(s.address || '-'),
+    `<button class="s" onclick="editSupplierPreview('${s.id}')">Edit</button>
+     <button class="s btn-danger" onclick="deactivateSupplierPreview('${s.id}')">Nonaktifkan</button>`
+  ]);
+  return `
+    <div class="card">
+      <h2>Master Supplier — TiDB Preview</h2>
+      <p style="color:var(--mu);font-size:12px;">Data master supplier pada kartu ini disimpan ke TiDB Preview. Pencatatan faktur, penerimaan batch, dan pembayaran pembelian masih menggunakan Firebase Preview sampai modul pembelian TiDB selesai.</p>
+      <div class="row">
+        <label style="flex:1;min-width:200px;">Nama Supplier / PBF *
+          <input id="ti-sup-name" placeholder="Nama badan usaha supplier">
+        </label>
+        <label>Telepon
+          <input id="ti-sup-phone" placeholder="Nomor telepon">
+        </label>
+        <label style="flex:1;min-width:200px;">Alamat
+          <input id="ti-sup-address" placeholder="Alamat supplier">
+        </label>
+        <button class="p" onclick="actionAddSupplierPreview()">+ Tambah Supplier TiDB</button>
+      </div>
+      ${renderTable(['Supplier', 'Telepon', 'Alamat', 'Aksi'], rows, { key: 'tidb_supplier_preview' })}
+    </div>
+  `;
+}
+
+async function actionAddSupplierPreview() {
+  const name = val('ti-sup-name').trim();
+  if (!name) { showAlert('Nama supplier wajib diisi.'); return; }
+  try {
+    await window.assalamTiDBCatalog.createSupplier({
+      name, phone: val('ti-sup-phone').trim(), address: val('ti-sup-address').trim()
+    });
+    renderApp();
+    showAlert('Master supplier tersimpan di TiDB Preview.', 'Sukses');
+  } catch (err) {
+    showAlert(err.message || 'Gagal menyimpan supplier ke TiDB.', 'Gagal');
+  }
+}
+
+function editSupplierPreview(id) {
+  const supplier = window.assalamTiDBCatalog.findSupplier(id);
+  if (!supplier) return;
+  showFormModal('Edit Supplier TiDB Preview', [
+    ['nama', 'Nama Supplier', 'text', supplier.nama],
+    ['phone', 'Telepon', 'text', supplier.phone || ''],
+    ['address', 'Alamat', 'text', supplier.address || '']
+  ], async result => {
+    try {
+      await window.assalamTiDBCatalog.updateSupplier({
+        publicId: supplier.publicId, expectedVersion: supplier.version,
+        name: result.nama, phone: result.phone, address: result.address
+      });
+      renderApp();
+      showAlert('Supplier berhasil diperbarui di TiDB Preview.', 'Sukses');
+    } catch (err) {
+      showAlert(err.message || 'Gagal memperbarui supplier.', 'Gagal');
+    }
+  });
+}
+
+function deactivateSupplierPreview(id) {
+  const supplier = window.assalamTiDBCatalog.findSupplier(id);
+  if (!supplier) return;
+  showConfirm('Nonaktifkan supplier ini? Riwayat pembelian lama tidak dihapus.', async () => {
+    try {
+      await window.assalamTiDBCatalog.deactivateSupplier(supplier.publicId, supplier.version);
+      renderApp();
+      showAlert('Supplier dinonaktifkan di TiDB Preview.', 'Sukses');
+    } catch (err) {
+      showAlert(err.message || 'Gagal menonaktifkan supplier.', 'Gagal');
+    }
+  });
+}
+
 // MODULE: PEMBELIAN OBAT (FAKTUR & SUPPLIER)
 // -------------------------------------------------------------
 function viewPembelian() {
@@ -2351,6 +2492,7 @@ function viewPembelian() {
   ]);
 
   return `
+    ${renderTiDBSupplierManager()}
     <div class="card">
       <h2>Pencatatan Pembelian Obat dari Supplier / PBF</h2>
       <p style="color:var(--mu);font-size:12px;margin-bottom:12px;">
@@ -2358,7 +2500,10 @@ function viewPembelian() {
       </p>
       <div class="row">
         <label>Supplier / PBF *
-          <input id="beli-sup" placeholder="Contoh: PT Kimia Farma">
+          <input id="beli-sup" list="beli-sup-options" placeholder="Contoh: PT Kimia Farma">
+          <datalist id="beli-sup-options">
+            ${(isTiDBCatalogPreview() ? window.assalamTiDBCatalog.getSuppliers() : []).map(s => `<option value="${esc(s.nama)}">`).join('')}
+          </datalist>
         </label>
         <label>Nomor Faktur
           <input id="beli-fak" placeholder="INV-2026-001">
@@ -4758,7 +4903,10 @@ function renderApp() {
     userHeaderEl.textContent = `${currentUser.nama} (${currentUser.role})`;
   }
 
-  const tabs = ROLE_TABS[currentRole] || [];
+  const tabs = (ROLE_TABS[currentRole] || []).slice();
+  if (isTiDBCatalogPreview() && currentRole === 'pimpinan') {
+    ['Obat & Tarif', 'Pembelian'].forEach(tab => { if (!tabs.includes(tab)) tabs.push(tab); });
+  }
   if (!tabs.includes(activeTab)) {
     activeTab = tabs[0];
   }
@@ -4769,6 +4917,24 @@ function renderApp() {
       <span>${t}</span>
     </button>
   `).join('');
+
+  if (isTiDBCatalogPreview() && ['Obat & Tarif', 'Pembelian'].includes(activeTab) &&
+      !window.assalamTiDBCatalog.isLoaded()) {
+    const sessionReady = !!window.ASSALAM_TIDB_PREVIEW_SESSION;
+    $('main-content').innerHTML = sessionReady
+      ? '<div class="card"><h2>Memuat katalog TiDB Preview…</h2><p>Master tarif dan supplier sedang dibaca dari database preview.</p></div>'
+      : '<div class="card"><h2>Sesi TiDB Preview belum siap</h2><p>Masuk menggunakan akun Pimpinan Preview yang sudah di-bootstrap untuk membuka katalog TiDB. Data Firebase produksi tidak disentuh.</p></div>';
+    if (sessionReady && !window.assalamTiDBCatalog.isLoading()) {
+      window.assalamTiDBCatalog.ensureLoaded()
+        .then(() => renderApp())
+        .catch(err => {
+          const main = $('main-content');
+          if (main) main.innerHTML = '<div class="card"><h2>Gagal memuat katalog TiDB</h2><p>' +
+            esc(err.message || 'Periksa sesi dan koneksi database.') + '</p></div>';
+        });
+    }
+    return;
+  }
 
   let content = '';
   switch (activeTab) {

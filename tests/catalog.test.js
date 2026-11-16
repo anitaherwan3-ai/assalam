@@ -35,3 +35,12 @@ test("tariff expected version accepts only a positive decimal version", () => {
   assert.equal(validateExpectedVersion("12"), "12");
   assert.throws(() => validateExpectedVersion("1x"));
 });
+
+
+test("supplier update/deactivation use the same positive version guard as tariffs", () => {
+  const { validateExpectedVersion } = require("../lib/catalog");
+  assert.equal(validateExpectedVersion("2"), "2");
+  for (const value of ["0", "-1", "2.1", "version"]) {
+    assert.throws(() => validateExpectedVersion(value));
+  }
+});
