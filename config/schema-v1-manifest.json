@@ -38,7 +38,7 @@
       "path": "lib/migrations/009_operational_controls_v1.js"
     }
   ],
-  "tableCount": 68,
+  "tableCount": 71,
   "tables": {
     "users": {
       "migration": "001_identity_foundation",
@@ -765,6 +765,222 @@
           "unique": false,
           "columns": [
             "active"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "user": {
+      "migration": "004_better_auth_core",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(120)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(254)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "emailVerified",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "image",
+          "type": "VARCHAR(2048)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "createdAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_ba_user_email",
+          "unique": true,
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "session": {
+      "migration": "004_better_auth_core",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "expiresAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "token",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "createdAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "ipAddress",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "userAgent",
+          "type": "VARCHAR(512)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "userId",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_ba_session_token",
+          "unique": true,
+          "columns": [
+            "token"
+          ]
+        },
+        {
+          "name": "idx_ba_session_user",
+          "unique": false,
+          "columns": [
+            "userId"
+          ]
+        },
+        {
+          "name": "idx_ba_session_expires",
+          "unique": false,
+          "columns": [
+            "expiresAt"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "account": {
+      "migration": "004_better_auth_core",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "accountId",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "providerId",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "userId",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "accessToken",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "refreshToken",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "idToken",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "accessTokenExpiresAt",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "refreshTokenExpiresAt",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "password",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "createdAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_ba_account_provider_identity",
+          "unique": true,
+          "columns": [
+            "providerId",
+            "accountId"
+          ]
+        },
+        {
+          "name": "idx_ba_account_user",
+          "unique": false,
+          "columns": [
+            "userId"
           ]
         }
       ],
