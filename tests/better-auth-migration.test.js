@@ -6,10 +6,10 @@ const migration = require("../lib/migrations/004_better_auth_core");
 
 test("Better Auth migration defines the four isolated core models", () => {
   assert.equal(migration.version, "004_better_auth_core");
-  assert.deepEqual([...migration.expectedTables].sort(), ["account", "session", "user", "verification"]);
-  assert.equal(migration.statements.length, 4);
+  assert.deepEqual([...migration.expectedTables].sort(), ["account", "rateLimit", "session", "user", "verification"]);
+  assert.equal(migration.statements.length, 5);
   const sql = migration.statements.join("\n");
-  for (const table of ["user", "session", "account", "verification"]) {
+  for (const table of ["user", "session", "account", "verification", "rateLimit"]) {
     assert.ok(sql.includes("CREATE TABLE IF NOT EXISTS " + (table === "user" || table === "session" || table === "account" ? "`" + table + "`" : table)));
   }
   assert.match(sql, /UNIQUE KEY uq_ba_user_email \(email\)/);
