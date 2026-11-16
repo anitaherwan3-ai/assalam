@@ -893,13 +893,13 @@ Untuk setiap field bertanda `UNSPECIFIED`, schema freeze ditahan sampai diputusk
 - Tidak mengisi NULL/default yang tidak dinyatakan sumber.
 - Tidak menambahkan unique supplier invoice line ke inventory batch.
 - Tidak menganggap legacy_id unik global.
-- Tidak menganggap 104 relasi FK kandidat sebagai constraint yang sudah ada atau lulus test.
+- Tidak menganggap 104 numbered FK rows / 116 expanded candidate tuples sebagai constraint fisik yang sudah ada atau lulus test.
 - Tidak membekukan DECIMAL(18,3) sebagai unit kuantitas final.
 - Tidak menulis DDL atau menjalankan perubahan database.
 
 ## 8. Gate sebelum DDL
 
-Pass 4 ini hanya inventory deklarasi fisik yang dapat dibuktikan dari proposal saat ini. Sebelum DDL: review seluruh `UNSPECIFIED`, lengkapkan tabel integrity tambahan, cocokkan seluruh 104 kandidat FK terhadap parent key yang benar-benar didefinisikan, lakukan test positif/negatif TiDB pada preview dengan data sintetis, dan dapatkan persetujuan owner untuk policy gate. Sampai itu selesai, Firebase tetap tidak disentuh dan produksi tetap berjalan pada sistem lama.
+Pass 4 ini hanya inventory deklarasi fisik yang dapat dibuktikan dari proposal saat ini. Sebelum DDL: review seluruh `UNSPECIFIED`, lengkapkan tabel integrity tambahan, cocokkan seluruh 104 numbered FK rows / 116 expanded candidate tuples terhadap parent key yang benar-benar didefinisikan, lakukan test positif/negatif TiDB pada preview dengan data sintetis, dan dapatkan persetujuan owner untuk policy gate. Sampai itu selesai, Firebase tetap tidak disentuh dan produksi tetap berjalan pada sistem lama.
 
 ## 9. Hasil pemeriksaan signedness deklarasi
 
