@@ -713,3 +713,6 @@ See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGR
 
 See [MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md](./MYSQL_MIGRATION_SUPPLEMENTAL_FK_TYPE_RECONCILIATION_PASS29.md). Pass 29 supplements 12 column type references from explicit proposal definitions, raising Pass 28 matrix coverage from 244/258 to 256/258. It leaves queue_prefix_guards.prefix type unspecified and F76's parent identity tuple undefined; F76 likely needs a canonical scalar quota-subject FK plus separate ownership enforcement, but the manifest must be reconciled before DDL. All 116 FK candidates remain unapproved; no DDL/runtime/data mutation.
 
+## 32. FK candidate canonicalization and queue guard — Pass 30
+
+See [MYSQL_MIGRATION_FK_CANDIDATE_CANONICALIZATION_PASS30.md](./MYSQL_MIGRATION_FK_CANDIDATE_CANONICALIZATION_PASS30.md). F76 is normalized to the scalar FK from sales_return_lines.return_quota_subject_id to return_quota_subjects.return_quota_subject_id, with same-subject line/component validation required in the server transaction. queue_prefix_guards.prefix is specified as VARCHAR(4) to match existing queue prefix columns; charset/collation and runtime behavior remain open. The matrix now has 258/258 type strings, but all 116 candidates remain unapproved. No DDL or data mutation.
