@@ -75,9 +75,11 @@ Pass 7 already withdraws the earlier 86/11/2 comparison as a complete-manifest m
 - Pass 7: correct 104 + 11 to 104 + 12; keep the 116 candidate count and the withdrawal of incomplete Pass 6 metrics.
 - This Pass 27 report records the reproducible evidence and remaining blockers.
 
-## 6. Next exact engineering deliverable
+## 6. Next exact engineering deliverable — completed in Pass 28
 
-Build a machine-checkable manifest with one row per literal tuple and fields:
+The 116-row machine-checkable matrix is now recorded in [MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.md) and its companion [CSV](./MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv). It expands all ten grouped rows, retains F76 as an undefined ownership tuple, and records exact Pass 4 type strings where extractable. Pass 28 still leaves all 116 candidates unapproved; 101 are unresolved, 10 are ownership-blocked, and 5 are polymorphic-policy-blocked. The next work is to close physical metadata and semantic gaps, then run isolated TiDB tests—not to generate/apply DDL yet.
+
+Original required manifest fields:
 
 `candidate_id, source_FK_ID, child_table, child_columns_ordered, parent_table, parent_columns_ordered, arity, child_type_vector, parent_type_vector, charset_collation, child_nullability, parent_key_kind, parent_key_columns_ordered, child_index_columns_ordered, on_delete, on_update, ownership_invariant, enforcement_method, positive_test_id, negative_test_id, status`.
 
