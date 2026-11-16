@@ -276,3 +276,10 @@ See [MYSQL_MIGRATION_INVENTORY_LEDGER_FK_LINEAGE_CLOSURE_PASS14.md](./MYSQL_MIGR
 ## Role authorization and security review — pass 18
 
 [Pass 18 audit](./MYSQL_MIGRATION_ROLE_AUTHORIZATION_DATA_SECURITY_AUDIT_PASS18.md) identifies identity and authorization blockers. The branch's hard-coded Admin and second-owner emails do not match the latest protected account list; do not run staff provisioning until all five accounts are mapped read-only to UID/profile/role. The current client-side role checks and collection listeners are not proof of deployed Firestore Rules enforcement. MySQL APIs must enforce actor identity, role, resource ownership, field projection and workflow transitions server-side.
+
+
+## Pass 19 — Patient, encounter, and queue integrity
+
+Static source audit: [MYSQL_MIGRATION_PATIENT_ENCOUNTER_QUEUE_INTEGRITY_AUDIT_PASS19.md](MYSQL_MIGRATION_PATIENT_ENCOUNTER_QUEUE_INTEGRITY_AUDIT_PASS19.md).
+
+Key schema implications: separate patient master from repeatable encounter; model queue type A/B and allocate each date/type sequence transactionally; enforce active-call policy server-side; preserve cancellation/reactivation and call history; validate encounter/patient/shift/cashier ownership at checkout; allocate invoice numbers server-side. Current source registration allocates A only, local calling is not a cross-device atomic invariant, checkout backend does not visibly reject a missing patient or validate the complete ownership tuple, and invoice display number is based on local transaction count. These are source findings, not runtime test results. Owner policy gates remain: meaning of A/B, queue switching, global-vs-per-queue active call, re-call behavior, and meaning of completed visit.
