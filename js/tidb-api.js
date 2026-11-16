@@ -19,7 +19,13 @@
   }
 
   async function request(path, options = {}) {
-    if (!/^\/api\/(?:auth\/(?:session|bootstrap-preview-owner)|catalog\/(?:tariffs|suppliers))$/.test(path)) {
+    const allowedPaths = new Set([
+      "/api/auth/session",
+      "/api/auth/bootstrap-preview-owner",
+      "/api/catalog/tariffs",
+      "/api/catalog/suppliers"
+    ]);
+    if (!allowedPaths.has(path)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
     }
     const backend = window.firebaseBackend;
