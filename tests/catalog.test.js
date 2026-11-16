@@ -29,3 +29,9 @@ test("supplier validation rejects empty name", () => {
 test("catalog validation rejects non-text values", () => {
   assert.throws(() => validateTariffInput({ name: { bad: true }, serviceType: "T", price: "10" }), /harus berupa teks/);
 });
+
+test("tariff expected version accepts only a positive decimal version", () => {
+  const { expectedVersionForTest } = require("../lib/catalog");
+  assert.equal(expectedVersionForTest("12"), "12");
+  assert.throws(() => expectedVersionForTest("1x"));
+});

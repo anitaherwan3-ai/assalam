@@ -37,6 +37,14 @@ The migration runner remains disabled because `TIDB_MIGRATIONS_ENABLED` and `TID
 - The operational five-account allowlist remains untouched. The preview Firebase project is `assalam-preview-test`, separate from operational `assalam-db`.
 - The identity schema is a deliberately narrow first migration, not approval of the full application schema. Owner decisions D01–D20 and FK/DDL runtime evidence still gate dependent domains.
 
+## Catalog module foundation — Pass 45
+
+- Added TiDB master tables for `tariffs` and `suppliers`.
+- Added authenticated read endpoints and Admin/Pimpinan create endpoints with server-side validation, idempotency keys and audit events.
+- Tariff edit uses optimistic version checks; tariff delete is a soft deactivation, not a physical delete.
+- Rupiah price is stored as integer `BIGINT` and transported as a decimal string. The TiDB pool now returns large integer values as strings to avoid JavaScript precision loss.
+- This is an API foundation only: the existing browser UI and Firebase data remain unchanged. No catalog records were imported or dual-written.
+
 ## Verification status
 
 Automated test source and CI workflow have been added. The corrected CI run passed all 12 tests on commit `9d87fef`. Additional tests for migration-runner idempotency, audit writes, idempotency replay and preview-owner bootstrap have since been added; their CI run is pending. The live TiDB migration remains gated for the final preview build. The preview deployment has not yet been verified against this final commit. No application module has been switched from Firebase to TiDB.
