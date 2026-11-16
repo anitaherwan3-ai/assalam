@@ -25,7 +25,8 @@ async function main() {
     require("../lib/migrations/005_patient_shift_queue_v1"),
     require("../lib/migrations/006_inventory_purchasing_v1"),
     require("../lib/migrations/007_sales_returns_refunds_v1"),
-    require("../lib/migrations/008_finance_controls_v1")
+    require("../lib/migrations/008_finance_controls_v1"),
+    require("../lib/migrations/009_operational_controls_v1")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
