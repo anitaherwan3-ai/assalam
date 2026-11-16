@@ -31,7 +31,7 @@ test("catalog validation rejects non-text values", () => {
 });
 
 test("tariff expected version accepts only a positive decimal version", () => {
-  const { expectedVersionForTest } = require("../lib/catalog");
+  const { validateExpectedVersion } = require("../lib/catalog");
   assert.equal(expectedVersionForTest("12"), "12");
   assert.throws(() => expectedVersionForTest("1x"));
 });
