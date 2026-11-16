@@ -739,3 +739,7 @@ See [MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_AUDIT_PASS35.md](./MYSQL_MIGRATION_
 ## 38. FK ON DELETE / ON UPDATE policy evidence — Pass 36
 
 See [MYSQL_MIGRATION_FK_ACTION_POLICY_AUDIT_PASS36.md](./MYSQL_MIGRATION_FK_ACTION_POLICY_AUDIT_PASS36.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_ACTION_POLICY_EVIDENCE_PASS36.csv). The proposal has a global RESTRICT default but no per-FK explicit action matrix; F13 patient deletion policy remains open. All candidate actions remain unapproved for DDL until explicitly recorded and TiDB-tested.
+
+## 39. FK child-index prefix coverage — Pass 37
+
+See [MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.md](./MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_CHILD_INDEX_PREFIX_COVERAGE_PASS37.csv). Pass 37 tests the full ordered FK child tuple against proposal index leading columns: 41 candidates have proposal index coverage, 72 do not, and 3 lack a complete table-section index definition. These are proposal-text findings, not live TiDB metadata. Schema v1 remains blocked.
