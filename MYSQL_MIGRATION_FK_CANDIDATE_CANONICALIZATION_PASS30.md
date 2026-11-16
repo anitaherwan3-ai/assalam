@@ -30,7 +30,7 @@ This is an engineering consistency choice from the existing declared queue prefi
 The Pass 28 CSV is updated:
 - F76 is now the scalar quota-subject FK, with ownership validation separately documented.
 - F18 parent type is populated as candidate `VARCHAR(4)`.
-- Exact type strings are now present for **258/258** candidate child/parent column references.
+- After reducing F76 from an undefined three-column tuple to the proposal-backed scalar FK, the matrix contains **256 column references**, all 256 with exact type strings.
 - Status counts remain **101 UNRESOLVED, 10 OWNERSHIP_BLOCKED, 5 POLYMORPHIC_POLICY_BLOCKED**. Type completion does not close index, key, NULL, charset/collation, action, ownership or runtime gates.
 
 ## 4. Remaining exit gates
