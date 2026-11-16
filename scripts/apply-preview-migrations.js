@@ -1,5 +1,7 @@
 "use strict";
 
+// Pass 66 diagnostic retry: confirmation was synchronized before this commit.
+
 const { execFileSync } = require("node:child_process");
 
 function migrationBuildEnabled() {
