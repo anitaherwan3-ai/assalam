@@ -185,7 +185,7 @@ For every relationship, the child tuple and parent tuple must have identical col
 | F73 | sales_returns(invoice_id) | sales_invoices(invoice_id) | PK | (invoice_id,status) | Candidate |
 | F74 | sales_returns(requested_by_user_id), admin_reviewed_by_user_id, final_decided_by_user_id | users(user_id) | PK | separate actor indexes | Nullable reviewers |
 | F75 | sales_return_lines(sales_return_id) | sales_returns(sales_return_id) | PK | (sales_return_id) | Candidate |
-| F76 | sales_return_lines(return_quota_subject_id,invoice_line_id,invoice_component_id) | return_quota_subjects(…matching identity tuple…) | exact non-null typed key required | matching tuple | BLOCK: nullable component and multiple IDs can disagree |
+| F76 | sales_return_lines(return_quota_subject_id) | return_quota_subjects(return_quota_subject_id) | PK | (return_quota_subject_id) | Candidate scalar FK; service transaction must verify invoice_line_id and nullable invoice_component_id match the referenced quota subject; NULL component is not ownership proof |
 | F77 | return_quota_subjects(invoice_line_id) | sales_invoice_lines(invoice_line_id) | PK | (invoice_line_id) | Candidate |
 | F78 | return_quota_subjects(invoice_component_id,invoice_line_id) | sales_invoice_line_components(invoice_component_id,invoice_line_id) | UNIQUE(invoice_component_id,invoice_line_id) | same tuple | BLOCK: component must belong to line |
 | F79 | sales_return_events(sales_return_id) | sales_returns(sales_return_id) | PK | (sales_return_id,occurred_at_utc) | Candidate |
