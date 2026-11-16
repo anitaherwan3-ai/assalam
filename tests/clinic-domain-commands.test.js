@@ -7,7 +7,7 @@ const { createClinicDomainCommands } = require("../lib/clinic-domain-commands");
 function createHarness(overrides = {}) {
   const state = {
     medicine: { medicineId: "med-1", quantityScale: 0, stockQty: "5", hpp: "1000", version: "1" },
-    batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", version: "1" }],
+    batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", disposition: "sellable", version: "1" }],
     movements: [], audits: [], patients: [], encounters: [], tickets: [],
     invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [], encounterCompleted: null,
     purchaseLine: { purchaseId: "purchase-1", purchaseLineId: "line-1", medicineId: "med-1", supplierId: "sup-1", quantityScale: 0, orderedQty: "5", receivedQty: "0", purchasedQty: "5", returnedQty: "0", originalBatchAllocations: [{ batchId: "batch-1" }] },

@@ -24,10 +24,10 @@ test("FEFO allocation orders by expiry, receipt time and stable batch ID", () =>
     businessDate: "2026-11-17",
     requestedQty: "5",
     batches: [
-      { batchId: "later", expiryDate: "2027-12-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5" },
-      { batchId: "expired", expiryDate: "2026-11-16", receivedAtUtc: "2025-01-01T00:00:00Z", remainingQty: "99" },
-      { batchId: "same-later-id", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "2" },
-      { batchId: "same-earlier-id", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "3" }
+      { batchId: "later", expiryDate: "2027-12-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", disposition: "sellable" },
+      { batchId: "expired", expiryDate: "2026-11-16", receivedAtUtc: "2025-01-01T00:00:00Z", remainingQty: "99", disposition: "sellable" },
+      { batchId: "same-later-id", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "2", disposition: "sellable" },
+      { batchId: "same-earlier-id", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "3", disposition: "sellable" }
     ]
   });
   assert.deepEqual(result.allocations, [
@@ -56,8 +56,8 @@ test("FEFO shortage rejects the whole plan without returning partial allocations
     businessDate: "2026-11-17",
     requestedQty: "3",
     batches: [
-      { batchId: "available", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "2" },
-      { batchId: "expired", expiryDate: "2026-11-16", receivedAtUtc: "2025-01-01T00:00:00Z", remainingQty: "100" }
+      { batchId: "available", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "2", disposition: "sellable" },
+      { batchId: "expired", expiryDate: "2026-11-16", receivedAtUtc: "2025-01-01T00:00:00Z", remainingQty: "100", disposition: "sellable" }
     ]
   }), { code: "INSUFFICIENT_SELLABLE_STOCK" });
 });
