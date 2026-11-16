@@ -17,7 +17,7 @@ test("operational v1 patient, shift and queue tables are declared", () => {
 
 test("A and B have independent call guards and transfers require a reason", () => {
   const sql = migration.statements.join("\n");
-  assert.match(sql, /VALUES \\(\x27A\x27, NULL, 1, UTC_TIMESTAMP\\(3\\)\\), \\(\x27B\x27, NULL, 1, UTC_TIMESTAMP\\(3\\)\\)/);
+  assert.ok(sql.includes("VALUES ('A', NULL, 1, UTC_TIMESTAMP(3)), ('B', NULL, 1, UTC_TIMESTAMP(3))"));
   assert.match(sql, /reason VARCHAR\(255\) NOT NULL/);
   assert.match(sql, /UNIQUE KEY uq_queue_guard_active_ticket \(active_queue_ticket_id\)/);
 });
