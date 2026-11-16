@@ -239,25 +239,22 @@
     {
       "id": "D13",
       "area": "Patient refunds and payout evidence",
-      "status": "owner_confirmed_pimpinan_refund_approval_method_account_required",
+      "status": "owner_confirmed_status_and_amount_reporting_only",
       "recommendation": {
         "approval": "No refund obligation may be approved without an explicit Pimpinan decision. Admin may perform the existing first-stage review, but cannot replace Pimpinan approval.",
         "obligation": "Pimpinan approval creates a refund obligation; it does not by itself record that money has been paid.",
-        "payout": "Payout is a separate Pimpinan-authorized event with actual date, amount, selected refund method, source cash/bank account, recipient/reference and evidence. Method and source account must be selected and validated for each payout from configured clinic accounts; do not invent or hardcode an account.",
+        "payout": "Record refund status and amount only. When the refund has been transferred, Pimpinan-facing report states that it has been transferred and the amount (for example, 'sudah ditransfer Rp X ke rekening kas'). Do not require or store refund method, bank account number/name, destination account details, or transfer reference as mandatory fields. Keep approval status separate from transferred/paid status; never mark paid merely because Pimpinan approved it.",
         "partialPayout": "Not enabled until a partial payout policy is explicitly approved."
       },
-      "ownerMustConfirm": [
-        "Register the actual clinic cash/bank accounts and enabled refund methods before payout can be posted",
-        "Minimum evidence for cash refund"
-      ],
+      "ownerMustConfirm": [],
       "blocks": [
-        "Refund payout until actual refund method, source account and evidence are configured"
+        "Only block status transition to transferred/paid until an authorized user records that transfer occurred and its amount; no bank-account catalogue or payment-method setup is required"
       ],
       "evidence": [
         "Pimpinan approval event",
         "Separate payout evidence"
       ],
-      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
+      "ownerApprovalStatus": "clarified_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D14",
