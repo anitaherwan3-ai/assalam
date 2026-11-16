@@ -61,6 +61,10 @@ module.exports = async function handler(req, res) {
       result = await commands.inspectQuarantineBatch(value);
     } else if (body.action === "quarantine_approve_release") {
       result = await commands.approveQuarantineRelease(value);
+    } else if (body.action === "quarantine_approve_disposition") {
+      result = await commands.approveQuarantineDisposition(value);
+    } else if (body.action === "quarantine_dispose") {
+      result = await commands.disposeQuarantineBatch(value);
     } else if (body.action === "quarantine_release") {
       result = await commands.releaseQuarantineBatch(value);
     } else if (body.action === "supplier_return_approve") {
