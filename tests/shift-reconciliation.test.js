@@ -9,7 +9,7 @@ function makeCommands(shift) {
   const repository = {
     async lockShiftForClose() { return { ...shift, status: "open", expectedCash: "100000" }; },
     async closeShift(_c, input) { state.closed = input; return "recon-1"; },
-    async lockShiftForVerification() { return { ...shift, status: "closed_pending_verification" }; },
+    async lockShiftForVerification() { return { ...shift, status: "pending_verification" }; },
     async verifyShift(_c, input) { state.verified = input; }
   };
   const commands = createClinicDomainCommands({
