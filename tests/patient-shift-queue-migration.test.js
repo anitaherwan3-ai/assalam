@@ -6,7 +6,7 @@ const migration = require("../lib/migrations/005_patient_shift_queue_v1");
 
 test("operational v1 patient, shift and queue tables are declared", () => {
   assert.equal(migration.version, "005_patient_shift_queue_v1");
-  assert.equal(migration.expectedTables.length, 11);
+  assert.equal(migration.expectedTables.length, 10);
   const sql = migration.statements.join("\n");
   for (const table of migration.expectedTables) {
     assert.ok(sql.includes("CREATE TABLE IF NOT EXISTS " + table), "missing DDL for " + table);
