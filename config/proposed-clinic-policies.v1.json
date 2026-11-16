@@ -21,7 +21,13 @@
     "Opening shift float is cash custody, not omzet.",
     "Patient-return medicine inspection/release is performed and recorded by Admin only after Pimpinan approval; quarantine remains non-sellable until both approval and Admin release event.",
     "Morning shift queue A is assigned to Kasir 1 (assalamkasir1@gmail.com); evening shift queue B is assigned to Kasir 2 (assalamkasir2@gmail.com).",
-    "Audit retention minimum is one year, subject to longer legal/accounting retention and legal hold."
+    "Audit retention minimum is one year, subject to longer legal/accounting retention and legal hold.",
+    "Queue lane A is assigned to Kasir 1 and lane B to Kasir 2; cashier-to-cashier transfer requires a reason, Admin may assist, Pimpinan has full authority, and every queue transaction/movement is audited.",
+    "All expenses are processed by Admin with Pimpinan approval; cash advances/cash-bon workflows are removed.",
+    "Supplier returns on already-paid invoices create a supplier receivable that remains Pending until an evidenced refund or offset is received.",
+    "Supplier invoices support multiple partial payments; each payment has date, amount and evidence; invoice is Lunas only when fully paid.",
+    "Monthly stock opname occurs on the first day; Admin counts and Pimpinan approves. Traceable stock with unknown HPP may be sold but its profit remains uncalculated; untraceable stock is quarantined.",
+    "New-system authentication uses Better Auth with TiDB; Pimpinan manages user registration and role assignment; no public self-registration; Firebase passwords are not migrated."
   ],
   "protectedAccounts": [
     {
@@ -107,134 +113,119 @@
     {
       "id": "D06",
       "area": "Package discount and refund allocation",
-      "status": "source_parity_then_owner_approval",
+      "status": "owner_confirmed_discount_per_service_line",
       "recommendation": {
-        "candidate": "Snapshot each package component's gross charge and discount allocation at checkout. Use exact integer-Rupiah allocation with a deterministic largest-remainder tie-break only if source audit confirms it matches the existing clinic calculation.",
-        "returnBasis": "Partial component return reverses its original snapshot allocation; never recalculate using current package prices.",
-        "constraint": "The sum of component allocations must equal the invoice/package discount exactly."
+        "discountScope": "Discount is applied separately to each service item/line; do not apply a package-wide discount allocation across multiple service components.",
+        "snapshot": "At checkout, persist each service line's gross price, discount amount and net charge in integer Rupiah.",
+        "returnBasis": "A returned/cancelled service line reverses only that line's original stored net charge and discount; do not recalculate using current prices.",
+        "constraint": "Invoice totals equal the sum of service-line net charges; all calculations use integer Rupiah."
       },
-      "ownerMustConfirm": [
-        "Approve source-matched allocation as the rule for new invoices",
-        "Conditions for refunding already-delivered service components"
-      ],
-      "blocks": [
-        "Final package return/refund allocation"
-      ],
+      "ownerMustConfirm": [],
+      "blocks": [],
       "evidence": [
         "Legacy app.js discount logic",
         "Representative package receipts and partial-return examples",
         "Source-parity tests"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D08",
       "area": "Expense approval and self-approval",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_admin_expense_with_pimpinan_approval",
       "recommendation": {
-        "default": "Maker-checker: requester cannot approve their own expense.",
-        "threshold": "Make approval thresholds configurable; until approved, require a separate approver for every expense.",
-        "audit": "Store requester, approver, decision time, amount, category, evidence and reversal link."
+        "workflow": "All clinic expenses are entered/processed by Admin and require Pimpinan approval before posting as an approved expense.",
+        "selfApproval": "Admin cannot approve their own expense; Pimpinan is the approver.",
+        "audit": "Record requester, Admin recorder, Pimpinan approver, decision time, amount, category, evidence and reversal link."
       },
-      "ownerMustConfirm": [
-        "Approver roles and monetary thresholds",
-        "Emergency exception and evidence procedure"
-      ],
-      "blocks": [
-        "Final expense authorization matrix"
-      ],
+      "ownerMustConfirm": [],
+      "blocks": [],
       "evidence": [
         "Written expense SOP",
         "Role/approval threshold matrix"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D09",
       "area": "Petty cash and reimbursements",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_no_cash_advances_or_petty_cash_advances",
       "recommendation": {
-        "classification": "Separate opening float, cash advance, expense evidence, reimbursement and repayment.",
-        "advance": "An advance remains an outstanding accountable advance until receipts/settlement are submitted; do not immediately count it as an expense.",
-        "reimbursement": "Link reimbursement payment to an approved expense so it is not recorded twice.",
-        "reporting": "Petty cash is not omzet; opening float is not revenue or profit."
+        "workflow": "Remove cash advances, cash-bon and advance-settlement workflows from the application.",
+        "expenseControl": "All expenses are processed by Admin and are known to/approved by Pimpinan under D08.",
+        "reporting": "Only evidenced expense transactions are recorded; no outstanding employee-advance balance is created."
       },
-      "ownerMustConfirm": [
-        "Allowed categories",
-        "Advance settlement deadlines",
-        "Who approves and who holds petty cash"
-      ],
-      "blocks": [
-        "Final petty-cash posting and reporting policy"
-      ],
+      "ownerMustConfirm": [],
+      "blocks": [],
       "evidence": [
         "Current petty-cash categories and sample records",
         "Written cash-advance/reimbursement SOP"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D10",
       "area": "Supplier-return credit recognition",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_supplier_return_receivable_pending_until_settled",
       "recommendation": {
         "stock": "Supplier-return request has no stock effect; approved dispatch posts one negative movement against the original batch.",
-        "creditRecognition": "Do not reduce supplier payable merely because goods were dispatched. Recognize a supplier credit only after supplier-issued credit note or other approved settlement evidence.",
-        "paidInvoice": "For a previously paid invoice, record a supplier receivable/credit balance until cash refund or offset is evidenced; do not rewrite historical payment."
+        "paidInvoice": "If the supplier invoice was already paid, record the returned value as a receivable/credit from the supplier.",
+        "pending": "Keep the supplier receivable Pending for as long as it remains unsettled; close it only when refund or offset is actually evidenced.",
+        "oversight": "Supplier return, receivable and settlement status must be visible to and known by Pimpinan; retain audit history."
       },
       "ownerMustConfirm": [
-        "Accepted proof for credit note/refund/offset",
-        "How long a dispatched return can remain unsettled",
-        "Who approves settlement evidence"
+        "Accepted evidence for supplier refund or offset settlement"
       ],
       "blocks": [
-        "Supplier credit recognition and payable reduction"
+        "Settlement evidence rules before closing supplier receivable"
       ],
       "evidence": [
         "Supplier credit note examples",
         "Supplier return SOP",
         "Sample paid and unpaid supplier return cases"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D11",
       "area": "Supplier partial and multiple payments",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_partial_and_multiple_supplier_payments",
       "recommendation": {
         "targetModel": "Allow multiple payment events and partial allocations through a payment-to-payable allocation ledger.",
-        "invariants": "An allocation cannot exceed the payment amount or the remaining payable balance; each payment needs date, method, source account and evidence/reference.",
+        "invariants": "Each payment records date, amount and evidence. An allocation cannot exceed payment amount or remaining payable balance.",
+        "paidStatus": "An invoice is Lunas only when the entire obligation has been paid; otherwise the outstanding balance remains visible.",
         "legacy": "A legacy lunas/paid boolean is status evidence only; never synthesize missing payment events or dates."
       },
-      "ownerMustConfirm": [
-        "Whether partial and combined payments occur in practice",
-        "Required settlement evidence and allocation workflow"
-      ],
-      "blocks": [
-        "Final supplier payment UI/authorization workflow"
-      ],
+      "ownerMustConfirm": [],
+      "blocks": [],
       "evidence": [
         "Supplier payment samples",
         "Bank/cash proof samples",
         "Reconciliation to open invoices"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D12",
       "area": "Shift close verification",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_role_based_shift_close_verification",
       "recommendation": {
         "default": "The cashier who closes a shift cannot verify their own close.",
         "workflow": "Preserve opening float, expected cash, counted cash, variance reason, verifier identity and timestamp as separate fields/events.",
-        "authority": "Verifier role allowlist and exception path must be configured; do not infer whether Admin, Pimpinan or both can verify."
+        "authority": "Kasir 1 and Kasir 2 shift closes are verified by Admin. Admin shift close is verified by Pimpinan.",
+        "audit": "Every close, verification, variance resolution and authorized reopening is recorded in audit."
       },
       "ownerMustConfirm": [
-        "Which role verifies morning/evening shifts",
-        "Who can resolve variances and reopen a shift"
+        "Who may resolve a shift variance and authorize reopening, if different from the verifier"
       ],
       "blocks": [
-        "Final shift-close permissions"
+        "Variance-resolution and reopening permissions"
       ],
       "evidence": [
         "Existing shift verification workflow",
         "Written role matrix"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D13",
@@ -283,17 +274,17 @@
     {
       "id": "D15",
       "area": "Opening stock and HPP",
-      "status": "awaiting_owner_approval",
+      "status": "owner_confirmed_monthly_first_day_admin_count_pimpinan_approval",
       "recommendation": {
-        "openingCount": "Use a dated, approved physical count by medicine and batch; capture quantity, unit, batch number, expiry and counter/approver.",
+        "openingCount": "Perform stock opname on the first day of each month; Admin counts physical stock by medicine and batch and Pimpinan reviews/approves the result.",
         "valuation": "Use documented supplier purchase cost or another explicitly approved valuation source; never infer HPP from selling price.",
-        "missingLineage": "Do not invent batch or supplier history. Quarantine untraceable quantities for review; keep unknown HPP visibly unknown instead of presenting false profit.",
-        "legacyDataset": "The prior migration decision register records the old Firebase operational dataset as dummy/testing data. Classify and reconfirm each source before importing it as genuine history; do not silently promote fixtures to opening balances."
+        "knownBatchUnknownHpp": "If batch and expiry are clear but HPP is unknown, keep quantity recorded and saleable; visibly mark HPP unknown and exclude that item's profit from valid profit calculation until verified.",
+        "unknownLineage": "If batch origin or expiry cannot be established, quarantine the quantity; it is not sellable until verified.",
+        "expiredOrDamaged": "Expired or damaged stock remains quarantined pending Pimpinan disposition.",
+        "legacyDataset": "Existing Firebase operational dataset is dummy/testing data; do not promote it to genuine opening balances. Establish production opening stock through approved physical count."
       },
       "ownerMustConfirm": [
-        "Cutover count date and responsible counters",
-        "Approved HPP valuation for items without purchase evidence",
-        "Disposition of untraceable/expired stock"
+        "Initial stock opname/cutover date and approved treatment of each quarantined item"
       ],
       "blocks": [
         "Opening-balance posting and live stock cutover"
@@ -303,25 +294,24 @@
         "Batch/expiry photographs or source records",
         "Purchase invoices/HPP evidence",
         "Source dataset classification"
-      ]
+      ],
+      "ownerApprovalStatus": "approved_by_owner_in_chat_2026-11-17"
     },
     {
       "id": "D16",
       "area": "Queue A/B and active-call concurrency",
-      "status": "owner_confirmed_morning_A_evening_B_cashier_assignment",
+      "status": "owner_confirmed_shift_lanes_transfer_admin_assist_pimpinan_full_authority",
       "recommendation": {
-        "laneRule": "A and B are separate queue lanes, with one lane assigned to each active clinic shift.",
-        "assignment": "Morning shift uses lane A and is assigned to Kasir 1 (assalamkasir1@gmail.com); evening shift uses lane B and is assigned to Kasir 2 (assalamkasir2@gmail.com). Assignment is explicit configuration; only the assigned cashier can register/call tickets for that shift, subject to Admin/Pimpinan overrides recorded in audit.",
+        "laneRule": "Morning shift uses lane A assigned to Kasir 1 (assalamkasir1@gmail.com); evening shift uses lane B assigned to Kasir 2 (assalamkasir2@gmail.com).",
+        "transfer": "A cashier may transfer a patient/ticket to another cashier/shift only with a recorded reason and an auditable handover event.",
+        "admin": "Admin may assist with queue transfers/moves; the acting Admin and reason are recorded.",
+        "pimpinan": "Pimpinan has full authority to manage, transfer, override and correct queue assignments, with audit.",
+        "audit": "Every queue transaction and movement, including registration, call, recall, cancellation, transfer and override, is recorded with actor, timestamp, before/after state and reason where applicable.",
         "activeCall": "One active call per lane/shift; A and B may each have one active call at the same time.",
-        "events": "Call, recall, cancel-call and authorized transfer are append-only events; recall retains the ticket identity.",
         "display": "Changing the TV view does not reset counters, active calls or ticket history."
       },
-      "ownerMustConfirm": [
-        "Who can transfer or override a call"
-      ],
-      "blocks": [
-        "Production queue lane assignment until shift-to-lane configuration is applied and access overrides are audited"
-      ],
+      "ownerMustConfirm": [],
+      "blocks": [],
       "evidence": [
         "Owner confirmation of separate lanes per shift",
         "Approved shift-to-lane configuration"
@@ -404,27 +394,31 @@
     {
       "id": "D20",
       "area": "Authentication, identity mapping and recovery",
-      "status": "interim_firebase_auth_recommended_long_term_provider_open",
+      "status": "owner_confirmed_better_auth_tidb_managed_identity",
       "recommendation": {
-        "interim": "Keep Firebase Authentication as the identity provider during the operational data migration; verify its bearer token on the server and map immutable provider UID to one internal user ID.",
-        "authority": "Resolve role and active state from the server-owned identity/role tables; never accept role, actor or UID asserted by browser payload.",
-        "protectedAccounts": "Keep the five protected email identities and linked records intact; verify UID/profile/role read-only before any identity migration.",
-        "recovery": "Implement email change, account recovery, disable/reactivate and UID rebind as explicit privileged workflows with approval and audit; no implicit provisioning or reactivation."
+        "provider": "Use Better Auth with TiDB as the application authentication/session store; the new system does not depend on Firebase Authentication for user login.",
+        "authority": "Backend validates sessions and resolves role/active state from server-owned records; never accept role, actor or user ID asserted by browser payload.",
+        "pimpinanUserManagement": "Pimpinan can register/create users, assign approved roles, update user identity, disable/reactivate accounts and initiate secure password reset/invitation workflows. No public self-registration.",
+        "protectedAccounts": "Preserve all five protected email identities and linked historical records. Do not silently merge identities or infer the role of nursalim422@gmail.com.",
+        "credentials": "Do not migrate or store Firebase passwords. Existing users activate/set a new password through a secure invitation or reset flow.",
+        "recovery": "Account recovery, email change, disable/reactivate and privileged role changes are explicit audited workflows. Pimpinan authority and emergency recovery path must be protected against lockout.",
+        "sessionSecurity": "Use secure server-managed sessions, HTTPS, secure HttpOnly cookies, rate limiting and session revocation."
       },
       "ownerMustConfirm": [
-        "Authoritative UID and profile mapping for all five protected accounts",
-        "Role of nursalim422@gmail.com",
-        "Long-term identity provider and emergency recovery approver"
+        "Verify authoritative identity/profile/role mapping for the five protected accounts, especially nursalim422@gmail.com",
+        "Confirm emergency recovery procedure if the primary Pimpinan account is inaccessible"
       ],
       "blocks": [
-        "Account seeding/rebinding and final identity-provider cutover"
+        "Account seeding until protected identity mapping is verified",
+        "Production auth cutover until recovery and session-revocation tests pass"
       ],
       "evidence": [
         "Read-only Firebase Auth UID export",
         "Read-only profile/role export",
         "Deployed Functions and Firestore Rules snapshots",
         "Owner-approved account matrix"
-      ]
+      ],
+      "ownerApprovalStatus": "provider_and_user_management_approved_by_owner_in_chat_2026-11-17"
     }
   ],
   "sourceEvidenceGates": [

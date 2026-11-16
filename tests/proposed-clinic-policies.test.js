@@ -85,5 +85,39 @@ test("queue lanes are assigned to the owner-confirmed morning and evening cashie
   const d16 = policy.decisions.find(item => item.id === "D16");
   assert.match(d16.recommendation.assignment, /Morning shift uses lane A.*assalamkasir1@gmail.com/i);
   assert.match(d16.recommendation.assignment, /evening shift uses lane B.*assalamkasir2@gmail.com/i);
-  assert.ok(d16.ownerMustConfirm.some(item => /override/i.test(item)));
+  assert.equal(d16.ownerMustConfirm.length, 0);
+  assert.match(d16.recommendation.transfer, /recorded reason/i);
+  assert.match(d16.recommendation.admin, /assist/i);
+  assert.match(d16.recommendation.pimpinan, /full authority/i);
+  assert.match(d16.recommendation.audit, /Every queue transaction and movement/i);
+});
+
+
+test("owner-confirmed operating policies are recorded for expenses, supplier payables, shifts and stocktake", () => {
+  const policy = JSON.parse(fs.readFileSync(file, "utf8"));
+  const get = id => policy.decisions.find(item => item.id === id);
+  assert.match(get("D08").recommendation.workflow, /Admin.*Pimpinan approval/i);
+  assert.match(get("D09").recommendation.workflow, /Remove cash advances/i);
+  assert.match(get("D10").recommendation.pending, /Pending/i);
+  assert.match(get("D11").recommendation.paidStatus, /entire obligation/i);
+  assert.match(get("D12").recommendation.authority, /Kasir 1.*Admin.*Pimpinan/i);
+  assert.match(get("D15").recommendation.knownBatchUnknownHpp, /saleable/i);
+  assert.match(get("D15").recommendation.unknownLineage, /quarantine/i);
+});
+
+test("discount is stored and reversed per service line", () => {
+  const policy = JSON.parse(fs.readFileSync(file, "utf8"));
+  const d06 = policy.decisions.find(item => item.id === "D06");
+  assert.equal(d06.status, "owner_confirmed_discount_per_service_line");
+  assert.match(d06.recommendation.discountScope, /each service item\/line/i);
+  assert.match(d06.recommendation.returnBasis, /original stored net charge/i);
+});
+
+test("new authentication is Better Auth with Pimpinan-managed user registration", () => {
+  const policy = JSON.parse(fs.readFileSync(file, "utf8"));
+  const d20 = policy.decisions.find(item => item.id === "D20");
+  assert.equal(d20.status, "owner_confirmed_better_auth_tidb_managed_identity");
+  assert.match(d20.recommendation.provider, /Better Auth with TiDB/i);
+  assert.match(d20.recommendation.pimpinanUserManagement, /Pimpinan can register\/create users/i);
+  assert.match(d20.recommendation.credentials, /Do not migrate or store Firebase passwords/i);
 });
