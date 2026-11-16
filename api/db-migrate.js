@@ -2,7 +2,10 @@
 
 const crypto = require("node:crypto");
 const { getPool } = require("../lib/tidb");
-const migration = require("../lib/migrations/001_identity_foundation");
+const migrations = [
+  require("../lib/migrations/001_identity_foundation"),
+  require("../lib/migrations/002_audit_idempotency_outbox")
+];
 
 function safeEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string") return false;
@@ -57,38 +60,40 @@ module.exports = async function handler(req, res) {
       "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
     );
 
-    const [existing] = await connection.execute(
-      "SELECT version FROM schema_migrations WHERE version = ? LIMIT 1",
-      [migration.version]
-    );
-
-    if (!existing.length) {
-      for (const statement of migration.statements) {
-        await connection.query(statement);
+    const applied = [];
+    for (const migration of migrations) {
+      const [existing] = await connection.execute(
+        "SELECT version FROM schema_migrations WHERE version = ? LIMIT 1",
+        [migration.version]
+      );
+      if (!existing.length) {
+        for (const statement of migration.statements) await connection.query(statement);
+      }
+      const expectedTables = migration.expectedTables || [
+        "users", "role_assignments", "active_role_slots", "firebase_identities"
+      ];
+      const placeholders = expectedTables.map(() => "?").join(", ");
+      const [tables] = await connection.execute(
+        "SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (" + placeholders + ")",
+        expectedTables
+      );
+      const names = tables.map(row => row.table_name).sort();
+      if (names.length !== expectedTables.length) {
+        throw new Error("Migration table verification failed for " + migration.version);
+      }
+      if (!existing.length) {
+        await connection.execute(
+          "INSERT INTO schema_migrations (version, description, applied_at_utc) VALUES (?, ?, UTC_TIMESTAMP(3))",
+          [migration.version, migration.description]
+        );
+        applied.push(migration.version);
       }
     }
-
-    const [tables] = await connection.execute(
-      "SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)",
-      ["users", "role_assignments", "active_role_slots", "firebase_identities"]
-    );
-    const names = tables.map(row => row.table_name).sort();
-    if (names.length !== 4) {
-      throw new Error("Identity foundation table verification failed.");
-    }
-
-    if (!existing.length) {
-      await connection.execute(
-        "INSERT INTO schema_migrations (version, description, applied_at_utc) VALUES (?, ?, UTC_TIMESTAMP(3))",
-        [migration.version, migration.description]
-      );
-    }
-
     return res.status(200).json({
       ok: true,
-      status: existing.length ? "already_applied" : "applied",
-      version: migration.version,
-      tables: names,
+      status: applied.length ? "applied" : "already_applied",
+      applied,
+      current: migrations.map(item => item.version),
       note: "No user, role, Firebase UID, or operational data was inserted or modified."
     });
   } catch (error) {
