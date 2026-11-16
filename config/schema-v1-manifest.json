@@ -38,7 +38,7 @@
       "path": "lib/migrations/009_operational_controls_v1.js"
     }
   ],
-  "tableCount": 72,
+  "tableCount": 71,
   "tables": {
     "users": {
       "migration": "001_identity_foundation",
@@ -2259,67 +2259,6 @@
           "name": "fk_queue_transfer_actor",
           "columns": [
             "actor_user_id"
-          ],
-          "referencedTable": "users",
-          "referencedColumns": [
-            "user_id"
-          ],
-          "onDelete": "RESTRICT",
-          "onUpdate": "RESTRICT"
-        }
-      ]
-    },
-    "queue_display_configs": {
-      "migration": "005_patient_shift_queue_v1",
-      "columns": [
-        {
-          "name": "config_id",
-          "type": "BIGINT UNSIGNED",
-          "attributes": "NOT NULL AUTO_INCREMENT"
-        },
-        {
-          "name": "display_mode",
-          "type": "VARCHAR(16)",
-          "attributes": "NOT NULL DEFAULT 'combined'"
-        },
-        {
-          "name": "running_text",
-          "type": "TEXT",
-          "attributes": "NULL"
-        },
-        {
-          "name": "updated_at_utc",
-          "type": "DATETIME(3)",
-          "attributes": "NOT NULL"
-        },
-        {
-          "name": "updated_by_user_id",
-          "type": "VARCHAR(64)",
-          "attributes": "NOT NULL"
-        },
-        {
-          "name": "version",
-          "type": "BIGINT UNSIGNED",
-          "attributes": "NOT NULL DEFAULT 1"
-        }
-      ],
-      "primaryKey": [
-        "config_id"
-      ],
-      "indexes": [
-        {
-          "name": "idx_queue_display_updater",
-          "unique": false,
-          "columns": [
-            "updated_by_user_id"
-          ]
-        }
-      ],
-      "foreignKeys": [
-        {
-          "name": "fk_queue_display_updater",
-          "columns": [
-            "updated_by_user_id"
           ],
           "referencedTable": "users",
           "referencedColumns": [
