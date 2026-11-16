@@ -29,7 +29,9 @@ test("every foreign key has a matching child index and exact parent unique key",
         parent.indexes.some(index => index.unique && index.columns.length === fk.referencedColumns.length &&
           index.columns.every((column, position) => column === fk.referencedColumns[position]));
       assert.equal(parentKeyExists, true, childName + "." + fk.name + " needs an exact parent key");
-      assert.equal(fk.onDelete, "RESTRICT");
+      const authCascade = (childName === "session" || childName === "account") &&
+        (fk.name === "fk_ba_session_user" || fk.name === "fk_ba_account_user");
+      assert.equal(fk.onDelete, authCascade ? "CASCADE" : "RESTRICT");
       assert.equal(fk.onUpdate, "RESTRICT");
       for (let position = 0; position < fk.columns.length; position++) {
         const childColumn = child.columns.find(column => column.name === fk.columns[position]);
