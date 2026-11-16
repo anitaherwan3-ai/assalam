@@ -80,9 +80,10 @@ test("medicine unit approval is restricted to whole tablet, capsule, bottle and 
   assert.equal(d01.recommendation.quantityScale, 0);
 });
 
-test("queue lane mapping is shift-specific but not guessed", () => {
+test("queue lanes are assigned to the owner-confirmed morning and evening cashiers", () => {
   const policy = JSON.parse(fs.readFileSync(file, "utf8"));
   const d16 = policy.decisions.find(item => item.id === "D16");
-  assert.match(d16.recommendation.assignment, /do not guess/i);
-  assert.ok(d16.ownerMustConfirm.some(item => /mapping/i.test(item)));
+  assert.match(d16.recommendation.assignment, /Morning shift uses lane A.*assalamkasir1@gmail.com/i);
+  assert.match(d16.recommendation.assignment, /evening shift uses lane B.*assalamkasir2@gmail.com/i);
+  assert.ok(d16.ownerMustConfirm.some(item => /override/i.test(item)));
 });

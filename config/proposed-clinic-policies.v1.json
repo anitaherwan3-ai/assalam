@@ -243,7 +243,7 @@
       "recommendation": {
         "approval": "No refund obligation may be approved without an explicit Pimpinan decision. Admin may perform the existing first-stage review, but cannot replace Pimpinan approval.",
         "obligation": "Pimpinan approval creates a refund obligation; it does not by itself record that money has been paid.",
-        "payout": "Record refund status and amount only. When the refund has been transferred, Pimpinan-facing report states that it has been transferred and the amount (for example, 'sudah ditransfer Rp X ke rekening kas'). Do not require or store refund method, bank account number/name, destination account details, or transfer reference as mandatory fields. Keep approval status separate from transferred/paid status; never mark paid merely because Pimpinan approved it.",
+        "payout": "Record refund status and amount only. When the refund has been transferred, Pimpinan-facing report states that it has been transferred and the amount (for example, 'sudah ditransfer Rp X ke rekening'). Do not require or store refund method, bank account number/name, destination account details, or transfer reference as mandatory fields. Keep approval status separate from transferred/paid status; never mark paid merely because Pimpinan approved it.",
         "partialPayout": "Not enabled until a partial payout policy is explicitly approved."
       },
       "ownerMustConfirm": [],
@@ -252,7 +252,7 @@
       ],
       "evidence": [
         "Pimpinan approval event",
-        "Separate payout evidence"
+        "Audit record of transferred status and amount"
       ],
       "ownerApprovalStatus": "clarified_by_owner_in_chat_2026-11-17"
     },
@@ -320,7 +320,7 @@
         "Who can transfer or override a call"
       ],
       "blocks": [
-        "Production queue lane assignment until shift-to-lane mapping is configured"
+        "Production queue lane assignment until shift-to-lane configuration is applied and access overrides are audited"
       ],
       "evidence": [
         "Owner confirmation of separate lanes per shift",
