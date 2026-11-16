@@ -732,3 +732,7 @@ See [MYSQL_MIGRATION_F70_PARENT_KEY_ORDER_CORRECTION_PASS33.md](./MYSQL_MIGRATIO
 ## 36. Consolidated FK readiness gate — Pass 34
 
 See [MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_AUDIT_PASS34.md](./MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_AUDIT_PASS34.md) and its [116-row consolidated CSV](./MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_MATRIX_PASS34.csv). Pass 34 joins type, child-index and parent-key evidence and keeps all 116 candidates blocked for DDL because physical metadata, NULL/action semantics, ownership enforcement and TiDB runtime tests remain open. No DDL or data mutation.
+
+## 37. FK child nullability evidence — Pass 35
+
+See [MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_AUDIT_PASS35.md](./MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_AUDIT_PASS35.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_PASS35.csv). Pass 35 extracts child nullability and documents optional composite semantics for encounter shift, opening batch, non-batch movement, aggregate stocktake and non-component quota subject relationships. One child FK column remains unspecified. This is static evidence only; schema v1 remains blocked.
