@@ -21,7 +21,8 @@ async function main() {
     require("../lib/migrations/001_identity_foundation"),
     require("../lib/migrations/002_audit_idempotency_outbox"),
     require("../lib/migrations/003_catalog_masters"),
-    require("../lib/migrations/004_better_auth_core")
+    require("../lib/migrations/004_better_auth_core"),
+    require("../lib/migrations/005_patient_shift_queue_v1")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
