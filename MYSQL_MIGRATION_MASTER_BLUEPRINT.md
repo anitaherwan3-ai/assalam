@@ -661,3 +661,8 @@ The closure report consolidates cross-domain blockers and required pre-DDL gates
 ## AG. Consolidated schema decision register — Pass 26
 
 See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md). This is the single consolidated register for confirmed owner requirements, engineering closures, source gates, owner policy gates D01–D20, v1 core/conditional scope and readiness verdict. It prevents repeated owner questions and prevents unresolved business policy from being guessed in schema. No DDL, import, production deployment or account change is authorized.
+
+
+## AH. Physical FK manifest reconciliation — Pass 27
+
+See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md). Corrected stale cardinality statements in Passes 3, 4 and 7. Canonical counts: 104 numbered rows F01–F104; 116 literal candidate tuples after expanding ten grouped rows; zero approved/applied constraints. Exact physical tuple/type/index/ownership/action proof and TiDB tests remain release gates. No DDL was generated or applied.
