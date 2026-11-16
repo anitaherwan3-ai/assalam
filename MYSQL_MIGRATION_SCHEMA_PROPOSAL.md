@@ -728,3 +728,7 @@ See [MYSQL_MIGRATION_FK_PARENT_KEY_EVIDENCE_AUDIT_PASS32.md](./MYSQL_MIGRATION_F
 ## 35. F70 parent composite-key order correction — Pass 33
 
 See [MYSQL_MIGRATION_F70_PARENT_KEY_ORDER_CORRECTION_PASS33.md](./MYSQL_MIGRATION_F70_PARENT_KEY_ORDER_CORRECTION_PASS33.md). The F70 child/parent tuple, required parent UNIQUE and sales_invoice_lines table definition are now aligned in the same order `(invoice_id,invoice_line_id)`. This is proposal-level only; TiDB runtime verification remains open.
+
+## 36. Consolidated FK readiness gate — Pass 34
+
+See [MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_AUDIT_PASS34.md](./MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_AUDIT_PASS34.md) and its [116-row consolidated CSV](./MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_MATRIX_PASS34.csv). Pass 34 joins type, child-index and parent-key evidence and keeps all 116 candidates blocked for DDL because physical metadata, NULL/action semantics, ownership enforcement and TiDB runtime tests remain open. No DDL or data mutation.
