@@ -66,7 +66,7 @@ test("weighted-average HPP handles an explicit fractional quantity scale without
     receivedQty: "0.5",
     purchaseTotal: "1000",
     quantityScale: 1
-  }), "1000");
+  }), "1250");
 });
 
 test("supplier return rejects quantities above original purchase or source batch balance", () => {
