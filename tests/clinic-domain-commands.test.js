@@ -68,7 +68,7 @@ function createHarness(overrides = {}) {
     async createReturnQuotas(_c, id, lines) { state.returnQuotas.push({ invoiceId: id, lineCount: lines.length }); },
     async markEncounterCompleted(_c, id, invoiceId) { state.encounterCompleted = { id, invoiceId }; },
     async previewMedicine() { return { ...state.medicine }; },
-    async previewPurchaseLine() { return { medicineId: "med-1", supplierId: "sup-1", quantityScale: 0 }; },
+    async previewPurchaseLine() { return { medicineId: "med-1", supplierId: "sup-1", unitCost: "2000", quantityScale: 0 }; },
     async lockPurchaseLine() { return state.purchaseLine; },
     async getPurchaseReceiptPolicy() { return { mode: "split_receipts" }; },
     async createPurchaseReceipt(_c, data) { state.receipts.push(data); return "receipt-" + state.receipts.length; },
