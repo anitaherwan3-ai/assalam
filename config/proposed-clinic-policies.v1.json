@@ -367,7 +367,7 @@
         "accountingDocuments": "Books, records and documents forming the basis of bookkeeping/accounting and electronic processing outputs are retained for at least 10 years where PP 50/2022 Article 11 applies to the clinic/taxpayer.",
         "personalData": "Patient identity/contact data follows the Personal Data Protection Law: stop processing when the retention period or purpose ends, and erase/destroy when statutory conditions apply, subject to other legal retention duties and legal hold.",
         "noBlanketRule": "Do not impose the electronic medical-record 25-year rule on every administrative/financial field in this application. Classify retention by data purpose and legal basis.",
-        "separateClinicObligation": "This application does not replace any separate Electronic Medical Record system/process required of a clinic under Minister of Health Regulation 24/2022 Article 3."
+        "separateClinicObligation": "This application does not replace any separate Electronic Medical Record system/process required of a clinic under Permenkes 24/2022 Article 3."
       },
       "ownerMustConfirm": [
         "Classify each patient/admin field and financial record against its actual purpose and statutory retention basis",
