@@ -10,10 +10,13 @@
     "build": "npm test && node scripts/apply-preview-migrations.js",
     "test": "node --test tests/*.test.js",
     "cutover:check": "node scripts/check-cutover-readiness.js",
-    "auth:schema-check": "auth check schema"
+    "auth:schema-check": "auth check schema --config ./lib/auth.config.mjs"
   },
   "dependencies": {
     "mysql2": "^3.15.3",
     "better-auth": "1.7.25"
+  },
+  "devDependencies": {
+    "auth": "1.7.25"
   }
 }
