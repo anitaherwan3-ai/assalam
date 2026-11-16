@@ -26,7 +26,7 @@ The companion CSV `MYSQL_MIGRATION_PHYSICAL_FK_TUPLE_MATRIX_PASS28.csv` contains
 | `OWNERSHIP_BLOCKED` | 10 | Composite ownership tuple requires ordered parent key, child index and NULL semantics |
 | `POLYMORPHIC_POLICY_BLOCKED` | 5 | Exactly-one target invariant is not proven |
 
-Exact types are now populated for **258 of 258** child/parent column references: 244 from Pass 4 and 12 supplemented from explicit table definitions in the schema proposal (§2.7, §5.10 and §6.8). Pass 30 now supplies a candidate `VARCHAR(4)` type for `queue_prefix_guards.prefix`, matching the three queue-prefix columns already declared in the proposal, and normalizes F76 to the explicit scalar quota-subject PK FK. Exact charset/collation remains open; F76 same-parent invoice-line/component enforcement remains blocked. This is static document evidence, not an exact collation/runtime proof.
+Exact types are now populated for **256 of 256** child/parent column references: 244 from Pass 4 and 12 supplemented from explicit table definitions in the schema proposal (§2.7, §5.10 and §6.8). Pass 30 now supplies a candidate `VARCHAR(4)` type for `queue_prefix_guards.prefix`, matching the three queue-prefix columns already declared in the proposal, and normalizes F76 to the explicit scalar quota-subject PK FK. Exact charset/collation remains open; F76 same-parent invoice-line/component enforcement remains blocked. This is static document evidence, not an exact collation/runtime proof.
 
 No row is marked `MATCH_CANDIDATE`: the proposal and catalogue provide candidate index/key descriptions, but do not prove the complete final DDL, exact collation, null tuple semantics, explicit per-FK actions, or TiDB positive/negative runtime evidence. A false green status would be misleading.
 
