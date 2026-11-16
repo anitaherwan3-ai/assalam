@@ -88,8 +88,29 @@ module.exports = async function handler(req, res) {
   const stockTable = `compat_${suffix}_stock`;
   const quote = (name) => "`" + name + "`";
   const tests = [];
+  const testTables = [];
   let cleanupStatus = "NOT_STARTED";
   let tablesMayExist = false;
+  const registerTable = (name) => {
+    testTables.push(name);
+    tablesMayExist = true;
+  };
+  const cleanupTestTables = async () => {
+    const errors = [];
+    for (const name of [...testTables].reverse()) {
+      try {
+        await connectionA.query(`DROP TABLE IF EXISTS ${quote(name)}`);
+      } catch (error) {
+        errors.push({ table: name, message: String(error.message).slice(0, 140) });
+      }
+    }
+    if (errors.length) {
+      const error = new Error("Synthetic table cleanup failed: " + JSON.stringify(errors));
+      error.code = "COMPATIBILITY_CLEANUP_FAILED";
+      throw error;
+    }
+    return testTables.length;
+  };
   const pass = (name, detail) => tests.push({ name, status: "PASS", detail });
   const fail = (name, error) => tests.push({
     name,
@@ -135,13 +156,14 @@ module.exports = async function handler(req, res) {
     }
     pass("foreign_key_checks_enabled", "Session and global foreign_key_checks are both enabled");
 
+    registerTable(parentTable);
     await connectionA.query(
       `CREATE TABLE ${quote(parentTable)} (
         id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
         marker INT NOT NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
     );
-    tablesMayExist = true;
+    registerTable(childTable);
     await connectionA.query(
       `CREATE TABLE ${quote(childTable)} (
         id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
@@ -156,6 +178,7 @@ module.exports = async function handler(req, res) {
           ON DELETE RESTRICT ON UPDATE RESTRICT
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
     );
+    registerTable(stockTable);
     await connectionA.query(
       `CREATE TABLE ${quote(stockTable)} (
         id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
@@ -171,6 +194,196 @@ module.exports = async function handler(req, res) {
        (1,1,125000,1.250,NULL),(2,1,25000,0.125,NULL)`
     );
     pass("composite_nullable_unique_index", "Two NULL values accepted by a composite UNIQUE index");
+
+    try {
+      await connectionA.query(`UPDATE ${quote(parentTable)} SET id=2 WHERE id=1`);
+      fail("foreign_key_on_update_restrict", new Error("Referenced parent key was unexpectedly updated"));
+    } catch (error) {
+      if (error.message.includes("unexpectedly updated")) throw error;
+      if (error.code === "ER_ROW_IS_REFERENCED_2" || error.errno === 1451) {
+        pass("foreign_key_on_update_restrict", "Referenced parent key update rejected");
+      } else {
+        fail("foreign_key_on_update_restrict", error);
+      }
+    }
+
+    const [fkMetadata] = await connectionA.query(
+      `SELECT kcu.CONSTRAINT_NAME AS constraint_name,
+              kcu.COLUMN_NAME AS child_column,
+              kcu.REFERENCED_TABLE_NAME AS parent_table,
+              kcu.REFERENCED_COLUMN_NAME AS parent_column,
+              kcu.ORDINAL_POSITION AS ordinal_position,
+              rc.UPDATE_RULE AS update_rule,
+              rc.DELETE_RULE AS delete_rule
+       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+       JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+         ON rc.CONSTRAINT_SCHEMA=kcu.CONSTRAINT_SCHEMA
+        AND rc.CONSTRAINT_NAME=kcu.CONSTRAINT_NAME
+        AND rc.TABLE_NAME=kcu.TABLE_NAME
+       WHERE kcu.CONSTRAINT_SCHEMA=DATABASE()
+         AND kcu.TABLE_NAME=?
+         AND kcu.CONSTRAINT_NAME='fk_compat_parent'
+       ORDER BY kcu.ORDINAL_POSITION`,
+      [childTable]
+    );
+    if (
+      fkMetadata.length === 1 &&
+      fkMetadata[0].child_column === "parent_id" &&
+      fkMetadata[0].parent_table === parentTable &&
+      fkMetadata[0].parent_column === "id" &&
+      String(fkMetadata[0].update_rule).toUpperCase() === "RESTRICT" &&
+      String(fkMetadata[0].delete_rule).toUpperCase() === "RESTRICT"
+    ) {
+      pass("foreign_key_metadata", fkMetadata);
+    } else {
+      fail("foreign_key_metadata", new Error("Foreign key metadata does not match the declared relationship: " + JSON.stringify(fkMetadata)));
+    }
+
+    // Composite parent index in exact FK order; omit the child index and
+    // verify TiDB creates it automatically.
+    const compositeParent = `compat_${suffix}_cp`;
+    const compositeChild = `compat_${suffix}_cc`;
+    registerTable(compositeParent);
+    await connectionA.query(
+      `CREATE TABLE ${quote(compositeParent)} (
+        a BIGINT UNSIGNED NOT NULL,
+        b BIGINT UNSIGNED NOT NULL,
+        PRIMARY KEY (a,b)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    registerTable(compositeChild);
+    await connectionA.query(
+      `CREATE TABLE ${quote(compositeChild)} (
+        id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        a BIGINT UNSIGNED NOT NULL,
+        b BIGINT UNSIGNED NOT NULL,
+        CONSTRAINT fk_composite_auto FOREIGN KEY (a,b)
+          REFERENCES ${quote(compositeParent)} (a,b)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    const [autoIndexRows] = await connectionA.query(
+      `SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX
+       FROM INFORMATION_SCHEMA.STATISTICS
+       WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?
+       ORDER BY INDEX_NAME, SEQ_IN_INDEX`,
+      [compositeChild]
+    );
+    const autoIndexGroups = new Map();
+    for (const row of autoIndexRows) {
+      if (!autoIndexGroups.has(row.INDEX_NAME)) autoIndexGroups.set(row.INDEX_NAME, []);
+      autoIndexGroups.get(row.INDEX_NAME).push(row.COLUMN_NAME);
+    }
+    const autoChildIndex = [...autoIndexGroups.values()].some((columns) =>
+      columns[0] === "a" && columns[1] === "b"
+    );
+    if (autoChildIndex) {
+      pass("composite_child_index_auto_creation", autoIndexRows);
+    } else {
+      fail("composite_child_index_auto_creation", new Error("No child index with leading columns (a,b) was found"));
+    }
+
+    // Reverse parent index order: the FK references (a,b), but only (b,a)
+    // is indexed on the parent. TiDB documentation requires exact order.
+    const reversedParent = `compat_${suffix}_rp`;
+    const reversedChild = `compat_${suffix}_rc`;
+    registerTable(reversedParent);
+    await connectionA.query(
+      `CREATE TABLE ${quote(reversedParent)} (
+        a BIGINT UNSIGNED NOT NULL,
+        b BIGINT UNSIGNED NOT NULL,
+        PRIMARY KEY (b,a)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    registerTable(reversedChild);
+    try {
+      await connectionA.query(
+        `CREATE TABLE ${quote(reversedChild)} (
+          id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+          a BIGINT UNSIGNED NOT NULL,
+          b BIGINT UNSIGNED NOT NULL,
+          CONSTRAINT fk_reversed_parent FOREIGN KEY (a,b)
+            REFERENCES ${quote(reversedParent)} (a,b)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+      );
+      fail("composite_parent_index_order", new Error("FK unexpectedly accepted parent index with reversed order"));
+    } catch (error) {
+      if (error.message.includes("unexpectedly accepted")) throw error;
+      if (error.errno === 1822 || /missing index|referenced table/i.test(error.message)) {
+        pass("composite_parent_index_order", String(error.message).slice(0, 200));
+      } else {
+        fail("composite_parent_index_order", error);
+      }
+    }
+
+    // Parent column has no supporting index.
+    const missingParent = `compat_${suffix}_mp`;
+    const missingChild = `compat_${suffix}_mc`;
+    registerTable(missingParent);
+    await connectionA.query(
+      `CREATE TABLE ${quote(missingParent)} (
+        id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        ref_code BIGINT UNSIGNED NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    registerTable(missingChild);
+    try {
+      await connectionA.query(
+        `CREATE TABLE ${quote(missingChild)} (
+          id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+          ref_code BIGINT UNSIGNED NOT NULL,
+          CONSTRAINT fk_missing_parent_index FOREIGN KEY (ref_code)
+            REFERENCES ${quote(missingParent)} (ref_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+      );
+      fail("missing_parent_index_rejected", new Error("FK unexpectedly accepted parent column without supporting index"));
+    } catch (error) {
+      if (error.message.includes("unexpectedly accepted")) throw error;
+      if (error.errno === 1822 || /missing index|referenced table/i.test(error.message)) {
+        pass("missing_parent_index_rejected", String(error.message).slice(0, 200));
+      } else {
+        fail("missing_parent_index_rejected", error);
+      }
+    }
+
+    // Composite FK with one NULL component should not require a parent match;
+    // a fully non-NULL orphan must still be rejected.
+    const nullableParent = `compat_${suffix}_np`;
+    const nullableChild = `compat_${suffix}_nc`;
+    registerTable(nullableParent);
+    await connectionA.query(
+      `CREATE TABLE ${quote(nullableParent)} (
+        a BIGINT UNSIGNED NOT NULL,
+        b BIGINT UNSIGNED NOT NULL,
+        PRIMARY KEY (a,b)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    registerTable(nullableChild);
+    await connectionA.query(
+      `CREATE TABLE ${quote(nullableChild)} (
+        id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+        a BIGINT UNSIGNED NULL,
+        b BIGINT UNSIGNED NULL,
+        CONSTRAINT fk_nullable_composite FOREIGN KEY (a,b)
+          REFERENCES ${quote(nullableParent)} (a,b)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+    );
+    await connectionA.query(
+      `INSERT INTO ${quote(nullableChild)} (id,a,b) VALUES (1,1,NULL)`
+    );
+    pass("composite_fk_partial_null", "A composite FK containing a NULL component accepted the row");
+    try {
+      await connectionA.query(
+        `INSERT INTO ${quote(nullableChild)} (id,a,b) VALUES (2,999,999)`
+      );
+      fail("composite_fk_non_null_orphan", new Error("Fully non-NULL orphan unexpectedly accepted"));
+    } catch (error) {
+      if (error.message.includes("unexpectedly accepted")) throw error;
+      if (error.code === "ER_NO_REFERENCED_ROW_2" || error.errno === 1452) {
+        pass("composite_fk_non_null_orphan", "Fully non-NULL orphan rejected");
+      } else {
+        fail("composite_fk_non_null_orphan", error);
+      }
+    }
 
     try {
       await connectionA.query(
@@ -303,16 +516,14 @@ module.exports = async function handler(req, res) {
       fail("explicit_utc_session_time", new Error(JSON.stringify({ ...timeRows[0], timeDifferenceMs })));
     }
 
-    cleanupStatus = "PASS";
     try {
-      await connectionA.query(`DROP TABLE IF EXISTS ${quote(stockTable)}`);
-      await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
-      await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
+      const droppedCount = await cleanupTestTables();
+      cleanupStatus = "PASS";
+      pass("cleanup_test_tables", `All ${droppedCount} registered synthetic tables dropped`);
     } catch (cleanupError) {
       cleanupStatus = "FAIL: " + String(cleanupError.message).slice(0, 180);
       fail("cleanup_test_tables", cleanupError);
     }
-    if (cleanupStatus === "PASS") pass("cleanup_test_tables", "All compatibility tables dropped");
     const failed = tests.filter((test) => test.status === "FAIL").length;
     return json(res, failed ? 207 : 200, {
       ok: failed === 0,
@@ -329,10 +540,9 @@ module.exports = async function handler(req, res) {
     // cleanup block. A cleanup failure is a hard stop for schema-v1 work.
     if (tablesMayExist && connectionA) {
       try {
-        await connectionA.query(`DROP TABLE IF EXISTS ${quote(stockTable)}`);
-        await connectionA.query(`DROP TABLE IF EXISTS ${quote(childTable)}`);
-        await connectionA.query(`DROP TABLE IF EXISTS ${quote(parentTable)}`);
+        const droppedCount = await cleanupTestTables();
         cleanupStatus = "PASS_AFTER_ERROR";
+        pass("cleanup_test_tables_after_error", `All ${droppedCount} registered synthetic tables dropped after error`);
       } catch (cleanupError) {
         cleanupStatus = "FAIL: " + String(cleanupError.message).slice(0, 180);
         fail("cleanup_test_tables_after_error", cleanupError);
