@@ -751,3 +751,7 @@ See [MYSQL_MIGRATION_TIDB_FOREIGN_KEY_CAPABILITY_AUDIT_PASS38.md](./MYSQL_MIGRAT
 ## 41. Schema v1 pre-DDL readiness consolidation — Pass 39
 
 See [MYSQL_MIGRATION_SCHEMA_V1_PRE_DDL_READINESS_CONSOLIDATION_PASS39.md](./MYSQL_MIGRATION_SCHEMA_V1_PRE_DDL_READINESS_CONSOLIDATION_PASS39.md). The FK inventory and documentation contradictions are reconciled, but parent composite keys, per-FK actions, one child nullability, owner policies and TiDB runtime evidence remain open. The next executable step is a read-only TiDB version/settings baseline, followed by disposable compatibility tests; application DDL is not yet authorized.
+
+## 42. TiDB preview baseline and diagnostic route review — Pass 40
+
+See [MYSQL_MIGRATION_TIDB_PREVIEW_BASELINE_AND_DIAGNOSTIC_REVIEW_PASS40.md](./MYSQL_MIGRATION_TIDB_PREVIEW_BASELINE_AND_DIAGNOSTIC_REVIEW_PASS40.md). User-provided read-only output confirms TiDB v8.5.3, session/global `foreign_key_checks=1`, server charset `utf8mb4`, and collation `utf8mb4_bin`. The version and FK-check gates pass. The existing compatibility endpoint is only a partial synthetic smoke suite and writes random test tables in preview `assalam_db`; it must be extended and its preview/token/schema guards verified before any execution. No DDL/DML or deployment occurred.
