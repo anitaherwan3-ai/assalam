@@ -10,7 +10,9 @@ const expected = [
   "cashier_queue_assignments", "queue_tickets", "queue_call_guards", "queue_call_events",
   "queue_transfer_events", "queue_display_configs",
   "medicines", "supplier_invoices", "supplier_invoice_lines", "purchase_receipts", "purchase_receipt_lines",
-  "inventory_batches", "inventory_movements", "medicine_stock_projections", "stocktakes", "stocktake_lines"
+  "inventory_batches", "inventory_movements", "medicine_stock_projections", "stocktakes", "stocktake_lines",
+  "sales_invoices", "sales_invoice_lines", "sales_batch_allocations", "invoice_payments", "return_quota_subjects",
+  "sales_returns", "sales_return_lines", "sales_return_events", "refund_obligations", "refund_payments"
 ];
 
 module.exports = async function handler(req, res) {
