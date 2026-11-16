@@ -59,21 +59,12 @@ module.exports = async function handler(req, res) {
       "SELECT version FROM schema_migrations WHERE version = ? LIMIT 1",
       [migration.version]
     );
-    if (existing.length) {
-      return res.status(200).json({
-        ok: true,
-        status: "already_applied",
-        version: migration.version
-      });
-    }
 
-    for (const statement of migration.statements) {
-      await connection.query(statement);
+    if (!existing.length) {
+      for (const statement of migration.statements) {
+        await connection.query(statement);
+      }
     }
-    await connection.execute(
-      "INSERT INTO schema_migrations (version, description, applied_at_utc) VALUES (?, ?, UTC_TIMESTAMP(3))",
-      [migration.version, migration.description]
-    );
 
     const [tables] = await connection.execute(
       "SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)",
@@ -84,9 +75,16 @@ module.exports = async function handler(req, res) {
       throw new Error("Identity foundation table verification failed.");
     }
 
+    if (!existing.length) {
+      await connection.execute(
+        "INSERT INTO schema_migrations (version, description, applied_at_utc) VALUES (?, ?, UTC_TIMESTAMP(3))",
+        [migration.version, migration.description]
+      );
+    }
+
     return res.status(200).json({
       ok: true,
-      status: "applied",
+      status: existing.length ? "already_applied" : "applied",
       version: migration.version,
       tables: names,
       note: "No user, role, Firebase UID, or operational data was inserted or modified."
