@@ -1,0 +1,96 @@
+name: Controlled TiDB preview migration
+
+on:
+  push:
+    branches:
+      - migration/tidb-foundation
+    paths:
+      - MIGRATE_TIDB_PREVIEW.trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assalam-tidb-preview-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate-preview:
+    # A normal branch push cannot run the migration. The trigger requires this exact commit title.
+    if: github.event.head_commit.message == 'RUN-TIDB-PREVIEW-MIGRATIONS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: tidb-preview
+    env:
+      TIDB_HOST: ${{ secrets.TIDB_HOST }}
+      TIDB_PORT: ${{ secrets.TIDB_PORT }}
+      TIDB_USER: ${{ secrets.TIDB_USER }}
+      TIDB_PASSWORD: ${{ secrets.TIDB_PASSWORD }}
+      TIDB_DATABASE: assalam_db
+      VERCEL_ENV: preview
+      VERCEL_GIT_COMMIT_REF: migration/tidb-foundation
+      TIDB_MIGRATIONS_ENABLED: "true"
+      TIDB_MIGRATION_BUILD_CONFIRM: ASSALAM_OPERATIONAL_SCHEMA_V1_PASS66
+    steps:
+      - name: Validate explicit trigger and required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat MIGRATE_TIDB_PREVIEW.trigger)" = "I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_013"
+          for name in TIDB_HOST TIDB_PORT TIDB_USER TIDB_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required GitHub Environment secret: $name"
+              exit 1
+            fi
+          done
+          if [ "$TIDB_DATABASE" != "assalam_db" ]; then
+            echo "::error::Unexpected database target."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/tidb-foundation
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pinned project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run full automated test suite
+        run: npm test
+
+      - name: Verify TiDB target before applying migrations
+        run: |
+          node - <<'NODE'
+          const mysql = require("mysql2/promise");
+          (async () => {
+            const pool = mysql.createPool({
+              host: process.env.TIDB_HOST,
+              port: Number(process.env.TIDB_PORT),
+              user: process.env.TIDB_USER,
+              password: process.env.TIDB_PASSWORD,
+              database: process.env.TIDB_DATABASE,
+              ssl: { minVersion: "TLSv1.2" },
+              connectTimeout: 10000,
+              connectionLimit: 1
+            });
+            try {
+              const [rows] = await pool.query("SELECT DATABASE() AS db, VERSION() AS version");
+              if (!rows[0] || rows[0].db !== "assalam_db") {
+                throw new Error("Connected database does not match the approved preview database.");
+              }
+              console.log("TiDB target verified:", { database: rows[0].db, version: rows[0].version });
+            } finally {
+              await pool.end();
+            }
+          })().catch(error => {
+            console.error("TiDB preflight failed:", error.code || "UNKNOWN", error.message);
+            process.exitCode = 1;
+          });
+          NODE
+
+      - name: Apply migrations 001-013 and rollback-only smoke tests
+        run: node scripts/apply-preview-migrations.js
