@@ -736,3 +736,7 @@ See [MYSQL_MIGRATION_FK_CONSOLIDATED_READINESS_AUDIT_PASS34.md](./MYSQL_MIGRATIO
 ## 37. FK child nullability evidence — Pass 35
 
 See [MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_AUDIT_PASS35.md](./MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_AUDIT_PASS35.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_NULLABILITY_EVIDENCE_PASS35.csv). Pass 35 extracts child nullability and documents optional composite semantics for encounter shift, opening batch, non-batch movement, aggregate stocktake and non-component quota subject relationships. One child FK column remains unspecified. This is static evidence only; schema v1 remains blocked.
+
+## 38. FK ON DELETE / ON UPDATE policy evidence — Pass 36
+
+See [MYSQL_MIGRATION_FK_ACTION_POLICY_AUDIT_PASS36.md](./MYSQL_MIGRATION_FK_ACTION_POLICY_AUDIT_PASS36.md) and its [116-row CSV](./MYSQL_MIGRATION_FK_ACTION_POLICY_EVIDENCE_PASS36.csv). The proposal has a global RESTRICT default but no per-FK explicit action matrix; F13 patient deletion policy remains open. All candidate actions remain unapproved for DDL until explicitly recorded and TiDB-tested.
