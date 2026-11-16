@@ -28,7 +28,7 @@
 
 ## Guarded first deployment plan
 
-The Vercel build hook is inert unless all are true:
+The Vercel build command runs the full Node test suite first; database migration is attempted only if all of these are true:
 - `VERCEL_ENV=preview`
 - `VERCEL_GIT_COMMIT_REF=migration/tidb-foundation`
 - `TIDB_DATABASE=assalam_db`
