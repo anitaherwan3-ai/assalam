@@ -214,12 +214,17 @@ module.exports = async function handler(req, res) {
               kcu.REFERENCED_COLUMN_NAME AS parent_column,
               kcu.ORDINAL_POSITION AS ordinal_position,
               rc.UPDATE_RULE AS update_rule,
-              rc.DELETE_RULE AS delete_rule
+              rc.DELETE_RULE AS delete_rule,
+              tc.CONSTRAINT_TYPE AS constraint_type
        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
        JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
          ON rc.CONSTRAINT_SCHEMA=kcu.CONSTRAINT_SCHEMA
         AND rc.CONSTRAINT_NAME=kcu.CONSTRAINT_NAME
         AND rc.TABLE_NAME=kcu.TABLE_NAME
+       JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+         ON tc.CONSTRAINT_SCHEMA=kcu.CONSTRAINT_SCHEMA
+        AND tc.CONSTRAINT_NAME=kcu.CONSTRAINT_NAME
+        AND tc.TABLE_NAME=kcu.TABLE_NAME
        WHERE kcu.CONSTRAINT_SCHEMA=DATABASE()
          AND kcu.TABLE_NAME=?
          AND kcu.CONSTRAINT_NAME='fk_compat_parent'
@@ -232,7 +237,8 @@ module.exports = async function handler(req, res) {
       fkMetadata[0].parent_table === parentTable &&
       fkMetadata[0].parent_column === "id" &&
       String(fkMetadata[0].update_rule).toUpperCase() === "RESTRICT" &&
-      String(fkMetadata[0].delete_rule).toUpperCase() === "RESTRICT"
+      String(fkMetadata[0].delete_rule).toUpperCase() === "RESTRICT" &&
+      String(fkMetadata[0].constraint_type).toUpperCase() === "FOREIGN KEY"
     ) {
       pass("foreign_key_metadata", fkMetadata);
     } else {
@@ -342,6 +348,63 @@ module.exports = async function handler(req, res) {
         pass("missing_parent_index_rejected", String(error.message).slice(0, 200));
       } else {
         fail("missing_parent_index_rejected", error);
+      }
+    }
+
+    // Column compatibility: TiDB requires matching type definitions for FK pairs.
+    // Each case uses isolated synthetic parent/child tables and expects DDL rejection.
+    const mismatchCases = [
+      {
+        key: "signedness",
+        parentColumn: "BIGINT UNSIGNED",
+        childColumn: "BIGINT",
+        parentIndex: "BIGINT UNSIGNED"
+      },
+      {
+        key: "decimal_precision_scale",
+        parentColumn: "DECIMAL(12,2)",
+        childColumn: "DECIMAL(12,3)",
+        parentIndex: "DECIMAL(12,2)"
+      },
+      {
+        key: "charset_collation",
+        parentColumn: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin",
+        childColumn: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci",
+        parentIndex: "VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin"
+      }
+    ];
+    for (const item of mismatchCases) {
+      const parent = `compat_${suffix}_m_${item.key}_p`;
+      const child = `compat_${suffix}_m_${item.key}_c`;
+      registerTable(parent);
+      await connectionA.query(
+        `CREATE TABLE ${quote(parent)} (
+          id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+          ref_value ${item.parentIndex} NOT NULL,
+          UNIQUE KEY uq_ref_value (ref_value)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+      );
+      registerTable(child);
+      try {
+        await connectionA.query(
+          `CREATE TABLE ${quote(child)} (
+            id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            ref_value ${item.childColumn} NOT NULL,
+            CONSTRAINT fk_mismatch_${item.key} FOREIGN KEY (ref_value)
+              REFERENCES ${quote(parent)} (ref_value)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+        );
+        fail(`foreign_key_mismatch_${item.key}`, new Error("Incompatible FK column definitions were unexpectedly accepted"));
+      } catch (error) {
+        if (error.message.includes("unexpectedly accepted")) throw error;
+        if (/foreign key|referenced|incompatible|same type|different|column type|collation|precision|length|data type/i.test(error.message)) {
+          pass(`foreign_key_mismatch_${item.key}`, {
+            code: error.code || error.errno || "DB_ERROR",
+            detail: String(error.message).slice(0, 180)
+          });
+        } else {
+          fail(`foreign_key_mismatch_${item.key}`, error);
+        }
       }
     }
 
