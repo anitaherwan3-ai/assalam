@@ -179,7 +179,7 @@ For every relationship, the child tuple and parent tuple must have identical col
 | F67 | invoice_batch_allocations(invoice_component_id) | sales_invoice_line_components(invoice_component_id) | PK | (invoice_component_id) | Nullable; component must belong to line |
 | F68 | invoice_batch_allocations(batch_id) | inventory_batches(batch_id) | PK | (batch_id) | Candidate; same medicine not proven |
 | F69 | invoice_batch_allocations(movement_id) | inventory_movements(inventory_movement_id) | PK | UNIQUE(movement_id) | Movement must be matching sale deduction |
-| F70 | invoice_discount_allocations(invoice_id,invoice_line_id) | sales_invoice_lines(invoice_id,invoice_line_id) | UNIQUE(invoice_id,line_no) is NOT same tuple; add UNIQUE(invoice_line_id,invoice_id) | (invoice_id,invoice_line_id) | BLOCK: exact parent composite key missing |
+| F70 | invoice_discount_allocations(invoice_id,invoice_line_id) | sales_invoice_lines(invoice_id,invoice_line_id) | UNIQUE(invoice_id,invoice_line_id) | (invoice_id,invoice_line_id) | Candidate; parent composite UNIQUE must be explicit in sales_invoice_lines |
 | F71 | invoice_payments(invoice_id) | sales_invoices(invoice_id) | PK | (invoice_id) | Candidate |
 | F72 | invoice_payments(actor_user_id) | users(user_id) | PK | (actor_user_id) | Candidate |
 | F73 | sales_returns(invoice_id) | sales_invoices(invoice_id) | PK | (invoice_id,status) | Candidate |
