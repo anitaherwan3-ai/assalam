@@ -1,0 +1,6694 @@
+{
+  "schemaVersion": "operational-v1",
+  "generatedFrom": [
+    {
+      "version": "001_identity_foundation",
+      "path": "lib/migrations/001_identity_foundation.js"
+    },
+    {
+      "version": "002_audit_idempotency_outbox",
+      "path": "lib/migrations/002_audit_idempotency_outbox.js"
+    },
+    {
+      "version": "003_catalog_masters",
+      "path": "lib/migrations/003_catalog_masters.js"
+    },
+    {
+      "version": "004_better_auth_core",
+      "path": "lib/migrations/004_better_auth_core.js"
+    },
+    {
+      "version": "005_patient_shift_queue_v1",
+      "path": "lib/migrations/005_patient_shift_queue_v1.js"
+    },
+    {
+      "version": "006_inventory_purchasing_v1",
+      "path": "lib/migrations/006_inventory_purchasing_v1.js"
+    },
+    {
+      "version": "007_sales_returns_refunds_v1",
+      "path": "lib/migrations/007_sales_returns_refunds_v1.js"
+    },
+    {
+      "version": "008_finance_controls_v1",
+      "path": "lib/migrations/008_finance_controls_v1.js"
+    },
+    {
+      "version": "009_operational_controls_v1",
+      "path": "lib/migrations/009_operational_controls_v1.js"
+    }
+  ],
+  "tableCount": 58,
+  "tables": {
+    "cashier_shifts": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "shift_code",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "opening_float",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "expected_cash",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "counted_cash",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "variance_amount",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "opened_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "closed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "closed_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "verified_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "verified_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "variance_reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "shift_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_shift_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_shift_owner",
+          "unique": true,
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ]
+        },
+        {
+          "name": "idx_shift_cashier_date_status",
+          "unique": false,
+          "columns": [
+            "cashier_user_id",
+            "business_date",
+            "status"
+          ]
+        },
+        {
+          "name": "idx_shift_closed_by",
+          "unique": false,
+          "columns": [
+            "closed_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_shift_verified_by",
+          "unique": false,
+          "columns": [
+            "verified_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_shift_cashier",
+          "columns": [
+            "cashier_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_shift_closed_by",
+          "columns": [
+            "closed_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_shift_verified_by",
+          "columns": [
+            "verified_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "active_shift_slots": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "activated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "cashier_user_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_active_shift_id",
+          "unique": true,
+          "columns": [
+            "shift_id"
+          ]
+        },
+        {
+          "name": "idx_active_shift_owner",
+          "unique": false,
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_active_shift_cashier",
+          "columns": [
+            "cashier_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_active_shift_owner",
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "patients": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "patient_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "full_name",
+          "type": "VARCHAR(160)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR(32)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "birth_date",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "address",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "patient_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_patient_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_patient_name",
+          "unique": false,
+          "columns": [
+            "full_name"
+          ]
+        },
+        {
+          "name": "idx_patient_phone",
+          "unique": false,
+          "columns": [
+            "phone"
+          ]
+        },
+        {
+          "name": "idx_patient_created_by",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_patient_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "patient_encounters": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "encounter_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "patient_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "service_name_snapshot",
+          "type": "VARCHAR(160)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "cancellation_reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "encounter_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_encounter_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_encounter_shift_owner",
+          "unique": true,
+          "columns": [
+            "encounter_id",
+            "cashier_user_id",
+            "shift_id"
+          ]
+        },
+        {
+          "name": "idx_encounter_patient_date",
+          "unique": false,
+          "columns": [
+            "patient_id",
+            "business_date"
+          ]
+        },
+        {
+          "name": "idx_encounter_cashier_date",
+          "unique": false,
+          "columns": [
+            "cashier_user_id",
+            "business_date"
+          ]
+        },
+        {
+          "name": "idx_encounter_shift_owner",
+          "unique": false,
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ]
+        },
+        {
+          "name": "idx_encounter_date_status",
+          "unique": false,
+          "columns": [
+            "business_date",
+            "status"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_encounter_patient",
+          "columns": [
+            "patient_id"
+          ],
+          "referencedTable": "patients",
+          "referencedColumns": [
+            "patient_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_encounter_cashier",
+          "columns": [
+            "cashier_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_encounter_shift_owner",
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_counters": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "prefix",
+          "type": "VARCHAR(4)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "last_sequence",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "business_date",
+        "prefix"
+      ],
+      "indexes": [],
+      "foreignKeys": []
+    },
+    "cashier_queue_assignments": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "assignment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "prefix",
+          "type": "VARCHAR(4)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "valid_from",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "valid_to",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "assigned_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "assignment_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_queue_assignment_user_valid",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "valid_from",
+            "valid_to"
+          ]
+        },
+        {
+          "name": "idx_queue_assignment_prefix_valid",
+          "unique": false,
+          "columns": [
+            "prefix",
+            "valid_from",
+            "valid_to"
+          ]
+        },
+        {
+          "name": "idx_queue_assignment_actor",
+          "unique": false,
+          "columns": [
+            "assigned_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_assignment_user",
+          "columns": [
+            "user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_assignment_actor",
+          "columns": [
+            "assigned_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_tickets": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "queue_ticket_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "encounter_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "prefix",
+          "type": "VARCHAR(4)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sequence_no",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "display_number",
+          "type": "VARCHAR(20)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "current_cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "current_shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "registered_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "registered_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "called_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "completed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "queue_ticket_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_queue_ticket_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_queue_ticket_encounter",
+          "unique": true,
+          "columns": [
+            "encounter_id"
+          ]
+        },
+        {
+          "name": "uq_queue_ticket_number",
+          "unique": true,
+          "columns": [
+            "business_date",
+            "prefix",
+            "sequence_no"
+          ]
+        },
+        {
+          "name": "idx_queue_ticket_date_status_lane",
+          "unique": false,
+          "columns": [
+            "business_date",
+            "status",
+            "prefix",
+            "sequence_no"
+          ]
+        },
+        {
+          "name": "idx_queue_ticket_current_owner",
+          "unique": false,
+          "columns": [
+            "current_cashier_user_id",
+            "current_shift_id"
+          ]
+        },
+        {
+          "name": "idx_queue_ticket_registered_by",
+          "unique": false,
+          "columns": [
+            "registered_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_ticket_encounter",
+          "columns": [
+            "encounter_id"
+          ],
+          "referencedTable": "patient_encounters",
+          "referencedColumns": [
+            "encounter_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_ticket_current_shift",
+          "columns": [
+            "current_shift_id",
+            "current_cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_ticket_registrar",
+          "columns": [
+            "registered_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_call_guards": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "prefix",
+          "type": "VARCHAR(4)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "active_queue_ticket_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "prefix"
+      ],
+      "indexes": [
+        {
+          "name": "uq_queue_guard_active_ticket",
+          "unique": true,
+          "columns": [
+            "active_queue_ticket_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_guard_ticket",
+          "columns": [
+            "active_queue_ticket_id"
+          ],
+          "referencedTable": "queue_tickets",
+          "referencedColumns": [
+            "queue_ticket_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_call_events": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "call_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "queue_ticket_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "counter_label",
+          "type": "VARCHAR(40)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "event_idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "call_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_queue_call_idempotency",
+          "unique": true,
+          "columns": [
+            "event_idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_queue_call_ticket_time",
+          "unique": false,
+          "columns": [
+            "queue_ticket_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_queue_call_actor_time",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_call_ticket",
+          "columns": [
+            "queue_ticket_id"
+          ],
+          "referencedTable": "queue_tickets",
+          "referencedColumns": [
+            "queue_ticket_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_call_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_transfer_events": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "queue_transfer_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "queue_ticket_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "from_cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "from_shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "to_cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "to_shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "queue_transfer_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_queue_transfer_ticket_time",
+          "unique": false,
+          "columns": [
+            "queue_ticket_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_queue_transfer_actor_time",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_queue_transfer_from_shift",
+          "unique": false,
+          "columns": [
+            "from_shift_id",
+            "from_cashier_user_id"
+          ]
+        },
+        {
+          "name": "idx_queue_transfer_to_shift",
+          "unique": false,
+          "columns": [
+            "to_shift_id",
+            "to_cashier_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_transfer_ticket",
+          "columns": [
+            "queue_ticket_id"
+          ],
+          "referencedTable": "queue_tickets",
+          "referencedColumns": [
+            "queue_ticket_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_transfer_from",
+          "columns": [
+            "from_shift_id",
+            "from_cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_transfer_to",
+          "columns": [
+            "to_shift_id",
+            "to_cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_queue_transfer_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_display_configs": {
+      "migration": "005_patient_shift_queue_v1",
+      "columns": [
+        {
+          "name": "config_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "display_mode",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL DEFAULT 'combined'"
+        },
+        {
+          "name": "running_text",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "config_id"
+      ],
+      "indexes": [],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_display_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "stored_files": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "stored_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "object_key",
+          "type": "VARCHAR(512)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "original_name",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR(120)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "size_bytes",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sha256",
+          "type": "CHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "uploaded_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "uploaded_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "stored_file_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_stored_file_object_key",
+          "unique": true,
+          "columns": [
+            "object_key"
+          ]
+        },
+        {
+          "name": "idx_stored_file_uploader_time",
+          "unique": false,
+          "columns": [
+            "uploaded_by_user_id",
+            "uploaded_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_stored_file_uploader",
+          "columns": [
+            "uploaded_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "medicines": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(180)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "canonical_unit",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "selling_price",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "minimum_stock",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "medicine_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_medicine_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_medicine_name",
+          "unique": false,
+          "columns": [
+            "name"
+          ]
+        },
+        {
+          "name": "idx_medicine_active",
+          "unique": false,
+          "columns": [
+            "active"
+          ]
+        },
+        {
+          "name": "idx_medicine_created_by",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_medicine_updated_by",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_medicine_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_medicine_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_invoices": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_number",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "invoice_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "due_date",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "gross_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "supplier_invoice_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_invoice_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_supplier_invoice_number",
+          "unique": true,
+          "columns": [
+            "supplier_id",
+            "supplier_invoice_number"
+          ]
+        },
+        {
+          "name": "idx_supplier_invoice_date",
+          "unique": false,
+          "columns": [
+            "supplier_id",
+            "invoice_date"
+          ]
+        },
+        {
+          "name": "idx_supplier_invoice_status_due",
+          "unique": false,
+          "columns": [
+            "status",
+            "due_date"
+          ]
+        },
+        {
+          "name": "idx_supplier_invoice_creator",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_invoice_supplier",
+          "columns": [
+            "supplier_id"
+          ],
+          "referencedTable": "suppliers",
+          "referencedColumns": [
+            "supplier_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_invoice_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_invoice_lines": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "supplier_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_number",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "ordered_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "received_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "unit_cost",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_total",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_invoice_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_invoice_line_no",
+          "unique": true,
+          "columns": [
+            "supplier_invoice_id",
+            "line_number"
+          ]
+        },
+        {
+          "name": "uq_supplier_invoice_line_medicine",
+          "unique": true,
+          "columns": [
+            "supplier_invoice_line_id",
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_invoice_line_medicine",
+          "unique": false,
+          "columns": [
+            "medicine_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_invoice_line_invoice",
+          "columns": [
+            "supplier_invoice_id"
+          ],
+          "referencedTable": "supplier_invoices",
+          "referencedColumns": [
+            "supplier_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_invoice_line_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "purchase_receipts": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "purchase_receipt_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "received_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "receipt_reference",
+          "type": "VARCHAR(100)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "received_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "purchase_receipt_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_purchase_receipt_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_purchase_receipt_invoice_time",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_id",
+            "received_at_utc"
+          ]
+        },
+        {
+          "name": "idx_purchase_receipt_receiver",
+          "unique": false,
+          "columns": [
+            "received_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_purchase_receipt_invoice",
+          "columns": [
+            "supplier_invoice_id"
+          ],
+          "referencedTable": "supplier_invoices",
+          "referencedColumns": [
+            "supplier_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_purchase_receipt_receiver",
+          "columns": [
+            "received_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "purchase_receipt_lines": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "purchase_receipt_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "purchase_receipt_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "received_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "unit_cost_snapshot",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_number",
+          "type": "VARCHAR(100)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "expiry_date",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "expiry_verified",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "origin_verified",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "purchase_receipt_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_receipt_line_batch",
+          "unique": true,
+          "columns": [
+            "purchase_receipt_line_id",
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "uq_receipt_line_invoice_line",
+          "unique": true,
+          "columns": [
+            "supplier_invoice_line_id",
+            "purchase_receipt_line_id"
+          ]
+        },
+        {
+          "name": "idx_receipt_line_receipt",
+          "unique": false,
+          "columns": [
+            "purchase_receipt_id"
+          ]
+        },
+        {
+          "name": "idx_receipt_line_medicine_expiry",
+          "unique": false,
+          "columns": [
+            "medicine_id",
+            "expiry_date"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_receipt_line_receipt",
+          "columns": [
+            "purchase_receipt_id"
+          ],
+          "referencedTable": "purchase_receipts",
+          "referencedColumns": [
+            "purchase_receipt_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_receipt_line_invoice_line",
+          "columns": [
+            "supplier_invoice_line_id",
+            "medicine_id"
+          ],
+          "referencedTable": "supplier_invoice_lines",
+          "referencedColumns": [
+            "supplier_invoice_line_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_receipt_line_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "inventory_batches": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_receipt_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "batch_number",
+          "type": "VARCHAR(100)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "expiry_date",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "expiry_verified",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "origin_verified",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "received_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "original_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "remaining_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "unit_cost_hpp",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "disposition",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "batch_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_batch_source_receipt_line",
+          "unique": true,
+          "columns": [
+            "source_receipt_line_id"
+          ]
+        },
+        {
+          "name": "uq_batch_owner",
+          "unique": true,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_batch_medicine_expiry_qty",
+          "unique": false,
+          "columns": [
+            "medicine_id",
+            "expiry_date",
+            "remaining_quantity"
+          ]
+        },
+        {
+          "name": "idx_batch_disposition_expiry",
+          "unique": false,
+          "columns": [
+            "disposition",
+            "expiry_date"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_batch_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_batch_source_receipt_line",
+          "columns": [
+            "source_receipt_line_id",
+            "medicine_id"
+          ],
+          "referencedTable": "purchase_receipt_lines",
+          "referencedColumns": [
+            "purchase_receipt_line_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "inventory_movements": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "inventory_movement_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "movement_type",
+          "type": "VARCHAR(32)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "direction",
+          "type": "VARCHAR(8)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_type",
+          "type": "VARCHAR(40)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reversal_of_movement_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "inventory_movement_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_inventory_movement_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_inventory_movement_medicine_time",
+          "unique": false,
+          "columns": [
+            "medicine_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_inventory_movement_batch_time",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_inventory_movement_source",
+          "unique": false,
+          "columns": [
+            "source_type",
+            "source_id"
+          ]
+        },
+        {
+          "name": "idx_inventory_movement_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_inventory_movement_reversal",
+          "unique": false,
+          "columns": [
+            "reversal_of_movement_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_inventory_movement_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_inventory_movement_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_inventory_movement_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_inventory_movement_reversal",
+          "columns": [
+            "reversal_of_movement_id"
+          ],
+          "referencedTable": "inventory_movements",
+          "referencedColumns": [
+            "inventory_movement_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "medicine_stock_projections": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "physical_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "sellable_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "unknown_hpp_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "weighted_hpp",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "profit_calculation_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL DEFAULT 'uncalculated'"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "projected_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "medicine_id"
+      ],
+      "indexes": [],
+      "foreignKeys": [
+        {
+          "name": "fk_stock_projection_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "stocktakes": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "stocktake_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "stocktake_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "counted_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "approval_note",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "stocktake_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_stocktake_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_stocktake_date",
+          "unique": true,
+          "columns": [
+            "stocktake_date"
+          ]
+        },
+        {
+          "name": "idx_stocktake_status_date",
+          "unique": false,
+          "columns": [
+            "status",
+            "stocktake_date"
+          ]
+        },
+        {
+          "name": "idx_stocktake_counter",
+          "unique": false,
+          "columns": [
+            "counted_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_stocktake_approver",
+          "unique": false,
+          "columns": [
+            "approved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_stocktake_counter",
+          "columns": [
+            "counted_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_stocktake_approver",
+          "columns": [
+            "approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "stocktake_lines": {
+      "migration": "006_inventory_purchasing_v1",
+      "columns": [
+        {
+          "name": "stocktake_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "stocktake_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "system_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "counted_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "variance_quantity",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "stocktake_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_stocktake_batch",
+          "unique": true,
+          "columns": [
+            "stocktake_id",
+            "batch_id"
+          ]
+        },
+        {
+          "name": "idx_stocktake_line_medicine",
+          "unique": false,
+          "columns": [
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_stocktake_line_batch_owner",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_stocktake_line_stocktake",
+          "columns": [
+            "stocktake_id"
+          ],
+          "referencedTable": "stocktakes",
+          "referencedColumns": [
+            "stocktake_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_stocktake_line_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_stocktake_line_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_invoices": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "encounter_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "patient_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "cashier_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "gross_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "discount_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "net_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "issued_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "sales_invoice_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_sales_invoice_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_sales_invoice_encounter",
+          "unique": false,
+          "columns": [
+            "encounter_id"
+          ]
+        },
+        {
+          "name": "idx_sales_invoice_patient_date",
+          "unique": false,
+          "columns": [
+            "patient_id",
+            "business_date"
+          ]
+        },
+        {
+          "name": "idx_sales_invoice_cashier_date",
+          "unique": false,
+          "columns": [
+            "cashier_user_id",
+            "business_date"
+          ]
+        },
+        {
+          "name": "idx_sales_invoice_shift_owner",
+          "unique": false,
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ]
+        },
+        {
+          "name": "idx_sales_invoice_date_status",
+          "unique": false,
+          "columns": [
+            "business_date",
+            "status"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_invoice_encounter",
+          "columns": [
+            "encounter_id"
+          ],
+          "referencedTable": "patient_encounters",
+          "referencedColumns": [
+            "encounter_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_invoice_patient",
+          "columns": [
+            "patient_id"
+          ],
+          "referencedTable": "patients",
+          "referencedColumns": [
+            "patient_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_invoice_shift_owner",
+          "columns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id",
+            "cashier_user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_invoice_lines": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_number",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_type",
+          "type": "VARCHAR(20)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "tariff_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "item_name_snapshot",
+          "type": "VARCHAR(180)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "unit_snapshot",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "gross_unit_price",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "gross_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_discount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "net_charge",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "hpp_snapshot",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "profit_calculation_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "sales_invoice_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_sales_invoice_line_number",
+          "unique": true,
+          "columns": [
+            "sales_invoice_id",
+            "line_number"
+          ]
+        },
+        {
+          "name": "uq_sales_invoice_line_owner",
+          "unique": true,
+          "columns": [
+            "sales_invoice_line_id",
+            "sales_invoice_id"
+          ]
+        },
+        {
+          "name": "idx_sales_line_medicine",
+          "unique": false,
+          "columns": [
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_sales_line_tariff",
+          "unique": false,
+          "columns": [
+            "tariff_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_line_invoice",
+          "columns": [
+            "sales_invoice_id"
+          ],
+          "referencedTable": "sales_invoices",
+          "referencedColumns": [
+            "sales_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_line_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_line_tariff",
+          "columns": [
+            "tariff_id"
+          ],
+          "referencedTable": "tariffs",
+          "referencedColumns": [
+            "tariff_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_batch_allocations": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_batch_allocation_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "hpp_unit_snapshot",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "hpp_total_snapshot",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "sales_batch_allocation_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_sales_allocation_line_batch",
+          "unique": true,
+          "columns": [
+            "sales_invoice_line_id",
+            "batch_id"
+          ]
+        },
+        {
+          "name": "idx_sales_allocation_batch_owner",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_allocation_line",
+          "columns": [
+            "sales_invoice_line_id"
+          ],
+          "referencedTable": "sales_invoice_lines",
+          "referencedColumns": [
+            "sales_invoice_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_allocation_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "invoice_payments": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "invoice_payment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "payment_method",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "review_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "settlement_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reviewed_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reviewed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "income_recognized_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "settlement_reference",
+          "type": "VARCHAR(120)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "settlement_evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "paid_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "recorded_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "invoice_payment_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_invoice_payment_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_invoice_payment_invoice",
+          "unique": false,
+          "columns": [
+            "sales_invoice_id",
+            "paid_at_utc"
+          ]
+        },
+        {
+          "name": "idx_invoice_payment_review",
+          "unique": false,
+          "columns": [
+            "review_status",
+            "paid_at_utc"
+          ]
+        },
+        {
+          "name": "idx_invoice_payment_settlement",
+          "unique": false,
+          "columns": [
+            "settlement_status",
+            "paid_at_utc"
+          ]
+        },
+        {
+          "name": "idx_invoice_payment_reviewer",
+          "unique": false,
+          "columns": [
+            "reviewed_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_invoice_payment_recorder",
+          "unique": false,
+          "columns": [
+            "recorded_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_invoice_payment_invoice",
+          "columns": [
+            "sales_invoice_id"
+          ],
+          "referencedTable": "sales_invoices",
+          "referencedColumns": [
+            "sales_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_invoice_payment_reviewer",
+          "columns": [
+            "reviewed_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_invoice_payment_recorder",
+          "columns": [
+            "recorded_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "return_quota_subjects": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "return_quota_subject_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "component_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "maximum_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reserved_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "approved_quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "primaryKey": [
+        "return_quota_subject_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_return_quota_line_component",
+          "unique": true,
+          "columns": [
+            "sales_invoice_line_id",
+            "component_key"
+          ]
+        },
+        {
+          "name": "uq_return_quota_subject_owner",
+          "unique": true,
+          "columns": [
+            "return_quota_subject_id",
+            "sales_invoice_line_id"
+          ]
+        },
+        {
+          "name": "idx_return_quota_batch_owner",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_return_quota_line",
+          "columns": [
+            "sales_invoice_line_id"
+          ],
+          "referencedTable": "sales_invoice_lines",
+          "referencedColumns": [
+            "sales_invoice_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_return_quota_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_returns": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sales_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "admin_reviewed_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "admin_reviewed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "pimpinan_approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "pimpinan_approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "sales_return_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_sales_return_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_sales_return_invoice_time",
+          "unique": false,
+          "columns": [
+            "sales_invoice_id",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_sales_return_status_time",
+          "unique": false,
+          "columns": [
+            "status",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_sales_return_requester",
+          "unique": false,
+          "columns": [
+            "requested_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_sales_return_admin",
+          "unique": false,
+          "columns": [
+            "admin_reviewed_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_sales_return_owner",
+          "unique": false,
+          "columns": [
+            "pimpinan_approved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_return_invoice",
+          "columns": [
+            "sales_invoice_id"
+          ],
+          "referencedTable": "sales_invoices",
+          "referencedColumns": [
+            "sales_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_requester",
+          "columns": [
+            "requested_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_admin",
+          "columns": [
+            "admin_reviewed_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_owner",
+          "columns": [
+            "pimpinan_approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_return_lines": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_return_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sales_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "return_quota_subject_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "original_net_charge_snapshot",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "refund_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "stock_disposition",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "sales_return_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_sales_return_line_quota",
+          "unique": true,
+          "columns": [
+            "sales_return_id",
+            "return_quota_subject_id"
+          ]
+        },
+        {
+          "name": "idx_sales_return_line_invoice_line",
+          "unique": false,
+          "columns": [
+            "sales_invoice_line_id"
+          ]
+        },
+        {
+          "name": "idx_sales_return_line_quota_owner",
+          "unique": false,
+          "columns": [
+            "return_quota_subject_id",
+            "sales_invoice_line_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_return_line_return",
+          "columns": [
+            "sales_return_id"
+          ],
+          "referencedTable": "sales_returns",
+          "referencedColumns": [
+            "sales_return_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_line_invoice_line",
+          "columns": [
+            "sales_invoice_line_id"
+          ],
+          "referencedTable": "sales_invoice_lines",
+          "referencedColumns": [
+            "sales_invoice_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_line_quota_owner",
+          "columns": [
+            "return_quota_subject_id",
+            "sales_invoice_line_id"
+          ],
+          "referencedTable": "return_quota_subjects",
+          "referencedColumns": [
+            "return_quota_subject_id",
+            "sales_invoice_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "sales_return_events": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "sales_return_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "old_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "new_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "sales_return_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_sales_return_event_time",
+          "unique": false,
+          "columns": [
+            "sales_return_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_sales_return_event_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_sales_return_event_return",
+          "columns": [
+            "sales_return_id"
+          ],
+          "referencedTable": "sales_returns",
+          "referencedColumns": [
+            "sales_return_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_sales_return_event_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "refund_obligations": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "refund_obligation_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "sales_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "outstanding_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "refund_obligation_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_refund_obligation_return",
+          "unique": true,
+          "columns": [
+            "sales_return_id"
+          ]
+        },
+        {
+          "name": "idx_refund_obligation_status",
+          "unique": false,
+          "columns": [
+            "status",
+            "approved_at_utc"
+          ]
+        },
+        {
+          "name": "idx_refund_obligation_approver",
+          "unique": false,
+          "columns": [
+            "approved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_refund_obligation_return",
+          "columns": [
+            "sales_return_id"
+          ],
+          "referencedTable": "sales_returns",
+          "referencedColumns": [
+            "sales_return_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_refund_obligation_approver",
+          "columns": [
+            "approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "refund_payments": {
+      "migration": "007_sales_returns_refunds_v1",
+      "columns": [
+        {
+          "name": "refund_payment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "refund_obligation_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "transfer_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "transfer_reference",
+          "type": "VARCHAR(120)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "transferred_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "transferred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "recorded_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "refund_payment_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_refund_payment_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_refund_payment_obligation",
+          "unique": false,
+          "columns": [
+            "refund_obligation_id",
+            "recorded_at_utc"
+          ]
+        },
+        {
+          "name": "idx_refund_payment_actor",
+          "unique": false,
+          "columns": [
+            "transferred_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_refund_payment_obligation",
+          "columns": [
+            "refund_obligation_id"
+          ],
+          "referencedTable": "refund_obligations",
+          "referencedColumns": [
+            "refund_obligation_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_refund_payment_actor",
+          "columns": [
+            "transferred_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_refund_payment_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "shift_reconciliations": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "shift_reconciliation_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "revision_no",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "expected_cash",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "counted_cash",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "variance_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "variance_reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "verified_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "verified_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "shift_reconciliation_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_shift_reconciliation_revision",
+          "unique": true,
+          "columns": [
+            "shift_id",
+            "revision_no"
+          ]
+        },
+        {
+          "name": "idx_shift_reconciliation_verifier",
+          "unique": false,
+          "columns": [
+            "verified_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_shift_reconciliation_shift",
+          "columns": [
+            "shift_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_shift_reconciliation_verifier",
+          "columns": [
+            "verified_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "cash_accounts": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "cash_account_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "account_code",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "account_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "account_name",
+          "type": "VARCHAR(120)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "owner_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "cash_account_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_cash_account_code",
+          "unique": true,
+          "columns": [
+            "account_code"
+          ]
+        },
+        {
+          "name": "idx_cash_account_owner",
+          "unique": false,
+          "columns": [
+            "owner_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_cash_account_owner",
+          "columns": [
+            "owner_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "cash_ledger_entries": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "cash_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "cash_account_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "shift_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "direction",
+          "type": "VARCHAR(8)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_type",
+          "type": "VARCHAR(40)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reversal_of_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "cash_entry_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_cash_entry_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_cash_entry_account_time",
+          "unique": false,
+          "columns": [
+            "cash_account_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cash_entry_shift_time",
+          "unique": false,
+          "columns": [
+            "shift_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cash_entry_actor_time",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cash_entry_reversal",
+          "unique": false,
+          "columns": [
+            "reversal_of_entry_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_cash_entry_account",
+          "columns": [
+            "cash_account_id"
+          ],
+          "referencedTable": "cash_accounts",
+          "referencedColumns": [
+            "cash_account_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cash_entry_shift",
+          "columns": [
+            "shift_id"
+          ],
+          "referencedTable": "cashier_shifts",
+          "referencedColumns": [
+            "shift_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cash_entry_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cash_entry_reversal",
+          "columns": [
+            "reversal_of_entry_id"
+          ],
+          "referencedTable": "cash_ledger_entries",
+          "referencedColumns": [
+            "cash_entry_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "bank_accounts": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "bank_account_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "account_code",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "account_name",
+          "type": "VARCHAR(120)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "bank_name",
+          "type": "VARCHAR(100)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "bank_account_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_bank_account_code",
+          "unique": true,
+          "columns": [
+            "account_code"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "bank_ledger_entries": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "bank_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "bank_account_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "direction",
+          "type": "VARCHAR(8)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_type",
+          "type": "VARCHAR(40)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "external_reference",
+          "type": "VARCHAR(120)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reversal_of_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "bank_entry_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_bank_entry_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_bank_entry_account_time",
+          "unique": false,
+          "columns": [
+            "bank_account_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_bank_entry_actor_time",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_bank_entry_reversal",
+          "unique": false,
+          "columns": [
+            "reversal_of_entry_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_bank_entry_account",
+          "columns": [
+            "bank_account_id"
+          ],
+          "referencedTable": "bank_accounts",
+          "referencedColumns": [
+            "bank_account_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_bank_entry_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_bank_entry_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_bank_entry_reversal",
+          "columns": [
+            "reversal_of_entry_id"
+          ],
+          "referencedTable": "bank_ledger_entries",
+          "referencedColumns": [
+            "bank_entry_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "expenses": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "expense_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "expense_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_expense_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_expense_date_status",
+          "unique": false,
+          "columns": [
+            "business_date",
+            "status"
+          ]
+        },
+        {
+          "name": "idx_expense_creator",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_expense_approver",
+          "unique": false,
+          "columns": [
+            "approved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_expense_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_expense_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_expense_approver",
+          "columns": [
+            "approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "expense_events": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "expense_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "expense_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "expense_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_expense_event_time",
+          "unique": false,
+          "columns": [
+            "expense_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_expense_event_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_expense_event_expense",
+          "columns": [
+            "expense_id"
+          ],
+          "referencedTable": "expenses",
+          "referencedColumns": [
+            "expense_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_expense_event_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_returns": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "supplier_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "dispatched_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "dispatched_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "dispatch_evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "settlement_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL DEFAULT 'pending'"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_return_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_return_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_invoice_time",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_id",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_status",
+          "unique": false,
+          "columns": [
+            "status",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_requester",
+          "unique": false,
+          "columns": [
+            "requested_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_approver",
+          "unique": false,
+          "columns": [
+            "approved_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_dispatcher",
+          "unique": false,
+          "columns": [
+            "dispatched_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_return_invoice",
+          "columns": [
+            "supplier_invoice_id"
+          ],
+          "referencedTable": "supplier_invoices",
+          "referencedColumns": [
+            "supplier_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_requester",
+          "columns": [
+            "requested_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_approver",
+          "columns": [
+            "approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_dispatcher",
+          "columns": [
+            "dispatched_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_evidence",
+          "columns": [
+            "dispatch_evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_return_lines": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "supplier_return_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "supplier_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_return_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_return_line_batch",
+          "unique": true,
+          "columns": [
+            "supplier_return_id",
+            "batch_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_line_invoice",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_line_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_return_line_batch_owner",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_return_line_return",
+          "columns": [
+            "supplier_return_id"
+          ],
+          "referencedTable": "supplier_returns",
+          "referencedColumns": [
+            "supplier_return_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_line_invoice",
+          "columns": [
+            "supplier_invoice_line_id"
+          ],
+          "referencedTable": "supplier_invoice_lines",
+          "referencedColumns": [
+            "supplier_invoice_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_return_line_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_credit_notes": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "supplier_credit_note_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "supplier_return_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "credit_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "settlement_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "settled_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "recorded_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_credit_note_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_credit_note_return",
+          "unique": true,
+          "columns": [
+            "supplier_return_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_credit_invoice",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_id",
+            "status"
+          ]
+        },
+        {
+          "name": "idx_supplier_credit_recorder",
+          "unique": false,
+          "columns": [
+            "recorded_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_credit_return",
+          "columns": [
+            "supplier_return_id"
+          ],
+          "referencedTable": "supplier_returns",
+          "referencedColumns": [
+            "supplier_return_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_credit_invoice",
+          "columns": [
+            "supplier_invoice_id"
+          ],
+          "referencedTable": "supplier_invoices",
+          "referencedColumns": [
+            "supplier_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_credit_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_credit_recorder",
+          "columns": [
+            "recorded_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_payments": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "supplier_payment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "payment_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "payment_method",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "external_reference",
+          "type": "VARCHAR(120)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "recorded_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_payment_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_payment_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_supplier_payment_idempotency",
+          "unique": true,
+          "columns": [
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_supplier_payment_supplier_date",
+          "unique": false,
+          "columns": [
+            "supplier_id",
+            "payment_date"
+          ]
+        },
+        {
+          "name": "idx_supplier_payment_recorder",
+          "unique": false,
+          "columns": [
+            "recorded_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_payment_supplier",
+          "columns": [
+            "supplier_id"
+          ],
+          "referencedTable": "suppliers",
+          "referencedColumns": [
+            "supplier_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_payment_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_payment_recorder",
+          "columns": [
+            "recorded_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "supplier_payment_allocations": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "supplier_payment_allocation_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "supplier_payment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "supplier_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "allocated_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "supplier_payment_allocation_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_supplier_payment_invoice",
+          "unique": true,
+          "columns": [
+            "supplier_payment_id",
+            "supplier_invoice_id"
+          ]
+        },
+        {
+          "name": "idx_supplier_payment_allocation_invoice",
+          "unique": false,
+          "columns": [
+            "supplier_invoice_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_supplier_payment_allocation_payment",
+          "columns": [
+            "supplier_payment_id"
+          ],
+          "referencedTable": "supplier_payments",
+          "referencedColumns": [
+            "supplier_payment_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_supplier_payment_allocation_invoice",
+          "columns": [
+            "supplier_invoice_id"
+          ],
+          "referencedTable": "supplier_invoices",
+          "referencedColumns": [
+            "supplier_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "inventory_quarantine_events": {
+      "migration": "008_finance_controls_v1",
+      "columns": [
+        {
+          "name": "quarantine_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_return_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "inspected_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "inspected_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "release_approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "release_approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "released_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "released_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "quarantine_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_quarantine_batch_time",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_quarantine_inspector",
+          "unique": false,
+          "columns": [
+            "inspected_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_quarantine_approver",
+          "unique": false,
+          "columns": [
+            "release_approved_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_quarantine_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_quarantine_batch",
+          "columns": [
+            "batch_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_inspector",
+          "columns": [
+            "inspected_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_approver",
+          "columns": [
+            "release_approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_releaser",
+          "columns": [
+            "released_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_quarantine_return_line",
+          "columns": [
+            "source_return_line_id"
+          ],
+          "referencedTable": "sales_return_lines",
+          "referencedColumns": [
+            "sales_return_line_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "clinic_settings": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "setting_key",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "setting_value",
+          "type": "TEXT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "value_type",
+          "type": "VARCHAR(20)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "editable_by_admin",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "setting_key"
+      ],
+      "indexes": [
+        {
+          "name": "idx_clinic_setting_updater",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_clinic_setting_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "display_configs": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "display_config_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "config_key",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "display_mode",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL DEFAULT 'combined'"
+        },
+        {
+          "name": "running_text",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "display_config_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_display_config_key",
+          "unique": true,
+          "columns": [
+            "config_key"
+          ]
+        },
+        {
+          "name": "idx_display_config_updater",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_display_config_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "queue_audio_assets": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "audio_asset_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "clip_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "clip_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "object_key",
+          "type": "VARCHAR(512)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "size_bytes",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sha256",
+          "type": "CHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "audio_asset_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_queue_audio_clip",
+          "unique": true,
+          "columns": [
+            "clip_id"
+          ]
+        },
+        {
+          "name": "uq_queue_audio_object",
+          "unique": true,
+          "columns": [
+            "object_key"
+          ]
+        },
+        {
+          "name": "idx_queue_audio_updater",
+          "unique": false,
+          "columns": [
+            "updated_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_queue_audio_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "service_packages": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "package_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(180)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "package_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_service_package_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_service_package_name",
+          "unique": false,
+          "columns": [
+            "name"
+          ]
+        },
+        {
+          "name": "idx_service_package_active",
+          "unique": false,
+          "columns": [
+            "active"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_service_package_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_service_package_updater",
+          "columns": [
+            "updated_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "package_components": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "package_component_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "package_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "component_type",
+          "type": "VARCHAR(20)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "tariff_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sort_order",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "package_component_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_package_component_order",
+          "unique": false,
+          "columns": [
+            "package_id",
+            "sort_order"
+          ]
+        },
+        {
+          "name": "idx_package_component_medicine",
+          "unique": false,
+          "columns": [
+            "medicine_id"
+          ]
+        },
+        {
+          "name": "idx_package_component_tariff",
+          "unique": false,
+          "columns": [
+            "tariff_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_package_component_package",
+          "columns": [
+            "package_id"
+          ],
+          "referencedTable": "service_packages",
+          "referencedColumns": [
+            "package_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_package_component_medicine",
+          "columns": [
+            "medicine_id"
+          ],
+          "referencedTable": "medicines",
+          "referencedColumns": [
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_package_component_tariff",
+          "columns": [
+            "tariff_id"
+          ],
+          "referencedTable": "tariffs",
+          "referencedColumns": [
+            "tariff_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "invoice_cancellation_requests": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "cancellation_request_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "sales_invoice_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "requested_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "resolved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "resolved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "resolution_note",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "cancellation_request_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_cancellation_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_cancellation_invoice_time",
+          "unique": false,
+          "columns": [
+            "sales_invoice_id",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cancellation_status_time",
+          "unique": false,
+          "columns": [
+            "status",
+            "requested_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cancellation_requester",
+          "unique": false,
+          "columns": [
+            "requested_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_cancellation_resolver",
+          "unique": false,
+          "columns": [
+            "resolved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_cancellation_invoice",
+          "columns": [
+            "sales_invoice_id"
+          ],
+          "referencedTable": "sales_invoices",
+          "referencedColumns": [
+            "sales_invoice_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cancellation_requester",
+          "columns": [
+            "requested_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cancellation_resolver",
+          "columns": [
+            "resolved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "invoice_cancellation_events": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "cancellation_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "cancellation_request_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "event_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "old_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "new_status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "cancellation_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_cancellation_event_time",
+          "unique": false,
+          "columns": [
+            "cancellation_request_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_cancellation_event_actor",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_cancellation_event_request",
+          "columns": [
+            "cancellation_request_id"
+          ],
+          "referencedTable": "invoice_cancellation_requests",
+          "referencedColumns": [
+            "cancellation_request_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_cancellation_event_actor",
+          "columns": [
+            "actor_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "loss_events": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "loss_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "batch_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "medicine_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "loss_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "quantity",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "hpp_snapshot",
+          "type": "BIGINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "inventory_movement_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "approved_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "evidence_file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "loss_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_loss_movement",
+          "unique": true,
+          "columns": [
+            "inventory_movement_id"
+          ]
+        },
+        {
+          "name": "idx_loss_batch_time",
+          "unique": false,
+          "columns": [
+            "batch_id",
+            "created_at_utc"
+          ]
+        },
+        {
+          "name": "idx_loss_medicine_time",
+          "unique": false,
+          "columns": [
+            "medicine_id",
+            "created_at_utc"
+          ]
+        },
+        {
+          "name": "idx_loss_approver",
+          "unique": false,
+          "columns": [
+            "approved_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_loss_batch_owner",
+          "columns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "referencedTable": "inventory_batches",
+          "referencedColumns": [
+            "batch_id",
+            "medicine_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_loss_movement",
+          "columns": [
+            "inventory_movement_id"
+          ],
+          "referencedTable": "inventory_movements",
+          "referencedColumns": [
+            "inventory_movement_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_loss_approver",
+          "columns": [
+            "approved_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_loss_evidence",
+          "columns": [
+            "evidence_file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "accounting_periods": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "accounting_period_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "period_start",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "period_end",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "closed_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "closed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        }
+      ],
+      "primaryKey": [
+        "accounting_period_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_accounting_period_start",
+          "unique": true,
+          "columns": [
+            "period_start"
+          ]
+        },
+        {
+          "name": "idx_accounting_period_status",
+          "unique": false,
+          "columns": [
+            "status",
+            "period_start"
+          ]
+        },
+        {
+          "name": "idx_accounting_period_closer",
+          "unique": false,
+          "columns": [
+            "closed_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_accounting_period_closer",
+          "columns": [
+            "closed_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "journal_entries": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "journal_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "accounting_period_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "business_date",
+          "type": "DATE",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_type",
+          "type": "VARCHAR(40)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "posted_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "posted_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "journal_entry_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_journal_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "uq_journal_source",
+          "unique": true,
+          "columns": [
+            "source_type",
+            "source_id"
+          ]
+        },
+        {
+          "name": "idx_journal_period_date",
+          "unique": false,
+          "columns": [
+            "accounting_period_id",
+            "business_date"
+          ]
+        },
+        {
+          "name": "idx_journal_creator",
+          "unique": false,
+          "columns": [
+            "created_by_user_id"
+          ]
+        },
+        {
+          "name": "idx_journal_poster",
+          "unique": false,
+          "columns": [
+            "posted_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_journal_period",
+          "columns": [
+            "accounting_period_id"
+          ],
+          "referencedTable": "accounting_periods",
+          "referencedColumns": [
+            "accounting_period_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_journal_creator",
+          "columns": [
+            "created_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_journal_poster",
+          "columns": [
+            "posted_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "journal_lines": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "journal_line_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "journal_entry_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "line_number",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "account_code",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "debit_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "credit_amount",
+          "type": "BIGINT",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        }
+      ],
+      "primaryKey": [
+        "journal_line_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_journal_line_number",
+          "unique": true,
+          "columns": [
+            "journal_entry_id",
+            "line_number"
+          ]
+        },
+        {
+          "name": "idx_journal_line_account",
+          "unique": false,
+          "columns": [
+            "account_code",
+            "journal_entry_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_journal_line_entry",
+          "columns": [
+            "journal_entry_id"
+          ],
+          "referencedTable": "journal_entries",
+          "referencedColumns": [
+            "journal_entry_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "backup_jobs": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "backup_job_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "storage_object_key",
+          "type": "VARCHAR(512)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "checksum_sha256",
+          "type": "CHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "size_bytes",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NULL"
+        },
+        {
+          "name": "requested_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "started_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "completed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "verified_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "failure_code",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "backup_job_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_backup_job_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_backup_job_status_time",
+          "unique": false,
+          "columns": [
+            "status",
+            "created_at_utc"
+          ]
+        },
+        {
+          "name": "idx_backup_job_requester",
+          "unique": false,
+          "columns": [
+            "requested_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_backup_job_requester",
+          "columns": [
+            "requested_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    },
+    "export_jobs": {
+      "migration": "009_operational_controls_v1",
+      "columns": [
+        {
+          "name": "export_job_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "export_type",
+          "type": "VARCHAR(40)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "date_from",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "date_to",
+          "type": "DATE",
+          "attributes": "NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "file_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "requested_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "completed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        }
+      ],
+      "primaryKey": [
+        "export_job_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_export_job_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_export_job_status_time",
+          "unique": false,
+          "columns": [
+            "status",
+            "created_at_utc"
+          ]
+        },
+        {
+          "name": "idx_export_job_requester",
+          "unique": false,
+          "columns": [
+            "requested_by_user_id"
+          ]
+        }
+      ],
+      "foreignKeys": [
+        {
+          "name": "fk_export_job_file",
+          "columns": [
+            "file_id"
+          ],
+          "referencedTable": "stored_files",
+          "referencedColumns": [
+            "stored_file_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        },
+        {
+          "name": "fk_export_job_requester",
+          "columns": [
+            "requested_by_user_id"
+          ],
+          "referencedTable": "users",
+          "referencedColumns": [
+            "user_id"
+          ],
+          "onDelete": "RESTRICT",
+          "onUpdate": "RESTRICT"
+        }
+      ]
+    }
+  }
+}
