@@ -38,8 +38,793 @@
       "path": "lib/migrations/009_operational_controls_v1.js"
     }
   ],
-  "tableCount": 58,
+  "tableCount": 68,
   "tables": {
+    "users": {
+      "migration": "001_identity_foundation",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "legacy_uid",
+          "type": "VARCHAR(128)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "display_name",
+          "type": "VARCHAR(120)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR(32)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "protected_owner",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "user_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_users_active",
+          "unique": false,
+          "columns": [
+            "active"
+          ]
+        },
+        {
+          "name": "idx_users_protected_owner",
+          "unique": false,
+          "columns": [
+            "protected_owner"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "role_assignments": {
+      "migration": "001_identity_foundation",
+      "columns": [
+        {
+          "name": "role_assignment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "role_code",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "scope_type",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL DEFAULT 'clinic'"
+        },
+        {
+          "name": "scope_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "valid_from_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "valid_to_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "granted_by_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        }
+      ],
+      "primaryKey": [
+        "role_assignment_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_role_assignment_owner",
+          "unique": true,
+          "columns": [
+            "role_assignment_id",
+            "user_id"
+          ]
+        },
+        {
+          "name": "idx_role_assignments_user_valid",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "valid_to_utc"
+          ]
+        },
+        {
+          "name": "idx_role_assignments_role_valid",
+          "unique": false,
+          "columns": [
+            "role_code",
+            "valid_to_utc"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "active_role_slots": {
+      "migration": "001_identity_foundation",
+      "columns": [
+        {
+          "name": "role_assignment_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "activated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "role",
+          "attributes": "_assignments (role_assignment_id, user_id)"
+        },
+        {
+          "name": "ON",
+          "type": "DELETE",
+          "attributes": "RESTRICT ON UPDATE RESTRICT"
+        }
+      ],
+      "primaryKey": [
+        "role_assignment_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_active_role_slots_user",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "firebase_identities": {
+      "migration": "001_identity_foundation",
+      "columns": [
+        {
+          "name": "firebase_identity_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "provider",
+          "type": "VARCHAR(24)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "subject_uid",
+          "type": "VARCHAR(128)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "email_snapshot",
+          "type": "VARCHAR(254)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "last_seen_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        }
+      ],
+      "primaryKey": [
+        "firebase_identity_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_firebase_identity_subject",
+          "unique": true,
+          "columns": [
+            "provider",
+            "subject_uid"
+          ]
+        },
+        {
+          "name": "idx_firebase_identity_user",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "provider"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "audit_events": {
+      "migration": "002_audit_idempotency_outbox",
+      "columns": [
+        {
+          "name": "audit_event_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "event_uuid",
+          "type": "CHAR(36)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "actor_role_snapshot",
+          "type": "VARCHAR(24)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "action_code",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "entity_type",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "before_json",
+          "type": "JSON",
+          "attributes": "NULL"
+        },
+        {
+          "name": "after_json",
+          "type": "JSON",
+          "attributes": "NULL"
+        },
+        {
+          "name": "reason",
+          "type": "VARCHAR(255)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "request_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "occurred_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "source_ip_hash",
+          "type": "VARCHAR(128)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        }
+      ],
+      "primaryKey": [
+        "audit_event_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_audit_event_uuid",
+          "unique": true,
+          "columns": [
+            "event_uuid"
+          ]
+        },
+        {
+          "name": "idx_audit_entity_time",
+          "unique": false,
+          "columns": [
+            "entity_type",
+            "entity_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_audit_actor_time",
+          "unique": false,
+          "columns": [
+            "actor_user_id",
+            "occurred_at_utc"
+          ]
+        },
+        {
+          "name": "idx_audit_occurred",
+          "unique": false,
+          "columns": [
+            "occurred_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "idempotency_requests": {
+      "migration": "002_audit_idempotency_outbox",
+      "columns": [
+        {
+          "name": "idempotency_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "actor_user_id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "command_name",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "idempotency_key",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "request_hash",
+          "type": "CHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "response_code",
+          "type": "SMALLINT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "response_json",
+          "type": "JSON",
+          "attributes": "NULL"
+        },
+        {
+          "name": "entity_type",
+          "type": "VARCHAR(60)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "entity_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "expires_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "REFERENCES",
+          "type": "users",
+          "attributes": "(user_id) ON DELETE RESTRICT ON UPDATE RESTRICT"
+        }
+      ],
+      "primaryKey": [
+        "idempotency_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_idempotency_actor_command_key",
+          "unique": true,
+          "columns": [
+            "actor_user_id",
+            "command_name",
+            "idempotency_key"
+          ]
+        },
+        {
+          "name": "idx_idempotency_expiry",
+          "unique": false,
+          "columns": [
+            "expires_at_utc"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "outbox_jobs": {
+      "migration": "002_audit_idempotency_outbox",
+      "columns": [
+        {
+          "name": "outbox_job_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "job_type",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "aggregate_type",
+          "type": "VARCHAR(60)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "aggregate_id",
+          "type": "VARCHAR(100)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "payload_json",
+          "type": "JSON",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(16)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "attempts",
+          "type": "INT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "available_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "locked_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "completed_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "last_error_code",
+          "type": "VARCHAR(80)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "outbox_job_id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_outbox_status_available",
+          "unique": false,
+          "columns": [
+            "status",
+            "available_at_utc"
+          ]
+        },
+        {
+          "name": "idx_outbox_aggregate",
+          "unique": false,
+          "columns": [
+            "aggregate_type",
+            "aggregate_id"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "tariffs": {
+      "migration": "003_catalog_masters",
+      "columns": [
+        {
+          "name": "tariff_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "legacy_id",
+          "type": "VARCHAR(128)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(180)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "service_type",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "price",
+          "type": "BIGINT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "tariff_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_tariffs_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_tariffs_name",
+          "unique": false,
+          "columns": [
+            "name"
+          ]
+        },
+        {
+          "name": "idx_tariffs_active",
+          "unique": false,
+          "columns": [
+            "active"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "suppliers": {
+      "migration": "003_catalog_masters",
+      "columns": [
+        {
+          "name": "supplier_id",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL AUTO_INCREMENT"
+        },
+        {
+          "name": "public_id",
+          "type": "VARCHAR(80)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "legacy_id",
+          "type": "VARCHAR(128)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(180)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR(32)",
+          "attributes": "NULL"
+        },
+        {
+          "name": "address",
+          "type": "TEXT",
+          "attributes": "NULL"
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "attributes": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "created_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updated_at_utc",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "version",
+          "type": "BIGINT UNSIGNED",
+          "attributes": "NOT NULL DEFAULT 1"
+        }
+      ],
+      "primaryKey": [
+        "supplier_id"
+      ],
+      "indexes": [
+        {
+          "name": "uq_suppliers_public_id",
+          "unique": true,
+          "columns": [
+            "public_id"
+          ]
+        },
+        {
+          "name": "idx_suppliers_name",
+          "unique": false,
+          "columns": [
+            "name"
+          ]
+        },
+        {
+          "name": "idx_suppliers_active",
+          "unique": false,
+          "columns": [
+            "active"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
+    "verification": {
+      "migration": "004_better_auth_core",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(64)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "identifier",
+          "type": "VARCHAR(255)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "value",
+          "type": "TEXT",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "expiresAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "createdAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        },
+        {
+          "name": "updatedAt",
+          "type": "DATETIME(3)",
+          "attributes": "NOT NULL"
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "name": "idx_ba_verification_identifier",
+          "unique": false,
+          "columns": [
+            "identifier"
+          ]
+        },
+        {
+          "name": "idx_ba_verification_expiry",
+          "unique": false,
+          "columns": [
+            "expiresAt"
+          ]
+        }
+      ],
+      "foreignKeys": []
+    },
     "cashier_shifts": {
       "migration": "005_patient_shift_queue_v1",
       "columns": [
