@@ -5,10 +5,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-function installCatalogUI({ projectId = "assalam-preview-test", api = {} } = {}) {
+function installCatalogUI({ enabled = true, api = {} } = {}) {
   const window = {
-    ASSALAM_TIDB_PREVIEW_BOOTSTRAP: projectId === "assalam-preview-test",
-    ASSALAM_FIREBASE_CONFIG: { projectId },
+    ASSALAM_TIDB_PREVIEW_BOOTSTRAP: enabled,
     assalamTiDBApi: api
   };
   const source = fs.readFileSync(require.resolve("../js/tidb-catalog-ui.js"), "utf8");
@@ -16,9 +15,9 @@ function installCatalogUI({ projectId = "assalam-preview-test", api = {} } = {})
   return window;
 }
 
-test("TiDB catalog UI is enabled only for the isolated preview Firebase project", async () => {
+test("TiDB catalog UI is enabled only for the isolated TiDB preview deployment", async () => {
   const preview = installCatalogUI();
-  const production = installCatalogUI({ projectId: "assalam-db" });
+  const production = installCatalogUI({ enabled: false });
   assert.equal(preview.assalamTiDBCatalog.enabled(), true);
   assert.equal(production.assalamTiDBCatalog.enabled(), false);
   await assert.rejects(production.assalamTiDBCatalog.ensureLoaded(), /hanya diaktifkan/);
