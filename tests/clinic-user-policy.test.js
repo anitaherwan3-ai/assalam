@@ -16,6 +16,8 @@ test("new staff accounts require valid email, clinic role and strong password", 
   assert.throws(() => validateNewUser({email:"bad",name:"A",role:"kasir",password:"minimum-12-chars"}));
   assert.throws(() => validateNewUser({email:"staff@example.org",name:"A",role:"kasir",password:"qwerty123"}));
   assert.throws(() => validateNewUser({email:"praktekrose@gmail.com",name:"Owner",role:"pimpinan",password:"minimum-12-chars"}), {code:"BOOTSTRAP_ROSTER_RESERVED"});
+  assert.equal(validateNewUser({email:"assalamkasir1@gmail.com",name:"Kasir 1",role:"kasir",password:"minimum-12-chars"},{allowRoster:true}).role,"kasir");
+  assert.throws(() => validateNewUser({email:"assalamkasir1@gmail.com",name:"Kasir 1",role:"admin",password:"minimum-12-chars"},{allowRoster:true}),{code:"BOOTSTRAP_ROSTER_RESERVED"});
 });
 
 test("five bootstrap emails and roles are immutable", () => {
