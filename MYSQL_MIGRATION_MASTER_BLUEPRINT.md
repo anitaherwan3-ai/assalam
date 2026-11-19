@@ -686,3 +686,8 @@ Read-only relationship profiler and eight synthetic tests are added in `scripts/
 ## Pass 71 — Firebase Auth identity reconciliation profiler
 
 Added `scripts/reconcile-firebase-identities.js`, `tests/reconcile-firebase-identities.test.js`, and `MYSQL_MIGRATION_FIREBASE_IDENTITY_RECONCILIATION_PROFILER_PASS71.md`. The read-only profiler accepts a normalized export containing `authUsers[]` and `collections.k_users`, uses exact UID matches only, reports unresolved email-only profiles and identity/role/status discrepancies, masks email and fingerprints UID, and flags any Auth roster count other than five. Run `npm run migration:identities -- --input <private-export.json> [--output <private-report.json>]`. No live Firebase export, Auth/Firestore mutation, TiDB write, DDL, import, deployment, or main merge was performed. Actual account mapping remains blocked on a complete read-only export from the correct Firebase project.
+
+
+## Pass 72 — Historical k_users evidence register
+
+Added `MYSQL_MIGRATION_K_USERS_HISTORICAL_EVIDENCE_RECONCILIATION_PASS72.md`. Recovered five historical profile leads (main owner, second owner, Admin, Kasir 1, and a proposed Kasir 2 mapping), but no literal UID values or complete live profile export were available, so confirmed Auth↔Firestore UID pairs remain zero. Historical source-code/rules allowlists are not authoritative for the current five Firebase Auth accounts. No account/profile was changed. Definitive matching still requires a complete same-project read-only Auth and `k_users` export; keep it private and out of Git.
