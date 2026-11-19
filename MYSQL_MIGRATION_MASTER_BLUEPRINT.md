@@ -666,3 +666,8 @@ See [MYSQL_MIGRATION_SCHEMA_V1_DECISION_REGISTER_CLOSURE_PASS26.md](./MYSQL_MIGR
 ## AH. Physical FK manifest reconciliation — Pass 27
 
 See [MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md](./MYSQL_MIGRATION_PHYSICAL_FK_MANIFEST_RECONCILIATION_PASS27.md). Corrected stale cardinality statements in Passes 3, 4 and 7. Canonical counts: 104 numbered rows F01–F104; 116 literal candidate tuples after expanding ten grouped rows; zero approved/applied constraints. Exact physical tuple/type/index/ownership/action proof and TiDB tests remain release gates. No DDL was generated or applied.
+
+
+## Pass 21 — Firebase data migration readiness
+
+[Pass 21 data readiness audit](./MYSQL_MIGRATION_FIREBASE_DATA_READINESS_AUDIT_PASS21.md) inventories the 16 local-store collections, additional `k_returKuota` and `klinik_config` paths, source document-ID patterns, timestamp/date representations, ownership chains and a staged export/profile/import/reconciliation protocol. It confirms that actual duplicate, orphan, null/missing and malformed-date checks have **not** been run because no live Firebase data was read. The current branch password-reset allowlist also statically differs from the latest owner-protected second Pimpinan/Admin emails; this is not evidence of live Auth state and must be resolved through read-only UID/profile verification only. Data import and DDL remain blocked; no Firebase/Auth mutation, export, TiDB write, merge or deployment occurred.
