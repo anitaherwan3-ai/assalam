@@ -1,29 +1,42 @@
 # Historical k_users Evidence Reconciliation — Pass 72
 
 ## Scope and conclusion
-This pass re-examined available conversation history, saved Library artifacts, checked-in Firebase backend code, and historical Firestore Rules. It did not obtain a live Firestore `k_users` export or Firebase Authentication export. Therefore this is a **provisional evidence register**, not a completed UID reconciliation. No record below is promoted to a verified Auth↔Firestore match unless an exact UID pair was actually available; none of the recovered notes contains a literal UID value suitable for comparison.
+This pass re-examined available conversation history, saved Library artifacts, checked-in Firebase backend code, and historical Firestore Rules. It did not obtain a live Firestore `k_users` export or Firebase Authentication export. The owner has now explicitly confirmed the intended five-account email-to-role roster (two Pimpinan, one Admin, two Kasir). This resolves the **business role roster**, but it does not establish the live Auth UIDs or prove that the corresponding Firestore profiles currently match. This remains a provisional evidence register, not a completed UID reconciliation.
 
-## Recovered profile leads
+For privacy, exact email addresses are retained in the owner conversation and are intentionally not copied into this repository report.
 
-| Historical lead | Profile/document evidence | Email evidence | Role/status evidence | UID match |
-|---|---|---|---|---|
-| Main owner | Intended/current historical path `k_users/praktekrose`; username `praktekrose` | `praktekrose@gmail.com` explicitly supplied by owner as master account | Intended role `pimpinan`; account creation was reported, but no exported current profile fields | **Unverified**: user previously reported UID created, but literal UID and exported profile UID are absent |
-| Second owner | Historical code/rules map `nursalim42@gmail.com` to `k_users/pimpinan2` | `nursalim42@gmail.com` appears in old source/rules | Historical role mapping `pimpinan`; earlier records include proposed/static setup, not an authoritative current account record | **Unverified** |
-| Admin | Historical profile/account references use `assalamadmin1@gmail.com`; old rules include it in a staff allowlist | `assalamadmin1@gmail.com` was later reported by owner as corrected account email | Intended role `admin`; owner reported login and menus working, but no exact profile document snapshot/UID supplied | **Unverified** |
-| Kasir 1 | A prior user-provided profile snippet described a Kasir profile; exact Firestore document path was not preserved in the recovered record | `assalamkasir1@gmail.com` | Snippet included `u: kasir`, `role: kasir`, `active: true`; no literal UID in recovered evidence | **Unverified** |
-| Kasir 2 | `k_users/assalamkasir2@gmail.com` and `k_users/kasir2` appeared as implementation suggestions in prior work | `assalamkasir2@gmail.com` | `kasir2` / `kasir` was a proposed mapping; no verified Auth creation/export was found | **Not established**; do not treat suggestion as actual account |
+## Owner-confirmed role roster
+| Account slot | Owner-confirmed role | Roster count | Auth UID ↔ k_users match |
+|---|---|---:|---|
+| Pimpinan account 1 | `pimpinan` | 1 | Unverified |
+| Pimpinan account 2 | `pimpinan` | 1 | Unverified |
+| Admin account | `admin` | 1 | Unverified |
+| Kasir account 1 | `kasir` | 1 | Unverified |
+| Kasir account 2 | `kasir` | 1 | Unverified |
+| **Total** | **2 Pimpinan, 1 Admin, 2 Kasir** | **5** | **0 confirmed UID pairs** |
+
+The exact email-to-role mapping supplied by the owner is the current business authority for this migration. Older email lists, hardcoded allowlists, suggested document IDs, and historical account proposals are superseded and must not be used to alter this roster. The profiler's expected account count remains five; any actual mismatch must be reported, never silently corrected.
+
+## Recovered profile leads and historical evidence
+| Historical lead | Profile/document evidence | Role/status evidence | UID match |
+|---|---|---|---|
+| Main owner | Historical intended path `k_users/praktekrose`; username `praktekrose` | Owner-confirmed as Pimpinan; account creation was previously reported | **Unverified**: literal Auth UID and exported profile UID absent |
+| Second owner | Historical code/rules map to `k_users/pimpinan2` | Owner-confirmed as Pimpinan; old path is not proof of current profile | **Unverified** |
+| Admin | Historical profile/account references exist | Owner-confirmed as Admin; owner previously reported login/menu working | **Unverified** |
+| Kasir 1 | A prior user-provided profile snippet described a Kasir profile; exact Firestore document path not preserved | Owner-confirmed as Kasir; historical snippet included `u: kasir`, `role: kasir`, `active: true` | **Unverified** |
+| Kasir 2 | Historical document/path variants appeared as implementation suggestions | Owner-confirmed as Kasir; old suggested path is not proof of current profile or Auth creation | **Unverified** |
 
 ## Source-code and Rules findings
-- Historical `firebase-backend.js` uses owner aliases `praktekrose` and `pimpinan2`, and its owner bootstrap writes UID/email/role/active fields to the owner profile. This is implementation behavior, not proof that the present Firestore documents contain those values.
-- Historical Rules use email-keyed staff profile lookup and owner email allowlists. Another saved Rules revision includes a static staff allowlist. These lists are legacy implementation evidence only and must not define the current five-account roster.
+- Historical `firebase-backend.js` uses owner aliases and bootstrap behavior to write UID/email/role/active fields. This is implementation behavior, not proof that present Firestore documents contain those values.
+- Historical Rules use email-keyed staff profile lookup and owner email allowlists. Other saved Rules revisions include static staff allowlists. These are legacy implementation details only and must not define or override the owner-confirmed roster.
 - Older app code also contained local user records/password fields. Those are not Firebase Authentication evidence and must never be used to establish account identity or import passwords.
 
 ## Reconciliation result
-- Historical profile leads recovered: 5.
-- Exact UID values recovered for those leads: 0.
+- Owner-confirmed intended roster: **5 accounts (2 Pimpinan, 1 Admin, 2 Kasir)**.
+- Exact UID values recovered for those accounts: 0.
 - Confirmed Auth↔k_users UID pairs: 0.
-- Current five-account Firebase Auth roster: **unknown until a complete export from the correct Firebase project is supplied**.
-- No account should be created, deleted, reactivated, renamed, or assigned a role based on this historical evidence register.
+- Live profile completeness and actual Auth membership: **not yet verified**.
+- No account should be created, deleted, reactivated, renamed, or assigned a role based only on historical evidence or this role roster.
 
 ## Required input for definitive matching
 Use the Pass 71 read-only profiler with one complete, same-project normalized export containing:
@@ -35,4 +48,4 @@ Command: `npm run migration:identities -- --input ./private/firebase-auth-and-pr
 Never include passwords, ID/refresh tokens, service-account private keys, or credential material. The export/report should remain private; do not commit it to GitHub.
 
 ## Safety
-Read-only historical review only. No live Firebase access, account/profile mutation, TiDB write/DDL/import, merge, deployment, or production change.
+Read-only historical review and owner role confirmation only. No live Firebase access, account/profile mutation, TiDB write/DDL/import, merge, deployment, or production change.
