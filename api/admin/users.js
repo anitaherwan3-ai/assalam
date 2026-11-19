@@ -17,7 +17,7 @@ module.exports = async function handler(req,res) {
    return res.status(200).json({ok:true,data:rows.map(x=>({userId:String(x.userId),name:x.name,email:x.email,role:x.role||null,active:Number(x.active)===1,protectedOwner:Number(x.protectedOwner)===1,banned:Number(x.banned)===1}))});
   }
   if(req.method==="POST") {
-   const input=validateNewUser(req.body);
+   const input=validateNewUser(req.body,{allowRoster:true});
    const created=await auth.api.createUser({body:{email:input.email,name:input.name,password:input.password,role:input.providerRole},headers});
    const userId=created && (created.id || (created.user && created.user.id));
    if(typeof userId!=="string" || !userId) throw Object.assign(new Error("Provider tidak mengembalikan identitas akun."),{code:"AUTH_CREATE_INVALID_RESPONSE"});
