@@ -23,9 +23,11 @@ test("TiDB browser adapter uses same-origin Better Auth cookies and no Firebase 
   assert.doesNotMatch(source, /bootstrapPreviewOwner/);
 });
 
-test("public preview owner bootstrap is disabled and Better Auth signup stays disabled pending invitation flow", () => {
+test("public preview owner bootstrap and open signup stay disabled; admin plugin is enabled for provider-level Pimpinan", () => {
   const bootstrap = read("api/auth/bootstrap-preview-owner.js");
   const auth = read("lib/better-auth.js");
   assert.match(bootstrap, /PREVIEW_BOOTSTRAP_DISABLED/);
   assert.match(auth, /disableSignUp:\s*true/);
+  assert.match(auth, /adminRoles:\s*\["admin"\]/);
+  assert.match(auth, /plugins:\s*\[admin\(/);
 });
