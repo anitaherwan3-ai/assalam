@@ -12,7 +12,8 @@
     "cutover:check": "node scripts/check-cutover-readiness.js",
     "auth:schema-check": "auth check schema --config ./lib/auth.config.mjs",
     "migration:profile": "node scripts/profile-firebase-export.js",
-    "migration:relationships": "node scripts/check-firebase-relationships.js"
+    "migration:relationships": "node scripts/check-firebase-relationships.js",
+    "migration:identities": "node scripts/reconcile-firebase-identities.js"
   },
   "dependencies": {
     "mysql2": "^3.15.3",
