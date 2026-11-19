@@ -38,12 +38,21 @@ module.exports = async function handler(req, res) {
     );
     const found = tables.map(row => row.table_name).sort();
     const missing = expected.filter(name => !found.includes(name));
-    return res.status(missing.length ? 503 : 200).json({
-      ok: missing.length === 0,
+    const [statusColumns] = await getPool().execute(
+      "SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, CHARACTER_MAXIMUM_LENGTH AS max_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = ? AND COLUMN_NAME = ?) OR (TABLE_NAME = ? AND COLUMN_NAME = ?))",
+      ["cashier_shifts", "status", "shift_reconciliations", "status"]
+    );
+    const shortStatusColumns = statusColumns.filter(row => Number(row.max_length) < 32).map(row => ({ table: row.table_name, column: row.column_name, maxLength: Number(row.max_length) }));
+    const statusColumnsMissing = ["cashier_shifts", "shift_reconciliations"].filter(name => !statusColumns.some(row => row.table_name === name && row.column_name === "status"));
+    return res.status(missing.length || shortStatusColumns.length || statusColumnsMissing.length ? 503 : 200).json({
+      ok: missing.length === 0 && shortStatusColumns.length === 0 && statusColumnsMissing.length === 0,
       service: "assalam-tidb-schema",
       versions: versions.map(row => row.version),
       tables: found,
-      missing
+      missing,
+      statusColumns: statusColumns.map(row => ({ table: row.table_name, column: row.column_name, maxLength: Number(row.max_length) })),
+      shortStatusColumns,
+      statusColumnsMissing
     });
   } catch (error) {
     console.error("[DB-SCHEMA-STATUS] Schema status unavailable", {
