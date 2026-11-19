@@ -782,3 +782,8 @@ See [MYSQL_MIGRATION_TIDB_FK_MATRIX_HARNESS_IMPLEMENTATION_PASS42B.md](./MYSQL_M
 ## Pass 70 — Firebase relationship integrity profiler
 
 Read-only relationship profiler and eight synthetic tests are added in `scripts/check-firebase-relationships.js` and `tests/check-firebase-relationships.test.js`; report: `MYSQL_MIGRATION_FIREBASE_RELATIONSHIP_INTEGRITY_PROFILER_PASS70.md`. It checks only source-evidenced relationships and explicitly skips uncertain cashier identity and supplier master mapping. Run with `npm run migration:relationships -- --input <normalized-export.json>`. No live Firebase export, account/Auth mutation, TiDB write, DDL, import, deployment, or main merge was performed. Actual record-level integrity remains unknown until a complete normalized export is supplied.
+
+
+## Pass 71 — Firebase Auth identity reconciliation profiler
+
+Added `scripts/reconcile-firebase-identities.js`, `tests/reconcile-firebase-identities.test.js`, and `MYSQL_MIGRATION_FIREBASE_IDENTITY_RECONCILIATION_PROFILER_PASS71.md`. The read-only profiler accepts a normalized export containing `authUsers[]` and `collections.k_users`, uses exact UID matches only, reports unresolved email-only profiles and identity/role/status discrepancies, masks email and fingerprints UID, and flags any Auth roster count other than five. Run `npm run migration:identities -- --input <private-export.json> [--output <private-report.json>]`. No live Firebase export, Auth/Firestore mutation, TiDB write, DDL, import, deployment, or main merge was performed. Actual account mapping remains blocked on a complete read-only export from the correct Firebase project.
