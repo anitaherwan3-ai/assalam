@@ -47,11 +47,11 @@ module.exports = async function handler(req,res) {
    const email=b.email===undefined?old.email:String(b.email).trim().toLowerCase(), role=b.role===undefined?old.role:b.role, name=b.name===undefined?old.name:String(b.name).trim();
    if(locked&&(email!==old.email||role!==old.role||name!==old.name)) throw Object.assign(new Error("Lima akun awal dikunci: email, nama, dan role tidak dapat diubah."),{code:"BOOTSTRAP_ROSTER_IMMUTABLE",statusCode:409});
    assertRosterImmutable(old.email,email,role,userId,locked);
+   if(email.length>254||!email.includes("@")||!["pimpinan","admin","kasir"].includes(role)||!name||name.length>120) return res.status(400).json({ok:false,code:"USER_FIELDS_INVALID"});
    if(b.password!==undefined) {
     if(typeof b.password!=="string"||b.password.length<12||b.password.length>128) return res.status(400).json({ok:false,code:"PASSWORD_POLICY",message:"Password harus 12–128 karakter."});
-    await auth.api.setUserPassword({body:{userId,newPassword:b.password},headers});
    }
-   if(email.length>254||!email.includes("@")||!["pimpinan","admin","kasir"].includes(role)||!name||name.length>120) return res.status(400).json({ok:false,code:"USER_FIELDS_INVALID"});
+   if(b.password!==undefined) await auth.api.setUserPassword({body:{userId,newPassword:b.password},headers});
    if(email!==old.email||role!==old.role||name!==old.name) {
     const conn=await pool.getConnection();
     try {
