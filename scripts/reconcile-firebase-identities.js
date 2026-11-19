@@ -1,0 +1,36 @@
+"use strict";
+const fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto");
+const OBJ=v=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const VALID_ROLES=new Set(["pimpinan","admin","kasir"]);
+function maskEmail(v){if(typeof v!=="string"||!v.includes("@"))return null;const [u,d]=v.toLowerCase().split("@");return (u.length<3?u[0]+"*":u.slice(0,2)+"***")+"@"+d;}
+function fingerprint(v){return crypto.createHash("sha256").update(String(v)).digest("hex").slice(0,16);}
+function profileRows(value){if(Array.isArray(value))return value.flatMap((x,i)=>OBJ(x)&&OBJ(x.data)&&typeof(x.documentId||x.id)==="string"?[{id:x.documentId||x.id,data:x.data}]:[{invalidIndex:i}]);if(OBJ(value))return Object.entries(value).map(([id,data])=>({id,data}));return [];}
+function reconcileFirebaseIdentities(input,opts={}){
+ if(!OBJ(input)||!Array.isArray(input.authUsers)||!OBJ(input.collections)||!Object.hasOwn(input.collections,"k_users"))throw Error("Input requires authUsers[] and collections.k_users.");
+ const expected=opts.expectedAuthCount??5, issues=[],auth=[],profiles=[],counts={};
+ for(let i=0;i<input.authUsers.length;i++){const u=input.authUsers[i];if(!OBJ(u)||typeof u.uid!=="string"||!u.uid.trim()){issues.push({code:"invalid_auth_user_record",index:i});continue;}auth.push({uid:u.uid,email:typeof u.email==="string"?u.email.trim().toLowerCase():null,disabled:u.disabled===true,emailVerified:u.emailVerified===true,providerIds:Array.isArray(u.providerData)?u.providerData.map(x=>x&&x.providerId).filter(x=>typeof x==="string").sort():[]});}
+ for(const p of profileRows(input.collections.k_users)){if(!p.data){issues.push({code:"invalid_profile_record",index:p.invalidIndex});continue;}if(!OBJ(p.data)){issues.push({code:"invalid_profile_data",profileKey:p.id});continue;}profiles.push({id:p.id,data:p.data});}
+ if(auth.length!==expected)issues.push({code:"auth_user_count_unexpected",expected,actual:auth.length});
+ const uidGroups=new Map(),emailGroups=new Map(),profileUidGroups=new Map(),profileEmailGroups=new Map();
+ const group=(m,k,v)=>{if(!k)return;const a=m.get(k)||[];a.push(v);m.set(k,a);};
+ for(const u of auth){group(uidGroups,u.uid,u);group(emailGroups,u.email,u);if(!u.email)issues.push({code:"auth_email_missing",uidFingerprint:fingerprint(u.uid)});if(u.disabled)issues.push({code:"auth_user_disabled",uidFingerprint:fingerprint(u.uid)});}
+ for(const [uid,a] of uidGroups)if(a.length>1)issues.push({code:"duplicate_auth_uid",uidFingerprint:fingerprint(uid),count:a.length});
+ for(const [email,a] of emailGroups)if(a.length>1)issues.push({code:"duplicate_auth_email",emailMasked:maskEmail(email),count:a.length});
+ for(const p of profiles){const d=p.data;const uid=typeof d.uid==="string"&&d.uid.trim()?d.uid.trim():null;const email=typeof d.email==="string"?d.email.trim().toLowerCase():null;group(profileUidGroups,uid,p);group(profileEmailGroups,email,p);if(!uid){const candidate=email?auth.filter(u=>u.email===email):[];issues.push({code:"profile_uid_missing_unresolved",profileKey:p.id,emailMasked:maskEmail(email),emailCandidateCount:candidate.length});}}
+ for(const [uid,a] of profileUidGroups)if(a.length>1)issues.push({code:"duplicate_profile_uid_binding",uidFingerprint:fingerprint(uid),count:a.length});
+ const matchedProfiles=new Set(),matchedAuth=new Set(),matches=[];
+ for(const u of auth){const candidates=profileUidGroups.get(u.uid)||[];if(candidates.length===0){issues.push({code:"auth_user_without_uid_bound_profile",uidFingerprint:fingerprint(u.uid),emailMasked:maskEmail(u.email)});continue;}if(candidates.length>1)continue;const p=candidates[0];matchedProfiles.add(p);matchedAuth.add(u);const d=p.data;const role=typeof d.role==="string"?d.role:null;const active=typeof d.active==="boolean"?d.active:null;
+ if(u.email&&typeof d.email==="string"&&d.email.trim().toLowerCase()!==u.email)issues.push({code:"auth_profile_email_mismatch",uidFingerprint:fingerprint(u.uid),profileKey:p.id,authEmailMasked:maskEmail(u.email),profileEmailMasked:maskEmail(d.email)});
+ if(!VALID_ROLES.has(role))issues.push({code:"profile_role_missing_or_invalid",uidFingerprint:fingerprint(u.uid),profileKey:p.id,role:role||null});
+ if(active===null)issues.push({code:"profile_active_flag_missing_or_invalid",uidFingerprint:fingerprint(u.uid),profileKey:p.id});else if(active===false)issues.push({code:"profile_inactive",uidFingerprint:fingerprint(u.uid),profileKey:p.id});
+ matches.push({uidFingerprint:fingerprint(u.uid),emailMasked:maskEmail(u.email),profileKey:p.id,role,active,emailVerified:u.emailVerified,disabled:u.disabled,providerIds:u.providerIds});
+ }
+ for(const p of profiles)if(!matchedProfiles.has(p)&&p.data.uid){const matchesAuth=uidGroups.get(String(p.data.uid))||[];if(!matchesAuth.length)issues.push({code:"profile_without_auth_user",profileKey:p.id,uidFingerprint:fingerprint(p.data.uid),emailMasked:maskEmail(p.data.email)});}
+ for(const p of profiles){const d=p.data;if(!d.uid&&d.email){const a=emailGroups.get(String(d.email).trim().toLowerCase())||[];if(a.length===0)issues.push({code:"profile_email_has_no_auth_candidate",profileKey:p.id,emailMasked:maskEmail(d.email)});}}
+ const issueCounts={};for(const x of issues)issueCounts[x.code]=(issueCounts[x.code]||0)+1;
+ return {reportVersion:1,mode:"read_only_firebase_auth_profile_reconciliation",generatedAtUtc:new Date().toISOString(),sourceExportedAt:input.exportedAt||null,expectedAuthCount:expected,authUserCount:auth.length,profileCount:profiles.length,uidBoundMatchCount:matches.length,issueCount:issues.length,issueCounts,matches,issues:issues.slice(0,100),issuesTruncated:Math.max(0,issues.length-100),safety:{sourceWritten:false,authMutated:false,profilesMutated:false,accountsCreatedOrDeleted:false,rawEmailIncluded:false,rawUidIncluded:false,passwordsOrTokensRead:false},limitations:["A profile without UID is never auto-bound by email; it is reported as an unresolved candidate.","A successful UID match does not prove deployed Firestore Rules or Cloud Functions are current.","Export completeness and correct Firebase project identity must be verified outside this profiler.","Roles are reported from the matching profile only; no role is inferred from email, document key, or source-code allowlists."]};
+}
+function parseArgs(a){const o={};for(let i=0;i<a.length;i++){if(["--input","--output"].includes(a[i])){if(!a[i+1]||a[i+1].startsWith("--"))throw Error("Missing value for "+a[i]);o[a[i].slice(2)]=a[++i];}else if(a[i]==="--help")o.help=true;else throw Error("Unknown argument: "+a[i]);}return o;}
+function main(argv){const a=parseArgs(argv);if(a.help){process.stdout.write("Usage: npm run migration:identities -- --input <private-auth-export.json> [--output <private-report.json>]\\n");return;}if(!a.input)throw Error("--input is required.");const input=JSON.parse(fs.readFileSync(path.resolve(a.input),"utf8"));const report=JSON.stringify(reconcileFirebaseIdentities(input),null,2)+"\\n";if(a.output)fs.writeFileSync(path.resolve(a.output),report,{flag:"wx"});process.stdout.write(report);}
+if(require.main===module){try{main(process.argv.slice(2));}catch(e){process.stderr.write("Firebase identity reconciliation failed: "+e.message+"\\n");process.exitCode=2;}}
+module.exports={reconcileFirebaseIdentities};
