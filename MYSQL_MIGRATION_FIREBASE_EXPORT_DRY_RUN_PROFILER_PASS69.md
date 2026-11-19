@@ -80,7 +80,7 @@ Keep the export and generated report in a private, access-controlled location. D
 - `node --test tests/profile-firebase-export.test.js`: 6 tests passed, 0 failed.
 - `node --check scripts/profile-firebase-export.js`: passed.
 
-These checks were executed in an isolated Node environment against the newly authored script and synthetic fixtures. They are not a claim that the complete repository test suite or GitHub Actions workflow has run.
+These checks were executed in an isolated Node environment against the newly authored script and synthetic fixtures. In addition, GitHub Actions run [#278](https://github.com/anitaherwan3-ai/assalam/actions/runs/44472681602), on commit `b14af53873a793739f0c7fef5dd0151db767afd2` which contains the profiler, its tests and package command, completed successfully. The repository workflow ran `npm run build` (full `node --test tests/*.test.js` suite plus the guarded preview migration build step). This verifies the branch CI gate, not live TiDB connectivity or Firebase data.
 
 ## Next gate
 
