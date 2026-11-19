@@ -3,7 +3,14 @@
 **Branch:** `migration/tidb-foundation`  
 **Audit date:** 2026-11-19  
 **Sequence note:** This is Pass 68 in the existing migration audit series. It supersedes the temporary Pass 21 filename created during session resumption; Pass 21 is already the queue/display audit.  
-**Method:** Static source inspection of `js/store.js` and `js/firebase-backend.js`; no live Firebase export or database query.
+**Method:** Static source inspection; no live Firebase export or database query.
+
+## Inspected source revisions
+- `js/app.js` — `da5f6ae886edd1c3e0a457d539c7e359ef5cd9ec`
+- `js/store.js` — `99e74acf8caec9c70d82be1d5f6efc5bfa6bc4fb`
+- `js/firebase-backend.js` — `3a613d96564f120b8141966f9ecbae21471c4e65`
+
+The queue/display Pass 21 report references an earlier `js/app.js` blob SHA; this Pass 68 inventory is tied to the exact revisions listed above.
 
 ## 1. Executive decision
 
