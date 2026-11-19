@@ -124,3 +124,8 @@ Required read-only reconciliation:
 5. The actual five Auth UIDs/emails are not known from this repository-only review. This addendum is an authority rule, not a claim that a live Firebase export has already been read.
 
 This instruction supersedes every earlier owner-protection email list and static browser/Rules allowlist as the account-roster source of truth. Static code may still contain legacy addresses; do not migrate those addresses as accounts unless they are present in the actual Firebase Auth export.
+
+
+## Pass 71 — Firebase Auth identity reconciliation profiler
+
+Added `scripts/reconcile-firebase-identities.js`, `tests/reconcile-firebase-identities.test.js`, and `MYSQL_MIGRATION_FIREBASE_IDENTITY_RECONCILIATION_PROFILER_PASS71.md`. The read-only profiler accepts a normalized export containing `authUsers[]` and `collections.k_users`, uses exact UID matches only, reports unresolved email-only profiles and identity/role/status discrepancies, masks email and fingerprints UID, and flags any Auth roster count other than five. Run `npm run migration:identities -- --input <private-export.json> [--output <private-report.json>]`. No live Firebase export, Auth/Firestore mutation, TiDB write, DDL, import, deployment, or main merge was performed. Actual account mapping remains blocked on a complete read-only export from the correct Firebase project.
