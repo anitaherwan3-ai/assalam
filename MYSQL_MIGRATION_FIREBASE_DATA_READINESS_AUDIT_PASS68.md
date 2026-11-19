@@ -163,3 +163,16 @@ Suggested synthetic tests (not executed): same raw ID in two collections; embedd
 This pass is static code/documentation review only. No live Firebase records or Authentication users were read. No data export, DDL, import, TiDB write, account mutation, Firebase Rules change, deployment, merge to `main`, or production operation was performed. No live duplicate/orphan or data-quality result is claimed.
 
 **Decision:** Pass 68 documents the source inventory and defines the data profiler/reconciliation gate. It does not authorize DDL or migration import.
+
+
+## Owner clarification — Firebase Auth is the sole account roster authority (2026-11-19)
+The owner has explicitly superseded previously supplied/static email lists. For the application account roster, use **only the five accounts actually present in the authoritative Firebase Authentication user export**. Do not use the five addresses previously typed in chat, checked-in browser allowlists, seeded users, or assumptions as a substitute for the provider's actual Auth records.
+
+Required read-only reconciliation:
+1. Export all five Firebase Auth records from the correct production Firebase project: immutable UID, exact current email, disabled state, provider metadata, and creation/update timestamps. Never export passwords, tokens, or secrets.
+2. Read all k_users profile documents and match to Auth users by immutable UID first. Where legacy profile UID is absent, record an unresolved email/document-key candidate for manual reconciliation; do not silently bind it.
+3. Take role and active status only from a verified matching Firestore profile or an explicit owner-approved mapping. Do not infer roles from email strings, username patterns, old seed data, or UI defaults.
+4. Report Auth users without profiles, profiles without Auth users, duplicate UID bindings, duplicate email claims, disabled users, missing/invalid roles, and conflicting identity fields. Do not create, delete, disable, enable, rename, demote, promote, or overwrite any account/profile during this audit.
+5. The actual five Auth UIDs/emails are not known from this repository-only review. This addendum is an authority rule, not a claim that a live Firebase export has already been read.
+
+This instruction supersedes every earlier owner-protection email list and static browser/Rules allowlist as the account-roster source of truth. Static code may still contain legacy addresses; do not migrate those addresses as accounts unless they are present in the actual Firebase Auth export.
