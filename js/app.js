@@ -4189,6 +4189,21 @@ async function actionProvisionStaffAccounts() {
 
 // Pengelolaan akun staf lokal dinonaktifkan; autentikasi staf wajib melalui Firebase.
 function actionAddUser() {
+  if (isTiDBCatalogPreview()) {
+    showFormModal('Tambah Akun Klinik',[
+     ['name','Nama Pengguna','text',''],['email','Email Login','email',''],
+     ['role','Peran Klinik','select','kasir',[{value:'pimpinan',label:'Pimpinan'},{value:'admin',label:'Admin'},{value:'kasir',label:'Kasir'}]],
+     ['password','Password (12–128 karakter)','password','']
+    ],async v=>{
+      if(String(v.password||'').length<12||String(v.password||'').length>128){showAlert('Password harus 12–128 karakter.');return;}
+      try{
+        await window.assalamTiDBApi.createUser({name:String(v.name||'').trim(),email:String(v.email||'').trim().toLowerCase(),role:v.role,password:v.password});
+        await loadTiDBUsers();
+        showAlert('Akun berhasil dibuat di TiDB.');
+      }catch(e){showAlert(e.message||'Pembuatan akun gagal.');}
+    });
+    return;
+  }
   showAlert('Pembuatan akun lokal sudah dinonaktifkan. Gunakan akun Firebase staf yang telah disiapkan oleh Pimpinan.');
 }
 
