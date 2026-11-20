@@ -5126,6 +5126,11 @@ function renderApp() {
   if (userHeaderEl) {
     userHeaderEl.textContent = `${currentUser.nama} (${currentUser.role})`;
   }
+  const syncBadge = $('sync-badge');
+  if (syncBadge && isTiDBCatalogPreview()) {
+    syncBadge.className = 'sync-badge online';
+    syncBadge.innerHTML = '<span>●</span> <span>TiDB Cloud Tersambung</span>';
+  }
 
   const tabs = (ROLE_TABS[currentRole] || []).slice();
   if (isTiDBCatalogPreview() && currentRole === 'pimpinan') {
