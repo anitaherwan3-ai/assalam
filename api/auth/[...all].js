@@ -16,6 +16,12 @@ async function bootstrapRoute(req,res){
  try{const body=await readJsonBody(req);const result=await bootstrapPreviewOwner(body,{origin:typeof req.headers.origin==="string"?req.headers.origin:"",requestId:req.headers["x-request-id"]});return res.status(200).json(result);}
  catch(e){const status=Number(e.statusCode)||503;if(status>=500)console.error("[PREVIEW-OWNER-BOOTSTRAP]",{code:e.code||"UNKNOWN"});return res.status(status).json({ok:false,code:e.code||"PREVIEW_OWNER_BOOTSTRAP_FAILED",message:status>=500?"Bootstrap Pimpinan Preview belum tersedia.":e.message});}
 }
+async function sessionRoute(req,res){
+ res.setHeader("Cache-Control","no-store, private");res.setHeader("Vary","Cookie");
+ if(req.method!=="GET"){res.setHeader("Allow","GET");return res.status(405).json({ok:false,code:"METHOD_NOT_ALLOWED"});}
+ try{return res.status(200).json({ok:true,actor:await requireBetterAuthActor(req)});}
+ catch(e){const status=Number(e.statusCode)||503;return res.status(status).json({ok:false,code:e.code||"AUTH_SESSION_FAILED",message:status>=500?"Sesi TiDB belum tersedia.":e.message});}
+}
 async function dryRunRoute(req,res){
  res.setHeader("Cache-Control","no-store, private");
  if(req.method!=="POST"){res.setHeader("Allow","POST");return res.status(405).json({ok:false,code:"METHOD_NOT_ALLOWED"});}
@@ -24,6 +30,7 @@ async function dryRunRoute(req,res){
 }
 async function handler(req,res){
  const path=String(req.url||"").split("?")[0];
+ if(path==="/api/auth/session")return sessionRoute(req,res);
  if(path==="/api/auth/preview-bootstrap")return bootstrapRoute(req,res);
  if(path==="/api/auth/preview-import-dry-run")return dryRunRoute(req,res);
  try{

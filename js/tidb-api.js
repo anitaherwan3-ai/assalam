@@ -66,7 +66,7 @@
     request,
     newIdempotencyKey: newRequestId,
     getSession: () => request("/api/auth/session"),
-    bootstrapPreviewOwner: (idToken, firebaseUid, password) => request("/api/auth/preview-bootstrap", { method:"POST", body:{idToken,firebaseUid,password} }),
+    bootstrapPreviewOwner: (email, bootstrapSecret, password) => request("/api/auth/preview-bootstrap", { method:"POST", body:{email,bootstrapSecret,password} }),
     signInEmail: (email,password) => request("/api/auth/sign-in/email", { method:"POST", body:{email,password} }),
     signOut: () => request("/api/auth/sign-out", { method:"POST", body:{} }),
     previewImportDryRun: () => request("/api/auth/preview-import-dry-run", { method:"POST", body:{} }),
