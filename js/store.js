@@ -137,6 +137,7 @@ class ClinicStore {
       'returJual', 'returBeli', 'batalTrx'
     ];
     this.listeners = [];
+    this._saveDebounceTimer = null;
     this.loadLocal();
   }
 
@@ -184,6 +185,33 @@ class ClinicStore {
   }
 
   saveLocal(triggerSync = true) {
+    const timerFn = (typeof setTimeout === 'function')
+      ? setTimeout
+      : (typeof globalThis !== 'undefined' && typeof globalThis.setTimeout === 'function')
+        ? globalThis.setTimeout
+        : null;
+
+    const clearFn = (typeof clearTimeout === 'function')
+      ? clearTimeout
+      : (typeof globalThis !== 'undefined' && typeof globalThis.clearTimeout === 'function')
+        ? globalThis.clearTimeout
+        : null;
+
+    if (timerFn) {
+      if (this._saveDebounceTimer && clearFn) {
+        clearFn(this._saveDebounceTimer);
+      }
+      this._saveDebounceTimer = timerFn(() => {
+        this._flushSave(triggerSync);
+      }, 100);
+    } else {
+      this._flushSave(triggerSync);
+    }
+
+    this.notify();
+  }
+
+  _flushSave(triggerSync = true) {
     try {
       localStorage.setItem('klinik_data', JSON.stringify(this.state));
     } catch (e) {
@@ -193,8 +221,6 @@ class ClinicStore {
     if (triggerSync && window.firebaseBackend) {
       window.firebaseBackend.pushData(this.state);
     }
-
-    this.notify();
   }
 
   subscribe(listener) {

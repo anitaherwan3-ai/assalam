@@ -1,4 +1,49 @@
-// Utility & Helper functions
+// Dynamic External Script Loader for Lazy Loading Modules
+function loadScriptAsync(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.getAttribute('data-loaded') === 'true' || window.jspdf || window.Chart) {
+        return resolve();
+      }
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', err => reject(err));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.setAttribute('data-loaded', 'true');
+      resolve();
+    };
+    script.onerror = err => reject(err);
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePdfLibraries() {
+  if (window.jspdf && window.jspdf.jsPDF) return true;
+  try {
+    await loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await loadScriptAsync('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+    return !!(window.jspdf && window.jspdf.jsPDF);
+  } catch (e) {
+    console.error('Failed to load PDF libraries dynamically:', e);
+    return false;
+  }
+}
+
+async function ensureChartLibrary() {
+  if (typeof window.Chart !== 'undefined') return true;
+  try {
+    await loadScriptAsync('https://cdn.jsdelivr.net/npm/chart.js');
+    return typeof window.Chart !== 'undefined';
+  } catch (e) {
+    console.error('Failed to load Chart.js dynamically:', e);
+    return false;
+  }
+}
 
 // HTML Escaping to prevent XSS attacks
 function esc(str) {

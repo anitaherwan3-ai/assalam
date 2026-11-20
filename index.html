@@ -17,22 +17,7 @@
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- Firebase SDK hanya dimuat pada host produksi lama. TiDB Preview tidak memuat Firebase. -->
-  <script>
-    if (location.hostname === 'klinikassalaam.vercel.app') {
-      document.write('<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"><\/script>');
-      document.write('<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"><\/script>');
-      document.write('<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"><\/script>');
-      document.write('<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"><\/script>');
-    }
-  </script>
-
-  <!-- jsPDF & autoTable (CDN) for PDF Export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-
-  <!-- Chart.js (CDN) for Executive Visual Analytics -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- jsPDF & Chart.js di-load secara dinamis (lazy load) saat modul laporan dibuka untuk menghemat bandwidth -->
 </head>
 <body>
 

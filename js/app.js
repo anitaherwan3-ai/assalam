@@ -792,13 +792,14 @@ function viewPasien() {
   `;
 }
 
-function exportPasienShiftPDF() {
+async function exportPasienShiftPDF() {
   const shiftId = val('pasien-export-shift');
   if (!shiftId) {
     showAlert('Pilih shift terlebih dahulu.');
     return;
   }
-  if (!window.jspdf || !window.jspdf.jsPDF) {
+  const ready = await ensurePdfLibraries();
+  if (!ready || !window.jspdf || !window.jspdf.jsPDF) {
     showAlert('Pustaka PDF belum siap. Periksa koneksi internet lalu coba lagi.');
     return;
   }
@@ -3630,8 +3631,11 @@ function viewDashboard() {
 
 window._activeCharts = [];
 
-function initDashboardCharts(fin) {
-  if (typeof Chart === 'undefined') return;
+async function initDashboardCharts(fin) {
+  if (typeof Chart === 'undefined') {
+    const ready = await ensureChartLibrary();
+    if (!ready || typeof Chart === 'undefined') return;
+  }
 
   window._activeCharts.forEach(c => {
     try { c.destroy(); } catch (e) {}
