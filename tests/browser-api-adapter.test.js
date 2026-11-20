@@ -24,22 +24,24 @@ test("browser TiDB adapter uses Better Auth cookies and only its exact API paths
   assert.equal(window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP, true);
   await window.assalamTiDBApi.getSession();
   assert.equal(calls[0].path, "/api/auth/session");
+  await window.assalamTiDBApi.getPreviewOwnerStatus();
+  assert.equal(calls[1].path, "/api/auth/preview-owner-status");
   assert.equal(calls[0].init.credentials, "same-origin");
   assert.equal(calls[0].init.headers.Authorization, undefined);
   assert.equal(calls[0].init.headers["X-Request-ID"], "request-uuid-test");
   await window.assalamTiDBApi.createTariff({ name: "Test", serviceType: "Test", price: "1000" }, "idempotency-key-1");
-  assert.equal(calls[1].init.headers["Idempotency-Key"], "idempotency-key-1");
+  assert.equal(calls[2].init.headers["Idempotency-Key"], "idempotency-key-1");
   await window.assalamTiDBApi.updateSupplier({ publicId: "supplier-public-id", expectedVersion: "1", name: "Supplier", phone: "", address: "" }, "supplier-update-key");
-  assert.equal(calls[2].path, "/api/catalog/suppliers");
-  assert.equal(calls[2].init.method, "PATCH");
-  assert.equal(calls[2].init.headers["Idempotency-Key"], "supplier-update-key");
+  assert.equal(calls[3].path, "/api/catalog/suppliers");
+  assert.equal(calls[3].init.method, "PATCH");
+  assert.equal(calls[3].init.headers["Idempotency-Key"], "supplier-update-key");
   await window.assalamTiDBApi.deactivateSupplier({ publicId: "supplier-public-id", expectedVersion: "2" }, "supplier-disable-key");
-  assert.equal(calls[3].init.method, "DELETE");
-  assert.equal(calls[3].init.headers["Idempotency-Key"], "supplier-disable-key");
+  assert.equal(calls[4].init.method, "DELETE");
+  assert.equal(calls[4].init.headers["Idempotency-Key"], "supplier-disable-key");
   assert.equal(typeof window.assalamTiDBApi.bootstrapPreviewOwner, "function");
   assert.equal(typeof window.assalamTiDBApi.previewImportDryRun, "function");
   await window.assalamTiDBApi.listUsers();
-  assert.equal(calls[4].path, "/api/admin/users");
+  assert.equal(calls[5].path, "/api/admin/users");
   await assert.rejects(
     window.assalamTiDBApi.request("/api/not-allowlisted"),
     error => error.code === "TIDB_ENDPOINT_NOT_ALLOWED"
