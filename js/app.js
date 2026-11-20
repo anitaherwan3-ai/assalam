@@ -203,10 +203,10 @@ function applyAppSettings() {
     : `<span>${esc(set.logo || '🏥')}</span>`;
   
   $('brand-logo').innerHTML = logoHtml;
-  $('brand-title').textContent = set.nama || 'Klinik Sehat';
+  $('brand-title').textContent = set.nama || 'Klinik Assalaam Palembang';
   $('login-brand-logo').innerHTML = logoHtml;
-  $('login-brand-title').textContent = set.nama || 'Klinik Sehat';
-  document.title = (set.nama || 'Klinik Sehat') + ' - Sistem Manajemen & Keuangan';
+  $('login-brand-title').textContent = set.nama || 'Klinik Assalaam Palembang';
+  document.title = (set.nama || 'Klinik Assalaam Palembang') + ' - Sistem Manajemen & Keuangan';
 }
 
 // Semua peran masuk melalui Firebase Authentication dan profil Firestore aktif.
@@ -636,7 +636,7 @@ function printShiftSlip(shiftId) {
   body.innerHTML = `
     <div class="nota-box">
       <div style="text-align:center;">
-        <b style="font-size:15px;">${esc(set.nama || 'Klinik Sehat Pratama')}</b><br>
+        <b style="font-size:15px;">${esc(set.nama || 'Klinik Assalaam Palembang')}</b><br>
         <span style="font-size:11px;font-weight:700;color:#0f766e;">BERITA ACARA TUTUP SHIFT KASIR</span><br>
         <span style="font-size:10px;color:#64748b;">${esc(set.alamat || '')}</span>
       </div>
@@ -1721,7 +1721,7 @@ function printReceipt(trxId) {
     <div class="nota-box">
       <div style="text-align:center;">
         ${set.logoImg ? `<img src="${esc(set.logoImg)}" style="height:44px;margin-bottom:4px;"><br>` : (set.logo || '🏥') + ' '}
-        <b style="font-size:15px;">${esc(set.nama || 'Klinik Sehat')}</b><br>
+        <b style="font-size:15px;">${esc(set.nama || 'Klinik Assalaam Palembang')}</b><br>
         <span style="font-size:11px;color:#475569;">${esc(set.alamat || '')}</span><br>
         <span style="font-size:11px;color:#475569;">Telp: ${esc(set.telp || '-')}</span>
       </div>
@@ -3530,7 +3530,7 @@ function renderLabelEditorAndPreview() {
           ${labels.map((item, idx) => `
             <div class="etiket-card ${item.jenis}" id="etiket-card-${idx}">
               <div class="etiket-header">
-                <div class="etiket-header-title">${esc(set.nama || 'Klinik Sehat Pratama')}</div>
+                <div class="etiket-header-title">${esc(set.nama || 'Klinik Assalaam Palembang')}</div>
                 <div class="etiket-header-sub">${esc(set.alamat || 'Pelayanan Kesehatan & Apotek')} ${set.telp ? `• Telp: ${esc(set.telp)}` : ''}</div>
                 <div class="etiket-badge-type">${item.jenis === 'biru' ? 'OBAT LUAR - TIDAK BOLEH DITELAN' : 'OBAT DALAM (DIMINUM)'}</div>
               </div>
@@ -4618,7 +4618,7 @@ function viewDisplayTV() {
       <h2>📢 Teks Berjalan (Running Text)</h2>
       <label style="display:block;margin-bottom:10px;">
         Isi Teks Berjalan di Bagian Bawah Layar TV
-        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Sehat... mohon perhatikan nomor antrean Anda." style="display:block;width:100%;box-sizing:border-box;min-height:56px;padding:14px 16px;font-size:16px;line-height:1.5;border-radius:10px;">
+        <input id="dtv-runningText" value="${esc(currentText)}" placeholder="Contoh: Selamat datang di Klinik Assalaam Palembang... mohon perhatikan nomor antrean Anda." style="display:block;width:100%;box-sizing:border-box;min-height:56px;padding:14px 16px;font-size:16px;line-height:1.5;border-radius:10px;">
       </label>
       <div style="background:var(--bg);padding:10px 20px;border-radius:8px;overflow:hidden;font-size:13px;color:#06b6d4;font-weight:600;">
         <span id="dtv-text-preview" style="white-space:nowrap;">${esc(currentText) || 'Pratinjau teks berjalan...'}</span>

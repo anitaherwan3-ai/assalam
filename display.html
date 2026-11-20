@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Layar Antrean Pasien - TV Ruang Tunggu</title>
+  <title>Layar Antrean Pasien - Klinik Assalaam Palembang</title>
 
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
@@ -528,7 +528,7 @@
     <div class="brand">
       <div id="display-logo" class="brand-logo">🏥</div>
       <div class="brand-info">
-        <h1 id="display-clinic-name">Klinik Sehat Pratama</h1>
+        <h1 id="display-clinic-name">Klinik Assalaam Palembang</h1>
         <p id="display-clinic-addr">Melayani dengan Sepenuh Hati dan Profesional</p>
       </div>
     </div>
@@ -624,7 +624,7 @@
     <div class="marquee-badge">Pengumuman</div>
     <div class="marquee-container">
       <div id="marquee-text" class="marquee-content">
-        Selamat datang di Klinik Sehat. Mohon perhatikan nomor antrean Anda pada layar display. Jaga selalu kebersihan dan kenyamanan bersama.
+        Selamat datang di Klinik Assalaam Palembang. Mohon perhatikan nomor antrean Anda pada layar display. Jaga selalu kebersihan dan kenyamanan bersama.
       </div>
     </div>
   </footer>
@@ -984,6 +984,7 @@
 
     // State & Sync Loader
     function loadDisplayData() {
+      if (tidbPollingActive) return; // Prioritaskan TiDB Backend untuk mencegah flicker/blink
       try {
         const raw = localStorage.getItem('klinik_data');
         if (!raw) return;
@@ -993,7 +994,7 @@
         const today = getDisplayTodayWIB();
 
         // Update clinic branding
-        document.getElementById('display-clinic-name').textContent = set.nama || 'Klinik Sehat Pratama';
+        document.getElementById('display-clinic-name').textContent = set.nama || 'Klinik Assalaam Palembang';
         document.getElementById('display-clinic-addr').textContent = set.alamat || 'Melayani dengan Sepenuh Hati dan Profesional';
         if (set.logoImg) {
           document.getElementById('display-logo').innerHTML = `<img src="${set.logoImg}" alt="Logo">`;
@@ -1044,7 +1045,7 @@
             document.getElementById('active-poli').textContent = lastServed.layanan || 'Poli Umum';
           } else {
             document.getElementById('active-no').textContent = '-';
-            document.getElementById('active-name').textContent = 'Belum ada pasien dilayani';
+            document.getElementById('active-name').textContent = 'Belum ada antrean dipanggil';
             document.getElementById('active-poli').textContent = 'Poli Umum';
           }
         }
@@ -1055,7 +1056,7 @@
 
         const queueListEl = document.getElementById('queue-list');
         if (nextList.length === 0) {
-          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Tidak ada antrean berikutnya</div>`;
+          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Belum ada antrean berikutnya hari ini</div>`;
         } else {
           queueListEl.innerHTML = nextList.slice(0, 6).map((p, idx) => `
             <div class="queue-item">
@@ -1298,7 +1299,7 @@
         document.getElementById('waiting-count').textContent = `${waitingList.length} Pasien Menunggu`;
         const queueListEl = document.getElementById('queue-list');
         if (waitingList.length === 0) {
-          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Tidak ada antrean berikutnya</div>`;
+          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Belum ada antrean berikutnya hari ini</div>`;
         } else {
           queueListEl.innerHTML = waitingList.slice(0, 6).map((p, idx) => `
             <div class="queue-item">
@@ -1322,11 +1323,9 @@
     window.addEventListener('DOMContentLoaded', () => {
       // Tampilkan health tips dulu sebagai default — akan diganti YouTube jika Admin sudah set video
       startHealthTips();
-      loadDisplayData();
       pollTiDBDisplay();
       // Fast polling (setiap 2 detik) untuk responsivitas audio panggilan dan nomor antrean TV
       setInterval(pollTiDBDisplay, 2000);
-      setInterval(loadDisplayData, 5000);
     });
   </script>
 </body>

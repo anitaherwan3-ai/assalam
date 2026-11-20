@@ -17,7 +17,7 @@ const DEFAULT_SETTINGS = {
   kertasNota: '80mm',     // '58mm', '80mm', 'A4'
   fiturKirimWA: true,     // Saklar fitur kirim struk WA (Pimpinan bisa nonaktifkan)
   waOwner: '081299998888', // Nomor WA Owner/Pimpinan untuk pengiriman otomatis rekap shift
-  runningTextDisplay: 'Selamat datang di Klinik Sehat Pratama. Mohon perhatikan nomor antrean Anda. Melayani dengan sepenuh hati.',
+  runningTextDisplay: 'Selamat datang di Klinik Assalaam Palembang. Mohon perhatikan nomor antrean Anda. Melayani dengan sepenuh hati.',
   youtubeVideoId: '',         // Dikosongkan — Admin mengatur via tab Display TV
   enableYoutubeDisplay: true  // Jika youtubeVideoId kosong, layar otomatis tampilkan Slide Edukasi Kesehatan
 };

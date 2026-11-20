@@ -309,7 +309,7 @@ function sendReceiptWA(trx, settings) {
   const hpClean = formatWaNumber(trx.hp || '');
   if (!hpClean) return;
 
-  const clinicName = settings.nama || 'Klinik Sehat';
+  const clinicName = settings.nama || 'Klinik Assalaam Palembang';
   const clinicTelp = settings.telp || '-';
   const clinicAddr = settings.alamat || '';
 
@@ -357,7 +357,7 @@ function sendShiftRecapWA(shift, store, customHp = null) {
   }
 
   const set = store.state.set || {};
-  const clinicName = set.nama || 'Klinik Sehat Pratama';
+  const clinicName = set.nama || 'Klinik Assalaam Palembang';
   const clinicAddr = set.alamat || '';
   
   // Ambil transaksi dalam shift ini

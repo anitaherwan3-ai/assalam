@@ -204,7 +204,7 @@ class ExportHelper {
     // Header Dokumen
     doc.setFontSize(16);
     doc.setTextColor(15, 118, 110);
-    doc.text(settings.nama || 'Klinik Sehat', 14, 15);
+    doc.text(settings.nama || 'Klinik Assalaam Palembang', 14, 15);
 
     doc.setFontSize(11);
     doc.setTextColor(51, 65, 85);
