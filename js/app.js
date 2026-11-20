@@ -4149,6 +4149,10 @@ function disableTiDBUser(id){
  const u=(window.ASSALAM_TIDB_USER_CACHE||[]).find(x=>x.userId===id);if(!u)return showAlert('Akun tidak ditemukan.');
  showConfirm('Nonaktifkan '+(u.email||u.name)+'? Sesi dicabut; riwayat dan audit tetap disimpan.',async()=>{try{await window.assalamTiDBApi.disableUser(id);await loadTiDBUsers();showAlert('Akun dinonaktifkan tanpa menghapus riwayat.');}catch(e){showAlert(e.message||'Penonaktifan gagal.');}},'Nonaktifkan Akun');
 }
+async function runMasterImportDryRun(){
+ return runFirebaseMasterImportDryRun();
+}
+window.runMasterImportDryRun=runMasterImportDryRun;
 async function runFirebaseMasterImportDryRun(){
  const target=$('firebase-master-dryrun-result');
  if(!target)return;
