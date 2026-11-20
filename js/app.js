@@ -231,10 +231,6 @@ async function doLogin() {
   try {
     const profile = await backend.login(email, password);
     applyFirebaseSession(profile);
-    if (isTiDBCatalogPreview() && profile.role === 'pimpinan' &&
-        String(profile.email || email).toLowerCase() === 'praktekrose@gmail.com') {
-      promptPreviewPimpinanTiDBAccess(backend, email);
-    }
     store.logActivity('Masuk', 'Sesi', `${profile.role}: ${profile.nama} login melalui Firebase`);
   } catch (err) {
     console.error('Login Firebase gagal:', err);
