@@ -1,5 +1,5 @@
 "use strict";
-const test=require("node:test"),assert=require("node:assert/strict"),fixture=require("../config/firebase-master-import-fixture.v1.json");
+const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),fixture=require("../config/firebase-master-import-fixture.v1.json");
 const {buildFirebaseMasterPlan}=require("../lib/firebase-master-normalization");
 test("master normalization maps legacy strip to pcs and preserves medicine prices",()=>{const p=buildFirebaseMasterPlan(fixture);assert.deepEqual(p.medicines.map(x=>x.canonicalUnit),["pcs","pcs","botol"]);assert.deepEqual(p.medicines.map(x=>x.sellingPrice),[5000,15000,20000]);assert.equal(p.summary.normalizedLegacyStripCount,2);assert.equal(p.summary.stockBalancesImported,false);assert.equal(p.summary.hppImported,false);});
 test("packages retain package selling price and source component snapshots",()=>{const p=buildFirebaseMasterPlan(fixture);assert.equal(p.summary.medicineCount,3);assert.equal(p.summary.tariffCount,6);assert.equal(p.summary.packageCount,3);assert.equal(p.summary.packageComponentCount,8);assert.deepEqual(p.packagePriceChecks.map(x=>x.difference),[-15000,-15000,10000]);assert.equal(p.components.find(x=>x.packageLegacyId==="p2"&&x.medicineLegacyId==="o1").componentPriceSnapshot,5000);});

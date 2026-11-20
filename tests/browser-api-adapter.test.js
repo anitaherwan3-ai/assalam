@@ -36,9 +36,12 @@ test("browser TiDB adapter uses Better Auth cookies and only its exact API paths
   await window.assalamTiDBApi.deactivateSupplier({ publicId: "supplier-public-id", expectedVersion: "2" }, "supplier-disable-key");
   assert.equal(calls[3].init.method, "DELETE");
   assert.equal(calls[3].init.headers["Idempotency-Key"], "supplier-disable-key");
-  assert.equal(window.assalamTiDBApi.bootstrapPreviewOwner, undefined);
+  assert.equal(typeof window.assalamTiDBApi.bootstrapPreviewOwner, "function");
+  assert.equal(typeof window.assalamTiDBApi.previewImportDryRun, "function");
+  await window.assalamTiDBApi.listUsers();
+  assert.equal(calls[4].path, "/api/admin/users");
   await assert.rejects(
-    window.assalamTiDBApi.request("/api/admin/users"),
+    window.assalamTiDBApi.request("/api/not-allowlisted"),
     error => error.code === "TIDB_ENDPOINT_NOT_ALLOWED"
   );
 });
