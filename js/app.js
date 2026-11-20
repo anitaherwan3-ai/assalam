@@ -278,11 +278,19 @@ async function activatePreviewOwnerBootstrap() {
     const password=String(values.password||"");
     if(password.length<12||password.length>128){showAlert("Password harus 12–128 karakter.");return;}
     if(password!==String(values.confirmPassword||"")){showAlert("Konfirmasi password tidak sama.");return;}
+    let stage="bootstrap";
     try{
       await window.assalamTiDBApi.bootstrapPreviewOwner("praktekrose@gmail.com",String(values.bootstrapSecret||""),password);
+      stage="sign_in";
       await signInTiDBPreview("praktekrose@gmail.com",password);
       showAlert("Pimpinan Utama berhasil diinisialisasi langsung di TiDB. Firebase tidak digunakan.","Aktivasi Berhasil");
-    }catch(e){showAlert(e.message||"Aktivasi Pimpinan gagal.","Aktivasi TiDB");}
+    }catch(e){
+      const step=stage==="bootstrap"
+        ?"Gagal pada tahap pembuatan/pemulihan akun Pimpinan."
+        :"Akun Pimpinan sudah dibuat atau diperbarui, tetapi login TiDB belum berhasil.";
+      const detail=[step,e.message||"Aktivasi Pimpinan gagal.",e.code?"Kode: "+e.code:"",e.status?"HTTP: "+e.status:"",e.requestId?"ID permintaan: "+e.requestId:""].filter(Boolean).join("\n");
+      showAlert(detail,"Aktivasi TiDB");
+    }
   });
 }
 
