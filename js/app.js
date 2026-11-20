@@ -224,42 +224,17 @@ async function doLogin() {
   const email = val('login-email').trim().toLowerCase();
   const password = val('login-password');
   const errorEl = $('login-error');
-  if (!email || !password) {
-    errorEl.textContent = 'Masukkan email dan password.';
-    return;
-  }
+  if (!email || !password) { errorEl.textContent = 'Masukkan email dan password.'; return; }
   const backend = window.firebaseBackend;
-  if (!backend || !backend.auth) {
-    errorEl.textContent = 'Firebase belum siap. Periksa koneksi internet lalu coba lagi.';
-    return;
-  }
+  if (!backend || !backend.auth) { errorEl.textContent = 'Firebase belum siap. Periksa koneksi internet lalu coba lagi.'; return; }
   errorEl.textContent = 'Memeriksa akun melalui Firebase...';
   try {
     const profile = await backend.login(email, password);
     applyFirebaseSession(profile);
-
-    // Bootstrap hanya identitas Pimpinan pada project Firebase preview terpisah.
-    // Tidak mengubah Firebase Auth/Firestore dan tidak pernah berjalan pada project operasional.
-    if (profile.role === 'pimpinan' &&
-        String(profile.email || email).toLowerCase() === 'praktekrose@gmail.com' &&
-        window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true &&
-        window.assalamTiDBApi &&
-        !window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED) {
-      window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = true;
-      try {
-        await window.assalamTiDBApi.bootstrapPreviewOwner();
-        window.ASSALAM_TIDB_PREVIEW_SESSION = await window.assalamTiDBApi.getSession();
-        if (window.assalamTiDBCatalog) await window.assalamTiDBCatalog.ensureLoaded(true);
-        console.info('[TiDB Preview] Identitas dan katalog Pimpinan preview terverifikasi.');
-        renderApp();
-      } catch (err) {
-        window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = false;
-        window.ASSALAM_TIDB_PREVIEW_SESSION = null;
-        console.warn('[TiDB Preview] Bootstrap/katalog belum selesai:', err.code || err.message);
-        showAlert('Sesi katalog TiDB Preview belum siap: ' + (err.message || 'Periksa koneksi.'), 'TiDB Preview');
-      }
+    if (isTiDBCatalogPreview() && profile.role === 'pimpinan' &&
+        String(profile.email || email).toLowerCase() === 'praktekrose@gmail.com') {
+      promptPreviewPimpinanTiDBAccess(backend, email);
     }
-
     store.logActivity('Masuk', 'Sesi', `${profile.role}: ${profile.nama} login melalui Firebase`);
   } catch (err) {
     console.error('Login Firebase gagal:', err);
@@ -267,6 +242,33 @@ async function doLogin() {
       ? 'Email atau password tidak sesuai.'
       : (err.code === 'auth/user-not-found' ? 'Akun belum terdaftar di Firebase Authentication.' : (err.message || 'Login gagal.'));
   }
+}
+
+function promptPreviewPimpinanTiDBAccess(backend, email) {
+  if (!window.assalamTiDBApi || !backend || !backend.auth || !backend.auth.currentUser) {
+    showAlert('Koneksi Firebase atau TiDB Preview belum siap.', 'TiDB Preview'); return;
+  }
+  showFormModal('Aktivasi Login Pimpinan TiDB Preview', [
+    ['tidbPassword','Password baru / password TiDB Preview (minimal 12 karakter)','password',''],
+    ['tidbPasswordConfirm','Ulangi password TiDB Preview','password','']
+  ], async values => {
+    const password=String(values.tidbPassword||'');
+    if(password.length<12||password.length>128){showAlert('Password TiDB harus 12–128 karakter. Password Firebase lama tidak diubah.','Aturan Password');return;}
+    if(password!==String(values.tidbPasswordConfirm||'')){showAlert('Konfirmasi password TiDB tidak sama.','Konfirmasi Password');return;}
+    try{
+      const fb=backend.auth.currentUser;
+      if(!fb||String(fb.email||'').toLowerCase()!=='praktekrose@gmail.com')throw new Error('Sesi Firebase Pimpinan Utama tidak ditemukan.');
+      const token=await fb.getIdToken(true);
+      const result=await window.assalamTiDBApi.bootstrapPreviewOwner(token,fb.uid,password);
+      await window.assalamTiDBApi.signInEmail(email,password);
+      const session=await window.assalamTiDBApi.getSession();
+      if(!session||session.ok!==true||!session.actor||session.actor.role!=='pimpinan')throw new Error('Sesi Better Auth Pimpinan belum terverifikasi.');
+      window.ASSALAM_TIDB_PREVIEW_SESSION=session;
+      if(window.assalamTiDBCatalog)await window.assalamTiDBCatalog.ensureLoaded(true);
+      showAlert(result.alreadyProvisioned?'Akun Pimpinan TiDB sudah tersedia dan sesi berhasil diverifikasi.':'Bootstrap Pimpinan TiDB berhasil dan sesi berhasil diverifikasi.','TiDB Preview');
+      renderApp();
+    }catch(err){window.ASSALAM_TIDB_PREVIEW_SESSION=null;console.error('[TiDB Preview] Login Pimpinan:',err.code||err.message);showAlert(err.message||'Login Pimpinan TiDB Preview gagal.','TiDB Preview');}
+  });
 }
 
 async function resetLoginPassword() {
@@ -292,6 +294,9 @@ function doLogout() {
     activeTab = '';
     cartItems = [];
     if (window.assalamTiDBCatalog) window.assalamTiDBCatalog.clear();
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      await window.assalamTiDBApi.signOut().catch(err => console.warn('[TiDB Preview] signOut:', err));
+    }
     window.ASSALAM_TIDB_PREVIEW_SESSION = null;
     window.ASSALAM_TIDB_BOOTSTRAP_ATTEMPTED = false;
     if (window.firebaseBackend && window.firebaseBackend.auth) {
@@ -4036,45 +4041,61 @@ function quickEditOwnerWa() {
 }
 
 function viewPengguna() {
-  const users = store.state.users || [];
-  const ownerWa = store.getOwnerWa ? store.getOwnerWa() : (store.state.set && store.state.set.waOwner);
-  const pimpinanUser = users.find(u => u.role === 'pimpinan');
-  const rows = users.map(u => [
-    esc(u.nama), `<code>${esc(u.u)}</code>`,
-    `<span class="badge-ok">${esc(u.role)}</span>`, esc(u.hp || '-'),
-    ['praktekrose', 'pimpinan2'].includes(u.u) ? 'Akun inti terlindungi' : 'Data lokal lama dipertahankan'
-  ]);
+  if (isTiDBCatalogPreview()) return viewTiDBPengguna();
+  const users=store.state.users||[],ownerWa=store.getOwnerWa?store.getOwnerWa():(store.state.set&&store.state.set.waOwner),pimpinanUser=users.find(u=>u.role==='pimpinan');
+  const rows=users.map(u=>[esc(u.nama),`<code>${esc(u.u)}</code>`,`<span class="badge-ok">${esc(u.role)}</span>`,esc(u.hp||'-'),['praktekrose','pimpinan2'].includes(u.u)?'Akun inti terlindungi':'Data lokal lama dipertahankan']);
+  return `<div class="card"><b>Pengaturan WhatsApp Owner</b><p>Nomor WA Owner: <b>${esc(ownerWa||'Belum Diatur')}</b> ${pimpinanUser?'('+esc(pimpinanUser.nama)+')':''}</p><button class="p s" onclick="quickEditOwnerWa()">Atur Nomor WA Owner</button></div>
+  <div class="card"><h2>Akun Staf Firebase (masa transisi)</h2><p class="muted">Akun Firebase lama tetap dipertahankan selama pengujian migrasi.</p><button class="p" onclick="actionProvisionStaffAccounts()">Aktifkan / Perbarui Profil Akses Staf</button>${renderTable(['Nama Pengguna Lama','Username','Peran','No. WhatsApp','Status'],rows,{key:'user_tbl'})}</div>`;
+}
 
-  return `
-    <div class="card" style="border-left:4px solid #16a34a;background:rgba(22,163,74,0.06);">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <b style="font-size:14px;color:#16a34a;">📱 Pengaturan WhatsApp Owner (Penerima Rekap Tutup Shift Otomatis)</b>
-          <div style="font-size:12.5px;color:var(--tx);margin-top:4px;">
-            Nomor WA Owner Saat Ini: <b style="color:var(--pr);font-size:14px;">${esc(ownerWa || 'Belum Diatur')}</b>
-            ${pimpinanUser ? ` <span style="color:var(--mu);font-size:12px;">(Terhubung ke user: <b>${esc(pimpinanUser.nama)}</b>)</span>` : ''}
-          </div>
-          <div style="font-size:11.5px;color:var(--mu);margin-top:2px;">
-            Setiap kali kasir melakukan Tutup Shift, rincian omset, kas laci, selisih kas, dan rincian transaksi akan otomatis terkirim ke WhatsApp ini.
-          </div>
-        </div>
-        <button class="p s" style="background:#16a34a;border-color:#16a34a;" onclick="quickEditOwnerWa()">✏️ Atur Nomor WA Owner</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Akun Staf Firebase</h2>
-      <p class="muted" style="font-size:12px;">Buat akun staf terlebih dahulu di Firebase Authentication. Tombol ini kemudian menyiapkan profil akses Firestore untuk email staf tersebut. Password tidak disimpan di aplikasi atau Firestore.</p>
-      <div style="margin:10px 0 14px;line-height:1.8;">
-        <div><b>Admin Gudang & Keuangan:</b> assalamadmin1@gmail.com</div>
-        <div><b>Kasir Shift Pagi:</b> assalamkasir1@gmail.com</div>
-        <div><b>Kasir Shift Sore:</b> assalamkasir2@gmail.com</div>
-      </div>
-      <button class="p" onclick="actionProvisionStaffAccounts()">Aktifkan / Perbarui Profil Akses Staf</button>
-      <p class="muted" style="font-size:11px;margin-top:10px;">Jalankan tombol ini dari akun Pimpinan. Akun lokal lama tidak dihapus selama masa pengujian.</p>
-      ${renderTable(['Nama Pengguna Lama', 'Username', 'Peran', 'No. WhatsApp', 'Status'], rows, { key: 'user_tbl' })}
-    </div>
-  `;
+function viewTiDBPengguna() {
+ const ready=!!(window.ASSALAM_TIDB_PREVIEW_SESSION&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role==='pimpinan');
+ return `<div class="card"><h2>Manajemen Akun — TiDB Preview</h2><p class="muted">Sumber otorisasi Better Auth + TiDB. Penonaktifan bersifat soft-disable dan tercatat dalam audit. Lima akun inti tidak dapat diubah identitas/role atau dinonaktifkan.</p>
+ ${ready?`<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0;"><button class="p" onclick="actionAddUser()">＋ Tambah Akun</button><button class="s" onclick="loadTiDBUsers()">Muat Ulang Akun</button><button class="s" onclick="runFirebaseMasterImportDryRun()">Dry-run Master Firebase → TiDB</button></div><div id="tidb-users-table"><p class="muted">Memuat akun...</p></div><div id="firebase-master-dryrun-result" style="margin-top:14px;"></div>`:'<p class="bad">Sesi Better Auth Pimpinan belum aktif. Login Pimpinan Utama dan selesaikan aktivasi TiDB Preview.</p>'}</div>`;
+}
+async function loadTiDBUsers(){
+ const target=$('tidb-users-table');if(!target||!window.ASSALAM_TIDB_PREVIEW_SESSION||window.ASSALAM_TIDB_USERS_LOADING)return;
+ window.ASSALAM_TIDB_USERS_LOADING=true;target.innerHTML='<p class="muted">Memuat akun...</p>';
+ try{
+  const response=await window.assalamTiDBApi.listUsers(),users=Array.isArray(response.data)?response.data:[];window.ASSALAM_TIDB_USER_CACHE=users;
+  if(!users.length){target.innerHTML='<p class="muted">Belum ada akun TiDB.</p>';return;}
+  const rows=users.map(u=>{const locked=!!u.protectedOwner||['praktekrose@gmail.com','nursalim42@gmail.com','assalamkasir1@gmail.com','assalamkasir2@gmail.com','assalamadmin1@gmail.com'].includes(String(u.email||'').toLowerCase());
+   const status=u.active&&!u.banned?'<span class="badge-ok">Aktif</span>':'<span class="badge-warn">Nonaktif</span>';
+   const actions=`<button class="s" onclick="editTiDBUser('${esc(u.userId)}')">Kelola</button>`+(locked||!u.active?'':` <button class="s btn-danger" onclick="disableTiDBUser('${esc(u.userId)}')">Nonaktifkan</button>`);
+   return `<tr><td>${esc(u.name||'-')}</td><td>${esc(u.email||'-')}</td><td>${esc(u.role||'-')}</td><td>${status}</td><td>${locked?'<span class="muted">Akun inti</span> ':''}${actions}</td></tr>`;
+  }).join('');
+  target.innerHTML=`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Total akun: ${users.length}. Akun nonaktif tetap tersimpan untuk audit.</p>`;
+ }catch(e){target.innerHTML=`<p class="bad">${esc(e.message||'Gagal memuat akun.')}</p>`;}finally{window.ASSALAM_TIDB_USERS_LOADING=false;}
+}
+function actionAddUser(){
+ if(!isTiDBCatalogPreview()){showAlert('Pembuatan akun lokal dinonaktifkan.');return;}
+ showFormModal('Tambah Akun Klinik',[
+  ['name','Nama Pengguna','text',''],['email','Email Login','email',''],
+  ['role','Peran Klinik','select','kasir',[{value:'pimpinan',label:'Pimpinan'},{value:'admin',label:'Admin'},{value:'kasir',label:'Kasir'}]],
+  ['password','Password (12–128 karakter)','password','']
+ ],async v=>{if(String(v.password||'').length<12||String(v.password||'').length>128){showAlert('Password harus 12–128 karakter.');return;}
+ try{await window.assalamTiDBApi.createUser({name:String(v.name||'').trim(),email:String(v.email||'').trim().toLowerCase(),role:v.role,password:v.password});await loadTiDBUsers();showAlert('Akun berhasil dibuat di TiDB Preview.');}catch(e){showAlert(e.message||'Pembuatan akun gagal.');}});
+}
+function editTiDBUser(id){
+ const u=(window.ASSALAM_TIDB_USER_CACHE||[]).find(x=>x.userId===id);if(!u)return showAlert('Akun tidak ditemukan.');
+ const locked=!!u.protectedOwner||['praktekrose@gmail.com','nursalim42@gmail.com','assalamkasir1@gmail.com','assalamkasir2@gmail.com','assalamadmin1@gmail.com'].includes(String(u.email||'').toLowerCase());
+ const fields=locked?[['password','Password baru (kosongkan bila tidak diubah)','password','']]:[
+  ['name','Nama Pengguna','text',u.name||''],['email','Email Login','email',u.email||''],
+  ['role','Peran Klinik','select',u.role||'kasir',[{value:'pimpinan',label:'Pimpinan'},{value:'admin',label:'Admin'},{value:'kasir',label:'Kasir'}]],
+  ['password','Password baru (kosongkan bila tidak diubah)','password','']
+ ];
+ showFormModal(locked?'Atur Password Akun Inti':'Perbarui Akun',fields,async v=>{const patch={userId:id};if(!locked){patch.name=String(v.name||'').trim();patch.email=String(v.email||'').trim().toLowerCase();patch.role=v.role;}
+ if(v.password){if(String(v.password).length<12||String(v.password).length>128){showAlert('Password harus 12–128 karakter.');return;}patch.password=v.password;}
+ try{await window.assalamTiDBApi.updateUser(patch);await loadTiDBUsers();showAlert('Perubahan akun berhasil disimpan.');}catch(e){showAlert(e.message||'Perubahan akun gagal.');}});
+}
+function disableTiDBUser(id){
+ const u=(window.ASSALAM_TIDB_USER_CACHE||[]).find(x=>x.userId===id);if(!u)return showAlert('Akun tidak ditemukan.');
+ showConfirm('Nonaktifkan '+(u.email||u.name)+'? Sesi dicabut; riwayat dan audit tetap disimpan.',async()=>{try{await window.assalamTiDBApi.disableUser(id);await loadTiDBUsers();showAlert('Akun dinonaktifkan tanpa menghapus riwayat.');}catch(e){showAlert(e.message||'Penonaktifan gagal.');}},'Nonaktifkan Akun');
+}
+async function runFirebaseMasterImportDryRun(){
+ const target=$('firebase-master-dryrun-result');if(!target)return;target.innerHTML='<p class="muted">Menjalankan pemeriksaan baca-saja...</p>';
+ try{const response=await window.assalamTiDBApi.previewImportDryRun();target.innerHTML=`<h3>Hasil Dry-run Master Data</h3><pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:8px;">${esc(JSON.stringify(response.data||response,null,2))}</pre>`;}
+ catch(e){target.innerHTML=`<p class="bad">${esc(e.message||'Dry-run gagal.')}</p>`;}
 }
 
 async function actionProvisionStaffAccounts() {
@@ -4985,6 +5006,10 @@ function renderApp() {
   }
 
   $('main-content').innerHTML = content;
+  if (isTiDBCatalogPreview() && activeTab === 'Pengguna' &&
+      window.ASSALAM_TIDB_PREVIEW_SESSION &&
+      window.ASSALAM_TIDB_PREVIEW_SESSION.actor &&
+      window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role === 'pimpinan') loadTiDBUsers();
 
   if (activeTab === 'Dashboard') {
     setTimeout(() => {

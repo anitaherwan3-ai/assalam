@@ -21,6 +21,11 @@
   async function request(path, options = {}) {
     const allowedPaths = new Set([
       "/api/auth/session",
+      "/api/auth/preview-bootstrap",
+      "/api/auth/sign-in/email",
+      "/api/auth/sign-out",
+      "/api/auth/preview-import-dry-run",
+      "/api/admin/users",
       "/api/catalog/tariffs",
       "/api/catalog/suppliers"
     ]);
@@ -61,6 +66,14 @@
     request,
     newIdempotencyKey: newRequestId,
     getSession: () => request("/api/auth/session"),
+    bootstrapPreviewOwner: (idToken, firebaseUid, password) => request("/api/auth/preview-bootstrap", { method:"POST", body:{idToken,firebaseUid,password} }),
+    signInEmail: (email,password) => request("/api/auth/sign-in/email", { method:"POST", body:{email,password} }),
+    signOut: () => request("/api/auth/sign-out", { method:"POST", body:{} }),
+    previewImportDryRun: () => request("/api/auth/preview-import-dry-run", { method:"POST", body:{} }),
+    listUsers: () => request("/api/admin/users"),
+    createUser: data => request("/api/admin/users", { method:"POST", body:data }),
+    updateUser: data => request("/api/admin/users", { method:"PATCH", body:data }),
+    disableUser: userId => request("/api/admin/users", { method:"DELETE", body:{userId} }),
     listTariffs: () => request("/api/catalog/tariffs"),
     createTariff: (data, key) => request("/api/catalog/tariffs", { method: "POST", body: data, idempotencyKey: key }),
     updateTariff: (data, key) => request("/api/catalog/tariffs", { method: "PATCH", body: data, idempotencyKey: key }),

@@ -1,0 +1,189 @@
+{
+  "exportVersion": 1,
+  "sourceProject": "assalam-preview-test",
+  "collections": {
+    "k_obat": [
+      {
+        "documentId": "o1",
+        "data": {
+          "id": "o1",
+          "nama": "Paracetamol 500mg",
+          "satuan": "strip",
+          "jual": 5000,
+          "min": 10
+        }
+      },
+      {
+        "documentId": "o2",
+        "data": {
+          "id": "o2",
+          "nama": "Amoxicillin 500mg",
+          "satuan": "strip",
+          "jual": 15000,
+          "min": 10
+        }
+      },
+      {
+        "documentId": "o3",
+        "data": {
+          "id": "o3",
+          "nama": "Vitamin C 500mg",
+          "satuan": "botol",
+          "jual": 20000,
+          "min": 5
+        }
+      }
+    ],
+    "k_tarif": [
+      {
+        "documentId": "t1",
+        "data": {
+          "id": "t1",
+          "nama": "Konsultasi Dokter Umum",
+          "jenis": "Konsultasi",
+          "harga": 50000
+        }
+      },
+      {
+        "documentId": "t2",
+        "data": {
+          "id": "t2",
+          "nama": "Konsultasi Dokter Gigi",
+          "jenis": "Konsultasi",
+          "harga": 80000
+        }
+      },
+      {
+        "documentId": "t3",
+        "data": {
+          "id": "t3",
+          "nama": "Konsultasi Spesialis",
+          "jenis": "Konsultasi",
+          "harga": 150000
+        }
+      },
+      {
+        "documentId": "t4",
+        "data": {
+          "id": "t4",
+          "nama": "Tindakan Jahit Luka Ringan",
+          "jenis": "Tindakan",
+          "harga": 120000
+        }
+      },
+      {
+        "documentId": "t5",
+        "data": {
+          "id": "t5",
+          "nama": "Nebulizer / Uap",
+          "jenis": "Tindakan",
+          "harga": 75000
+        }
+      },
+      {
+        "documentId": "t6",
+        "data": {
+          "id": "t6",
+          "nama": "Cek Gula Darah / Asam Urat",
+          "jenis": "Tindakan",
+          "harga": 30000
+        }
+      }
+    ],
+    "k_paket": [
+      {
+        "documentId": "p1",
+        "data": {
+          "id": "p1",
+          "nama": "Paket MCU Sehat (Pemeriksaan Dasar)",
+          "deskripsi": "Konsultasi Dokter Umum + Cek Gula Darah/Asam Urat + Suplemen Vitamin C 500mg",
+          "harga": 85000,
+          "items": [
+            {
+              "id": "t1",
+              "type": "tarif",
+              "nama": "Konsultasi Dokter Umum",
+              "harga": 50000,
+              "qty": 1
+            },
+            {
+              "id": "t6",
+              "type": "tarif",
+              "nama": "Cek Gula Darah / Asam Urat",
+              "harga": 30000,
+              "qty": 1
+            },
+            {
+              "id": "o3",
+              "type": "obat",
+              "oid": "o3",
+              "nama": "Vitamin C 500mg",
+              "harga": 20000,
+              "qty": 1
+            }
+          ]
+        }
+      },
+      {
+        "documentId": "p2",
+        "data": {
+          "id": "p2",
+          "nama": "Paket Tindakan Khitan / Jahit Ceria",
+          "deskripsi": "Tindakan Jahit Medis Ringan + Antibiotik Amoxicillin + Antinyeri Paracetamol",
+          "harga": 130000,
+          "items": [
+            {
+              "id": "t4",
+              "type": "tarif",
+              "nama": "Tindakan Jahit Luka Ringan",
+              "harga": 120000,
+              "qty": 1
+            },
+            {
+              "id": "o1",
+              "type": "obat",
+              "oid": "o1",
+              "nama": "Paracetamol 500mg",
+              "harga": 5000,
+              "qty": 2
+            },
+            {
+              "id": "o2",
+              "type": "obat",
+              "oid": "o2",
+              "nama": "Amoxicillin 500mg",
+              "harga": 15000,
+              "qty": 1
+            }
+          ]
+        }
+      },
+      {
+        "documentId": "p3",
+        "data": {
+          "id": "p3",
+          "nama": "Paket Perawatan Gigi & Mulut",
+          "deskripsi": "Konsultasi Dokter Gigi + Perawatan & Terapi Obat",
+          "harga": 95000,
+          "items": [
+            {
+              "id": "t2",
+              "type": "tarif",
+              "nama": "Konsultasi Dokter Gigi",
+              "harga": 80000,
+              "qty": 1
+            },
+            {
+              "id": "o1",
+              "type": "obat",
+              "oid": "o1",
+              "nama": "Paracetamol 500mg",
+              "harga": 5000,
+              "qty": 1
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

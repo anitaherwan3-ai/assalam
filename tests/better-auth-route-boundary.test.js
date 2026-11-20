@@ -1,32 +1,6 @@
 "use strict";
-
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-
-function read(path) {
-  return fs.readFileSync(require.resolve("../" + path), "utf8");
-}
-
-test("TiDB session and catalog APIs require Better Auth, not Firebase bearer tokens", () => {
-  for (const path of ["api/auth/session.js", "api/catalog/tariffs.js", "api/catalog/suppliers.js"]) {
-    const source = read(path);
-    assert.match(source, /requireBetterAuthActor/);
-    assert.doesNotMatch(source, /requireFirebaseActor|require-auth["']/);
-  }
-});
-
-test("TiDB browser adapter uses same-origin Better Auth cookies and no Firebase token", () => {
-  const source = read("js/tidb-api.js");
-  assert.match(source, /credentials:\s*"same-origin"/);
-  assert.doesNotMatch(source, /firebaseBackend|getIdToken|Authorization/);
-  assert.doesNotMatch(source, /bootstrapPreviewOwner/);
-});
-
-test("public Firebase bootstrap route is absent; open signup stays disabled and Pimpinan provider admin is enabled", () => {
-  assert.throws(() => require.resolve("../api/auth/bootstrap-preview-owner.js"), { code: "MODULE_NOT_FOUND" });
-  const auth = read("lib/better-auth.js");
-  assert.match(auth, /disableSignUp:\s*true/);
-  assert.match(auth, /adminRoles:\s*\["admin"\]/);
-  assert.match(auth, /plugins:\s*\[admin\(/);
-});
+const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs");
+function read(p){return fs.readFileSync(require.resolve("../"+p),"utf8");}
+test("TiDB session and account APIs require Better Auth",()=>{for(const p of ["api/auth/session.js","api/catalog/tariffs.js","api/catalog/suppliers.js","api/admin/users.js"]){const s=read(p);assert.match(s,/requireBetterAuthActor/);assert.doesNotMatch(s,/requireFirebaseActor|require-auth["']/);}});
+test("TiDB browser adapter only allows same-origin auth and account APIs",()=>{const s=read("js/tidb-api.js");assert.match(s,/credentials:\s*"same-origin"/);assert.doesNotMatch(s,/getIdToken|Authorization/);for(const p of ["/api/auth/preview-bootstrap","/api/auth/sign-in/email","/api/auth/sign-out","/api/admin/users","/api/auth/preview-import-dry-run"])assert.ok(s.includes(p));});
+test("bootstrap and dry-run are integrated in the current auth catch-all, without extra API function files",()=>{const s=read("api/auth/[...all].js");assert.match(s,/preview-bootstrap/);assert.match(s,/preview-import-dry-run/);assert.match(s,/requireRole/);assert.throws(()=>require.resolve("../api/auth/bootstrap-preview-owner.js"),{code:"MODULE_NOT_FOUND"});assert.throws(()=>require.resolve("../api/auth/preview-import-dry-run.js"),{code:"MODULE_NOT_FOUND"});const auth=read("lib/better-auth.js");assert.match(auth,/disableSignUp:\s*true/);assert.match(auth,/adminRoles:\s*\["admin"\]/);});

@@ -11,46 +11,141 @@
       "target": "medicines",
       "priority": "critical",
       "purpose": "Obat master catalogue only",
-      "include": ["document identity", "medicine name", "canonical unit", "selling price", "minimum stock", "active state", "category metadata when present"],
-      "exclude": ["stock quantity", "batch quantity", "expiry allocations", "HPP snapshots", "stock movement", "transaction usage"],
-      "validation": ["unique normalized name or verified legacy ID", "unit in tablet/kapsul/botol/pcs", "non-negative integer price and minimum stock"]
+      "include": [
+        "document identity",
+        "medicine name",
+        "canonical unit",
+        "selling price",
+        "minimum stock",
+        "active state",
+        "category metadata when present"
+      ],
+      "exclude": [
+        "stock quantity",
+        "batch quantity",
+        "expiry allocations",
+        "HPP snapshots",
+        "stock movement",
+        "transaction usage"
+      ],
+      "validation": [
+        "unique normalized name or verified legacy ID",
+        "unit in tablet/kapsul/botol/pcs",
+        "non-negative integer price and minimum stock"
+      ],
+      "unitNormalization": {
+        "strip": "pcs",
+        "preserveSellingPrice": true,
+        "convertToTabletCount": false,
+        "note": "Legacy strip values map to pcs in the agreed canonical unit set; do not infer tablet-per-strip quantity."
+      }
     },
     {
       "source": "k_tarif",
       "target": "tariffs",
       "priority": "critical",
       "purpose": "Tindakan, jasa, and service tariff master only",
-      "include": ["document identity", "service name", "service type", "price", "active state"],
-      "exclude": ["patient references", "transaction history", "payment amounts"],
-      "validation": ["non-empty service name", "non-negative integer price", "deduplicate by verified legacy ID then normalized name/type"]
+      "include": [
+        "document identity",
+        "service name",
+        "service type",
+        "price",
+        "active state"
+      ],
+      "exclude": [
+        "patient references",
+        "transaction history",
+        "payment amounts"
+      ],
+      "validation": [
+        "non-empty service name",
+        "non-negative integer price",
+        "deduplicate by verified legacy ID then normalized name/type"
+      ]
     },
     {
       "source": "k_paket",
       "target": "service_packages",
       "priority": "high",
       "purpose": "Service package master and its component definitions",
-      "include": ["document identity", "package name", "package price", "active state", "component references and quantities"],
-      "exclude": ["sold package instances", "patient and invoice references", "historical component usage"],
-      "validation": ["all component references resolve to imported medicine/tariff masters", "component quantities positive", "no circular package composition"]
+      "include": [
+        "document identity",
+        "package name",
+        "package price",
+        "active state",
+        "component references and quantities",
+        "package selling price",
+        "component selling-price snapshots",
+        "component name snapshots"
+      ],
+      "exclude": [
+        "sold package instances",
+        "patient and invoice references",
+        "historical component usage"
+      ],
+      "validation": [
+        "all component references resolve to imported medicine/tariff masters",
+        "component quantities positive",
+        "no circular package composition",
+        "preserve package-level price even when it differs from component total",
+        "preserve each component price/name snapshot"
+      ]
     },
     {
       "source": "klinik_config or settings (select the actual collection after source profiling)",
       "target": "clinic_settings and display_configs",
       "priority": "high",
       "purpose": "Non-secret clinic identity and queue display configuration",
-      "include": ["clinic display name", "clinic address", "queue display text", "display preferences", "non-secret operational preferences"],
-      "exclude": ["API keys", "tokens", "passwords", "Firebase credentials", "payment secrets", "binary audio payloads"],
-      "validation": ["clinic name remains fixed as Klinik Assalaam Palembang", "settings keys are explicitly allowlisted", "no secret-like field names or values"]
+      "include": [
+        "clinic display name",
+        "clinic address",
+        "queue display text",
+        "display preferences",
+        "non-secret operational preferences"
+      ],
+      "exclude": [
+        "API keys",
+        "tokens",
+        "passwords",
+        "Firebase credentials",
+        "payment secrets",
+        "binary audio payloads"
+      ],
+      "validation": [
+        "clinic name remains fixed as Klinik Assalaam Palembang",
+        "settings keys are explicitly allowlisted",
+        "no secret-like field names or values"
+      ]
     }
   ],
   "identityProvisioning": {
     "source": "owner-approved fixed roster, not Firebase password hashes",
     "fixedAccounts": [
-      {"email":"praktekrose@gmail.com","clinicRole":"pimpinan","protectedOwner":true},
-      {"email":"nursalim42@gmail.com","clinicRole":"pimpinan","protectedOwner":false},
-      {"email":"assalamkasir1@gmail.com","clinicRole":"kasir","protectedOwner":false},
-      {"email":"assalamkasir2@gmail.com","clinicRole":"kasir","protectedOwner":false},
-      {"email":"assalamadmin1@gmail.com","clinicRole":"admin","protectedOwner":false}
+      {
+        "email": "praktekrose@gmail.com",
+        "clinicRole": "pimpinan",
+        "protectedOwner": true
+      },
+      {
+        "email": "nursalim42@gmail.com",
+        "clinicRole": "pimpinan",
+        "protectedOwner": false
+      },
+      {
+        "email": "assalamkasir1@gmail.com",
+        "clinicRole": "kasir",
+        "protectedOwner": false
+      },
+      {
+        "email": "assalamkasir2@gmail.com",
+        "clinicRole": "kasir",
+        "protectedOwner": false
+      },
+      {
+        "email": "assalamadmin1@gmail.com",
+        "clinicRole": "admin",
+        "protectedOwner": false
+      }
     ],
     "passwordHashesImported": false,
     "activation": "new Better Auth credentials with minimum 12-character passwords"

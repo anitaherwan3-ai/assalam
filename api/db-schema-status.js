@@ -42,17 +42,26 @@ module.exports = async function handler(req, res) {
       "SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name, CHARACTER_MAXIMUM_LENGTH AS max_length FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = ? AND COLUMN_NAME = ?) OR (TABLE_NAME = ? AND COLUMN_NAME = ?))",
       ["cashier_shifts", "status", "shift_reconciliations", "status"]
     );
+    const [packagePriceColumns] = await getPool().execute(
+      "SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND ((TABLE_NAME = ? AND COLUMN_NAME = ?) OR (TABLE_NAME = ? AND COLUMN_NAME = ?) OR (TABLE_NAME = ? AND COLUMN_NAME = ?))",
+      ["service_packages", "package_price", "package_components", "component_price_snapshot", "package_components", "component_name_snapshot"]
+    );
+    const requiredPackagePriceColumns = ["service_packages.package_price", "package_components.component_price_snapshot", "package_components.component_name_snapshot"];
+    const foundPackagePriceColumns = new Set(packagePriceColumns.map(row => row.table_name + "." + row.column_name));
+    const missingPackagePriceColumns = requiredPackagePriceColumns.filter(name => !foundPackagePriceColumns.has(name));
     const shortStatusColumns = statusColumns.filter(row => Number(row.max_length) < 32).map(row => ({ table: row.table_name, column: row.column_name, maxLength: Number(row.max_length) }));
     const statusColumnsMissing = ["cashier_shifts", "shift_reconciliations"].filter(name => !statusColumns.some(row => row.table_name === name && row.column_name === "status"));
     return res.status(missing.length || shortStatusColumns.length || statusColumnsMissing.length ? 503 : 200).json({
-      ok: missing.length === 0 && shortStatusColumns.length === 0 && statusColumnsMissing.length === 0,
+      ok: missing.length === 0 && shortStatusColumns.length === 0 && statusColumnsMissing.length === 0 && missingPackagePriceColumns.length === 0,
       service: "assalam-tidb-schema",
       versions: versions.map(row => row.version),
       tables: found,
       missing,
       statusColumns: statusColumns.map(row => ({ table: row.table_name, column: row.column_name, maxLength: Number(row.max_length) })),
       shortStatusColumns,
-      statusColumnsMissing
+      statusColumnsMissing,
+      requiredPackagePriceColumns,
+      missingPackagePriceColumns
     });
   } catch (error) {
     console.error("[DB-SCHEMA-STATUS] Schema status unavailable", {
