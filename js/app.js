@@ -1078,7 +1078,7 @@ function viewTrx() {
         <div style="display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--bdr);flex-wrap:wrap;">
           <input id="trx-search-input" type="search" placeholder="🔍 Cari obat / jasa / paket... (F2)"
             value="${esc(cashierSearchQuery)}"
-            oninput="cashierSearchQuery=this.value;renderApp();"
+            oninput="onCashierSearchInput(this.value)"
             style="flex:1;min-width:160px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--bdr);background:var(--card);color:var(--tx);font-size:13px;">
           <div style="display:flex;gap:4px;flex-shrink:0;">
             <button type="button" class="touch-chip ${posFilterCategory === 'Semua' ? 'active' : ''}" onclick="setPosCategory('Semua')">Semua</button>
@@ -1337,13 +1337,27 @@ function renderTouchCardsPOS() {
        </div>`;
 }
 
-function renderTouchCards() {
-  return renderTouchCardsPOS();
+function updatePosProductGridOnly() {
+  const grid = document.querySelector('.pos-product-grid');
+  if (grid) {
+    grid.innerHTML = renderTouchCardsPOS();
+  } else {
+    renderApp();
+  }
+}
+
+function onCashierSearchInput(val) {
+  cashierSearchQuery = val;
+  updatePosProductGridOnly();
 }
 
 function setPosCategory(cat) {
   posFilterCategory = cat;
-  renderApp();
+  document.querySelectorAll('.touch-chip').forEach(btn => {
+    const isTarget = btn.textContent.includes(cat);
+    btn.classList.toggle('active', isTarget);
+  });
+  updatePosProductGridOnly();
 }
 
 function addTouchItem(type, id) {
