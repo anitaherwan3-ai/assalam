@@ -21,6 +21,7 @@
   async function request(path, options = {}) {
     const allowedPaths = new Set([
       "/api/auth/session",
+      "/api/auth/preview-owner-status",
       "/api/auth/preview-bootstrap",
       "/api/auth/sign-in/email",
       "/api/auth/sign-out",
@@ -33,9 +34,10 @@
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
     }
     const method = String(options.method || "GET").toUpperCase();
+    const requestId = newRequestId();
     const headers = {
       "Accept": "application/json",
-      "X-Request-ID": newRequestId()
+      "X-Request-ID": requestId
     };
     const init = {
       method,
@@ -54,8 +56,15 @@
     try { payload = await response.json(); }
     catch (_) { throw makeError("Server TiDB mengirim respons yang tidak valid.", response.status, "TIDB_RESPONSE_INVALID"); }
     if (!response.ok) {
-      throw makeError(payload && payload.message ? payload.message : "Permintaan TiDB ditolak.",
-        response.status, payload && payload.code ? payload.code : "TIDB_REQUEST_FAILED");
+      const code = payload && payload.code ? String(payload.code) : "TIDB_REQUEST_FAILED";
+      const nestedMessage = payload && payload.error && typeof payload.error === "object" ? payload.error.message : "";
+      const message = payload && payload.message ? payload.message
+        : (nestedMessage || (payload && typeof payload.error === "string" ? payload.error : "")
+          || (payload && payload.error_description ? payload.error_description : "")
+          || ("Permintaan TiDB ditolak (HTTP " + response.status + ", kode " + code + ")."));
+      const error = makeError(message, response.status, code);
+      error.requestId = requestId;
+      throw error;
     }
     return payload;
   }
@@ -66,6 +75,7 @@
     request,
     newIdempotencyKey: newRequestId,
     getSession: () => request("/api/auth/session"),
+    getPreviewOwnerStatus: () => request("/api/auth/preview-owner-status"),
     bootstrapPreviewOwner: (email, bootstrapSecret, password) => request("/api/auth/preview-bootstrap", { method:"POST", body:{email,bootstrapSecret,password} }),
     signInEmail: (email,password) => request("/api/auth/sign-in/email", { method:"POST", body:{email,password} }),
     signOut: () => request("/api/auth/sign-out", { method:"POST", body:{} }),
