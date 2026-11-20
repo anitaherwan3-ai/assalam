@@ -104,10 +104,11 @@ const numVal = id => {
   return el ? (parseFloat(el.value) || 0) : 0;
 };
 
-// Common Table Generator with pagination and safe escaping
+// Common Table Generator with pagination, custom perPage selector, and safe escaping
 function renderTable(headers, rows, options = {}) {
   const tableKey = options.key || headers.join('_').replace(/\W/g, '');
-  const perPage = options.perPage || 10;
+  const storedPerPage = window.PAGE_STATE[tableKey + '_perPage'];
+  const perPage = storedPerPage ? Number(storedPerPage) : (options.perPage || 15);
   const total = rows.length;
   const maxPage = Math.max(1, Math.ceil(total / perPage));
   const currentPage = Math.min(window.PAGE_STATE[tableKey] || 1, maxPage);
@@ -130,15 +131,30 @@ function renderTable(headers, rows, options = {}) {
   }
   html += '</tbody></table></div>';
 
-  if (total > perPage) {
+  if (total > 0) {
     html += `
-      <div class="row" style="margin-top:10px;justify-content:space-between;align-items:center;">
-        <span style="font-size:12px;color:var(--mu)">Menampilkan ${startIdx + 1} - ${Math.min(startIdx + perPage, total)} dari ${total} data</span>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button class="s" ${currentPage <= 1 ? 'disabled' : ''} onclick="changePage('${tableKey}', ${currentPage - 1})">‹ Sebelumnya</button>
-          <span style="font-size:12px;font-weight:600">Hal ${currentPage} / ${maxPage}</span>
-          <button class="s" ${currentPage >= maxPage ? 'disabled' : ''} onclick="changePage('${tableKey}', ${currentPage + 1})">Berikutnya ›</button>
+      <div class="row" style="margin-top:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:12px;color:var(--mu)">Menampilkan ${Math.min(startIdx + 1, total)} - ${Math.min(startIdx + perPage, total)} dari ${total} data</span>
+          <label style="font-size:12px;color:var(--mu);display:flex;align-items:center;gap:4px;margin:0;">
+            Baris:
+            <select onchange="changePerPage('${tableKey}', this.value)" style="padding:2px 6px;font-size:12px;border-radius:6px;border:1px solid var(--bdr);background:var(--bg);color:var(--tx);">
+              <option value="10" ${perPage === 10 ? 'selected' : ''}>10</option>
+              <option value="15" ${perPage === 15 ? 'selected' : ''}>15</option>
+              <option value="25" ${perPage === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${perPage === 50 ? 'selected' : ''}>50</option>
+            </select>
+          </label>
         </div>
+        ${maxPage > 1 ? `
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="s" ${currentPage <= 1 ? 'disabled' : ''} onclick="changePage('${tableKey}', 1)" title="Halaman Pertama">«</button>
+          <button class="s" ${currentPage <= 1 ? 'disabled' : ''} onclick="changePage('${tableKey}', ${currentPage - 1})">‹ Sebelumnya</button>
+          <span style="font-size:12px;font-weight:600;padding:0 4px;">Hal ${currentPage} / ${maxPage}</span>
+          <button class="s" ${currentPage >= maxPage ? 'disabled' : ''} onclick="changePage('${tableKey}', ${currentPage + 1})">Berikutnya ›</button>
+          <button class="s" ${currentPage >= maxPage ? 'disabled' : ''} onclick="changePage('${tableKey}', ${maxPage})" title="Halaman Terakhir">»</button>
+        </div>
+        ` : ''}
       </div>
     `;
   }
@@ -149,6 +165,14 @@ function renderTable(headers, rows, options = {}) {
 window.PAGE_STATE = {};
 function changePage(key, newPage) {
   window.PAGE_STATE[key] = newPage;
+  if (typeof window.renderCurrentTab === 'function') {
+    window.renderCurrentTab();
+  }
+}
+
+function changePerPage(key, newLimit) {
+  window.PAGE_STATE[key + '_perPage'] = Number(newLimit);
+  window.PAGE_STATE[key] = 1;
   if (typeof window.renderCurrentTab === 'function') {
     window.renderCurrentTab();
   }
