@@ -11,6 +11,12 @@ const commands = createClinicDomainCommands({ repository: queueRepository });
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, private");
   try {
+    const isDisplay = req.query && (req.query.display === "1" || req.query.display === "true");
+    if (req.method === "GET" && isDisplay) {
+      const displayData = await queueRepository.getDisplayQueue();
+      return res.status(200).json({ ok: true, data: displayData });
+    }
+
     const actor = await requireBetterAuthActor(req);
     if (req.method === "GET") {
       const rows = await queueRepository.listQueueTickets();

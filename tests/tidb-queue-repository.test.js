@@ -15,4 +15,5 @@ test("queue repository is wired for independent per-lane call policy", async () 
   assert.deepEqual(await repository.getQueuePrefixPolicy(null, "A"), { approved: true, mode: "per_lane" });
   assert.deepEqual(await repository.getQueuePrefixPolicy(null, "B"), { approved: true, mode: "per_lane" });
   assert.deepEqual(await repository.getQueuePrefixPolicy(null, "C"), { approved: false, mode: "per_lane" });
+  assert.equal(typeof repository.getDisplayQueue, "function");
 });

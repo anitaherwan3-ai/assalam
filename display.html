@@ -1238,11 +1238,94 @@
       console.warn('Firebase Display init error:', e);
     }
 
+    // TiDB Backend Realtime Polling for TV Display
+    let tidbPollingActive = false;
+    async function pollTiDBDisplay() {
+      try {
+        const response = await fetch('/api/queue?display=1', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-store'
+        });
+        if (!response.ok) return;
+        const resJson = await response.json();
+        if (!resJson || !resJson.ok || !resJson.data) return;
+        tidbPollingActive = true;
+        const { activeCall, waiting, lastServed, settings } = resJson.data;
+
+        // 1. Update Clinic Branding & Running Text from TiDB
+        if (settings) {
+          if (settings.nama) document.getElementById('display-clinic-name').textContent = settings.nama;
+          if (settings.alamat) document.getElementById('display-clinic-addr').textContent = settings.alamat;
+          if (settings.logoImg) {
+            document.getElementById('display-logo').innerHTML = `<img src="${settings.logoImg}" alt="Logo">`;
+          } else if (settings.logo) {
+            document.getElementById('display-logo').textContent = settings.logo;
+          }
+          if (settings.runningText) {
+            document.getElementById('marquee-text').textContent = String(settings.runningText);
+          }
+          const enableVideo = settings.enableYoutubeDisplay !== false;
+          const videoId = parseYoutubeId(settings.youtubeVideoId || '');
+          showVideoOrFallback(videoId, enableVideo);
+        }
+
+        // 2. Active Call Card & Audio Notification
+        if (activeCall) {
+          document.getElementById('active-no').textContent = activeCall.queueNumber || '-';
+          document.getElementById('active-name').textContent = activeCall.patientName || '';
+          document.getElementById('active-poli').textContent = activeCall.serviceName || 'Poli Umum';
+
+          notifyPatientCall({
+            id: activeCall.ticketId,
+            no: activeCall.queueNumber,
+            nama: activeCall.patientName,
+            layanan: activeCall.serviceName,
+            _t: activeCall.calledAtUtc || activeCall.ticketId
+          }, activeCall.serviceName || 'Poli Umum');
+        } else if (lastServed) {
+          document.getElementById('active-no').textContent = lastServed.queueNumber || '-';
+          document.getElementById('active-name').textContent = 'Terakhir dilayani: ' + (lastServed.patientName || '-');
+          document.getElementById('active-poli').textContent = lastServed.serviceName || 'Poli Umum';
+        } else {
+          document.getElementById('active-no').textContent = '-';
+          document.getElementById('active-name').textContent = 'Belum ada antrean dipanggil';
+          document.getElementById('active-poli').textContent = 'Poli Umum';
+        }
+
+        // 3. Waiting List
+        const waitingList = Array.isArray(waiting) ? waiting : [];
+        document.getElementById('waiting-count').textContent = `${waitingList.length} Pasien Menunggu`;
+        const queueListEl = document.getElementById('queue-list');
+        if (waitingList.length === 0) {
+          queueListEl.innerHTML = `<div style="text-align:center;color:var(--mu);padding:24px 20px;">Tidak ada antrean berikutnya</div>`;
+        } else {
+          queueListEl.innerHTML = waitingList.slice(0, 6).map((p, idx) => `
+            <div class="queue-item">
+              <div class="queue-item-left">
+                <span class="queue-no">${p.queueNumber}</span>
+                <div>
+                  <div class="queue-name">${p.patientName}</div>
+                  <div class="queue-poli">${p.serviceName || 'Poli Umum'}</div>
+                </div>
+              </div>
+              <span class="queue-status">Antrean ke-${idx + 1}</span>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        // Fallback to local data on offline/network glitch
+      }
+    }
+
     // Initial load
     window.addEventListener('DOMContentLoaded', () => {
       // Tampilkan health tips dulu sebagai default — akan diganti YouTube jika Admin sudah set video
       startHealthTips();
       loadDisplayData();
+      pollTiDBDisplay();
+      // Fast polling (setiap 2 detik) untuk responsivitas audio panggilan dan nomor antrean TV
+      setInterval(pollTiDBDisplay, 2000);
       setInterval(loadDisplayData, 5000);
     });
   </script>
