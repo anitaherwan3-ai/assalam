@@ -39,71 +39,81 @@
     </div>
   </header>
 
-  <!-- Landing Page Modern Sederhana (Sebelum Login) -->
-  <section id="landing-page" style="display:none;min-height:100vh;background:radial-gradient(ellipse at 50% 10%, #0d2847 0%, #061321 100%);color:#f8fafc;padding:32px 20px;box-sizing:border-box;">
-    <div style="max-width:1100px;margin:0 auto;">
+  <!-- Landing Page Modern Sederhana (Sebelum Login) - Nuansa Soft, Bersih & Kontras Tinggi -->
+  <section id="landing-page" style="display:none;min-height:100vh;background:#f8fafc;color:#1e293b;padding:24px 20px 48px;box-sizing:border-box;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+    <div style="max-width:1120px;margin:0 auto;">
       <!-- Landing Header -->
-      <header style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid rgba(255,255,255,0.08);background:transparent;">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:32px;">🏥</span>
+      <header style="display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-radius:16px;background:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);border:1px solid #e2e8f0;margin-bottom:32px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;font-size:24px;border:1px solid #bbf7d0;">
+            🏥
+          </div>
           <div>
-            <h1 style="font-size:20px;margin:0;font-weight:800;letter-spacing:-0.02em;color:#fff;">Klinik Assalaam Palembang</h1>
-            <p style="font-size:12px;margin:2px 0 0;color:#94a3b8;">Melayani dengan Sepenuh Hati dan Profesional</p>
+            <h1 style="font-size:18px;margin:0;font-weight:800;letter-spacing:-0.02em;color:#0f172a;">Klinik Assalaam Palembang</h1>
+            <p style="font-size:12.5px;margin:2px 0 0;color:#64748b;font-weight:500;">Melayani dengan Sepenuh Hati dan Profesional</p>
           </div>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <button class="btn-tv-header" onclick="openTvDisplay()" style="background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.4);color:#67e8f9;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;">
-            <span>📺</span> <span>Layar Antrean TV</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-tv-header" onclick="openTvDisplay()" style="background:#f0fdfa;border:1.5px solid #99f6e4;color:#0d9488;padding:8px 18px;border-radius:10px;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <span>📺</span> <span>Layar TV Antrean</span>
           </button>
-          <button class="p" onclick="openStaffLoginModal()" style="background:#0f766e;border:1px solid #14b8a6;color:#fff;padding:8px 20px;border-radius:8px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(15,118,110,0.35);">
-            <span>🔐</span> <span>Masuk Petugas</span>
+          <button class="p" onclick="openStaffLoginModal()" style="background:#0f766e;border:1px solid #0f766e;color:#ffffff;padding:9px 22px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 2px 8px rgba(15,118,110,0.25);display:flex;align-items:center;gap:6px;">
+            <span>🔐</span> <span>Portal Petugas</span>
           </button>
         </div>
       </header>
 
       <!-- Hero Section -->
-      <div style="padding:64px 0 48px;text-align:center;">
-        <div style="display:inline-block;padding:6px 14px;background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.25);border-radius:20px;color:#38bdf8;font-size:13px;font-weight:600;margin-bottom:20px;">
-          ✨ Sistem Informasi &amp; Manajemen Layanan Kesehatan Terpadu
+      <div style="padding:48px 20px 40px;text-align:center;background:linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);border-radius:24px;border:1px solid #e2e8f0;box-shadow:0 4px 20px -2px rgba(0,0,0,0.05);margin-bottom:32px;">
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 16px;background:#ccfbf1;border:1px solid #99f6e4;border-radius:999px;color:#0f766e;font-size:13px;font-weight:700;margin-bottom:20px;">
+          <span>✨</span> Sistem Manajemen Klinik &amp; Pelayanan Pasien
         </div>
-        <h2 style="font-size:clamp(28px, 5vw, 44px);font-weight:800;line-height:1.2;margin:0 0 16px;letter-spacing:-0.03em;">
-          Pelayanan Cepat, Tepat, dan <br><span style="background:linear-gradient(90deg, #38bdf8, #34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Transparan untuk Pasien</span>
+        <h2 style="font-size:clamp(26px, 4.5vw, 42px);font-weight:800;line-height:1.25;margin:0 0 16px;letter-spacing:-0.03em;color:#0f172a;">
+          Layanan Kesehatan Modern, Cepat &amp; <br><span style="color:#0f766e;">Terintegrasi untuk Pasien</span>
         </h2>
-        <p style="font-size:16px;color:#94a3b8;max-width:640px;margin:0 auto 32px;line-height:1.6;">
-          Terintegrasi penuh antara antrean nomor pasien otomatis, resep obat farmasi, kasir transaksi, dan layar display TV ruang tunggu.
+        <p style="font-size:16px;color:#475569;max-width:680px;margin:0 auto 32px;line-height:1.65;font-weight:400;">
+          Pendaftaran antrean otomatis, resep &amp; etiket farmasi obat, kasir transaksi multifitur, serta sinkronisasi layar display TV ruang tunggu dalam satu sistem terpadu.
         </p>
-        <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
-          <button class="p" onclick="openStaffLoginModal()" style="background:#0f766e;border:1px solid #14b8a6;color:#fff;padding:12px 28px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(15,118,110,0.4);">
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <button class="p" onclick="openStaffLoginModal()" style="background:#0f766e;border:1.5px solid #0f766e;color:#ffffff;padding:12px 28px;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(15,118,110,0.3);transition:all 0.2s;">
             Masuk Portal Petugas Klinik →
           </button>
-          <button onclick="openTvDisplay()" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#e2e8f0;padding:12px 24px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">
-            📺 Buka Display TV Antrean
+          <button onclick="openTvDisplay()" style="background:#ffffff;border:1.5px solid #cbd5e1;color:#334155;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.05);transition:all 0.2s;">
+            📺 Buka Display TV Ruang Tunggu
           </button>
         </div>
       </div>
 
-      <!-- Feature Highlights Grid -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:20px;margin-top:20px;">
-        <div style="background:rgba(17,34,53,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;backdrop-filter:blur(10px);">
-          <div style="font-size:32px;margin-bottom:12px;">📢</div>
-          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#f1f5f9;">Antrean &amp; TV Display Pintar</h3>
-          <p style="font-size:13.5px;color:#94a3b8;line-height:1.55;margin:0;">Pemanggilan pasien otomatis dengan suara suara sintesis &amp; chime stasiun, tersinkronisasi langsung ke TV ruang tunggu tanpa jeda.</p>
+      <!-- Feature Cards Grid (Soft, Clean, Contemporary) -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:20px;">
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;box-shadow:0 1px 4px rgba(0,0,0,0.04);transition:transform 0.2s;">
+          <div style="width:48px;height:48px;border-radius:14px;background:#f0fdfa;color:#0d9488;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;border:1px solid #ccfbf1;">
+            📢
+          </div>
+          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#0f172a;">Antrean TV &amp; Panggilan Suara</h3>
+          <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0;">Pemanggilan nomor antrean bersuara jernih dengan chime stasiun, tersinkronisasi instan ke layar TV ruang tunggu tanpa jeda.</p>
         </div>
-        <div style="background:rgba(17,34,53,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;backdrop-filter:blur(10px);">
-          <div style="font-size:32px;margin-bottom:12px;">💊</div>
-          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#f1f5f9;">Farmasi &amp; Stok Obat FEFO</h3>
-          <p style="font-size:13.5px;color:#94a3b8;line-height:1.55;margin:0;">Pengawasan kedaluwarsa ketat, cetak etiket obat otomatis (dalam/luar), dan alokasi stok obat terkontrol akurat.</p>
+
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;box-shadow:0 1px 4px rgba(0,0,0,0.04);transition:transform 0.2s;">
+          <div style="width:48px;height:48px;border-radius:14px;background:#eff6ff;color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;border:1px solid #dbeafe;">
+            💊
+          </div>
+          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#0f172a;">Farmasi &amp; Kontrol Obat FEFO</h3>
+          <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0;">Pengawasan tanggal kedaluwarsa presisi, pencetakan etiket dosis otomatis (obat dalam &amp; luar), serta keamanan stok batch obat.</p>
         </div>
-        <div style="background:rgba(17,34,53,0.7);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;backdrop-filter:blur(10px);">
-          <div style="font-size:32px;margin-bottom:12px;">🧾</div>
-          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#f1f5f9;">Kasir &amp; Struk WhatsApp</h3>
-          <p style="font-size:13.5px;color:#94a3b8;line-height:1.55;margin:0;">Transaksi multi-metode (Tunai/QRIS), berita acara tutup shift kasir, dan pengiriman struk nota digital langsung via WhatsApp.</p>
+
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;box-shadow:0 1px 4px rgba(0,0,0,0.04);transition:transform 0.2s;">
+          <div style="width:48px;height:48px;border-radius:14px;background:#f0fdf4;color:#16a34a;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px;border:1px solid #dcfce7;">
+            🧾
+          </div>
+          <h3 style="font-size:17px;font-weight:700;margin:0 0 8px;color:#0f172a;">Kasir &amp; Notifikasi WhatsApp</h3>
+          <p style="font-size:14px;color:#64748b;line-height:1.6;margin:0;">Transaksi kasir cepat (Tunai/QRIS), berita acara tutup kasir per shift, dan pengiriman bukti pembayaran digital langsung via WhatsApp.</p>
         </div>
       </div>
 
-      <!-- Simple Footer -->
-      <footer style="margin-top:64px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:12px;color:#64748b;background:transparent;">
-        <div>© 2026 Klinik Assalaam Palembang. Sistem Informasi Klinik &amp; Manajemen Keuangan.</div>
+      <!-- Footer Info -->
+      <footer style="margin-top:48px;padding-top:20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-size:12.5px;color:#64748b;background:transparent;">
+        <div>© 2026 <b>Klinik Assalaam Palembang</b>. Sistem Informasi Manajemen Klinik Terpadu.</div>
         <div>Jl. Kemang Manis Lr. Beringin No. 492, Kota Palembang</div>
       </footer>
     </div>
