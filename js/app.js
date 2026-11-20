@@ -5036,22 +5036,58 @@ function viewPimpinanStok() {
   `;
 }
 
+function openStaffLoginModal() {
+  const landing = $('landing-page');
+  const loginModal = $('login-modal');
+  if (landing) landing.style.display = 'none';
+  if (loginModal) loginModal.style.display = 'flex';
+}
+
+function closeStaffLoginModal() {
+  const landing = $('landing-page');
+  const loginModal = $('login-modal');
+  if (!currentUser && landing) {
+    landing.style.display = 'block';
+    if (loginModal) loginModal.style.display = 'none';
+  } else if (loginModal) {
+    loginModal.style.display = 'none';
+  }
+}
+
 // -------------------------------------------------------------
 // MAIN RENDERER
 // -------------------------------------------------------------
 function renderApp() {
   window.renderCurrentTab = renderApp;
   const userHeaderEl = $('header-user-info');
+  const appHeader = $('app-header');
+  const appContainer = $('app');
+  const landingPage = $('landing-page');
+  const loginModal = $('login-modal');
 
   if (!currentUser) {
-    $('login-modal').style.display = 'flex';
+    if (appHeader) appHeader.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'none';
+    if (landingPage && loginModal && loginModal.style.display !== 'flex') {
+      landingPage.style.display = 'block';
+      loginModal.style.display = 'none';
+    } else if (loginModal && loginModal.style.display === 'flex') {
+      if (landingPage) landingPage.style.display = 'none';
+    } else if (landingPage) {
+      landingPage.style.display = 'block';
+    } else if (loginModal) {
+      loginModal.style.display = 'flex';
+    }
     $('nav-bar').innerHTML = '';
     $('main-content').innerHTML = '';
     if (userHeaderEl) userHeaderEl.textContent = '';
     return;
   }
 
-  $('login-modal').style.display = 'none';
+  if (landingPage) landingPage.style.display = 'none';
+  if (loginModal) loginModal.style.display = 'none';
+  if (appHeader) appHeader.style.display = 'flex';
+  if (appContainer) appContainer.style.display = 'flex';
   if (userHeaderEl) {
     userHeaderEl.textContent = `${currentUser.nama} (${currentUser.role})`;
   }
