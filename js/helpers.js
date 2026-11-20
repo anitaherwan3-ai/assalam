@@ -339,8 +339,13 @@ function sendReceiptWA(trx, settings) {
   message += `--------------------------------------\n`;
   message += `_${settings.footer || 'Terima kasih, semoga lekas sembuh.'}_\n`;
 
-  const waUrl = `https://wa.me/${hpClean}?text=${encodeURIComponent(message)}`;
-  window.open(waUrl, '_blank');
+  const waGateway = (typeof window !== 'undefined' && window.assalamWaGateway) ? window.assalamWaGateway : null;
+  if (waGateway && settings.waGatewayUrl) {
+    waGateway.dispatchWaMessage(hpClean, message, settings).catch(err => console.warn('WA send error:', err));
+  } else {
+    const waUrl = `https://wa.me/${hpClean}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+  }
 }
 
 // Rekap Tutup Shift Kasir Otomatis ke WhatsApp Owner/Pimpinan
@@ -433,7 +438,12 @@ function sendShiftRecapWA(shift, store, customHp = null) {
 
   message += `_Laporan otomatis dikirim oleh Sistem Keuangan Klinik saat Kasir menutup shift._`;
 
-  const waUrl = `https://wa.me/${hpClean}?text=${encodeURIComponent(message)}`;
-  window.open(waUrl, '_blank');
+  const waGateway = (typeof window !== 'undefined' && window.assalamWaGateway) ? window.assalamWaGateway : null;
+  let waUrl = `https://wa.me/${hpClean}?text=${encodeURIComponent(message)}`;
+  if (waGateway && set.waGatewayUrl) {
+    waGateway.dispatchWaMessage(hpClean, message, set).catch(err => console.warn('WA recap error:', err));
+  } else {
+    window.open(waUrl, '_blank');
+  }
   return { success: true, waUrl, hp: targetHp, message };
 }

@@ -4280,6 +4280,18 @@ function viewPengaturan() {
           <span>Aktifkan Tombol Kirim Struk Pembayaran ke WhatsApp Pasien</span>
         </label>
       </div>
+      <div style="margin-top:14px;border-top:1px dashed var(--bdr);padding-top:14px;">
+        <h3 style="font-size:14px;margin-bottom:6px;">🚀 Pengaturan WhatsApp Gateway Otomatis (Opsional)</h3>
+        <p style="font-size:12px;color:var(--mu);margin-bottom:10px;">Jika diisi, struk kasir &amp; rekap tutup shift dikirim otomatis di latar belakang. Jika dikosongkan, sistem tetap menggunakan tombol buka WhatsApp (wa.me) seperti biasa.</p>
+        <div class="row">
+          <label style="flex:2;min-width:240px;">URL Endpoint Gateway (API URL)
+            <input id="set-waGatewayUrl" placeholder="https://api.fonnte.com/send atau webhook gateway" value="${esc(set.waGatewayUrl || '')}">
+          </label>
+          <label style="flex:1;min-width:180px;">API Token / Auth Header
+            <input id="set-waGatewayToken" type="password" placeholder="Token otorisasi API" value="${esc(set.waGatewayToken || '')}">
+          </label>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -4414,6 +4426,8 @@ function actionSaveSettings() {
   set.tempoPeringatan = numVal('set-tempo') || 7;
   set.edPeringatan = numVal('set-edHari') || 60;
   set.fiturKirimWA = $('set-fiturWA') ? $('set-fiturWA').checked : true;
+  set.waGatewayUrl = val('set-waGatewayUrl') ? val('set-waGatewayUrl').trim() : '';
+  set.waGatewayToken = val('set-waGatewayToken') ? val('set-waGatewayToken').trim() : '';
 
   const pimpinan = (store.state.users || []).find(u => u.role === 'pimpinan');
   if (pimpinan && set.waOwner) {
