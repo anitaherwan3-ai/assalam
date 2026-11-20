@@ -4453,9 +4453,19 @@ function actionDisconnectFirebase() {
 }
 
 // -------------------------------------------------------------
-// MODULE: PENCARIAN CEPAT PASIEN LAMA (AUTO-COMPLETE)
+// MODULE: PENCARIAN CEPAT PASIEN LAMA (AUTO-COMPLETE DEBOUNCED)
 // -------------------------------------------------------------
+let searchPasienDebounceTimer = null;
 function searchPasienLama() {
+  if (searchPasienDebounceTimer) {
+    clearTimeout(searchPasienDebounceTimer);
+  }
+  searchPasienDebounceTimer = setTimeout(() => {
+    _executeSearchPasienLama();
+  }, 150);
+}
+
+function _executeSearchPasienLama() {
   const inputEl = document.getElementById('p-search-lama');
   const resultsEl = document.getElementById('p-search-results');
   if (!inputEl || !resultsEl) return;
@@ -4467,21 +4477,25 @@ function searchPasienLama() {
   }
 
   const seen = new Set();
-  const unique = [];
-  (store.state.pasien || []).forEach(p => {
-    if (p.deletedAt || p.status === 'dihapus') return;
+  const filtered = [];
+  const allPatients = store.state.pasien || [];
+  for (let i = allPatients.length - 1; i >= 0; i--) {
+    const p = allPatients[i];
+    if (p.deletedAt || p.status === 'dihapus') continue;
+    const nameMatch = p.nama && p.nama.toLowerCase().includes(q);
+    const hpMatch = p.hp && p.hp.includes(q);
+    if (!nameMatch && !hpMatch) continue;
     const key = (p.nama + '|' + (p.hp || '')).toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
-      unique.push({ nama: p.nama, hp: p.hp || '' });
+      filtered.push({ nama: p.nama, hp: p.hp || '' });
+      if (filtered.length >= 5) break;
     }
-  });
-  const filtered = unique.filter(p =>
-    p.nama.toLowerCase().includes(q) || p.hp.includes(q)
-  ).slice(0, 8);
+  }
 
   if (filtered.length === 0) {
     resultsEl.style.display = 'none';
+    resultsEl.innerHTML = '';
     return;
   }
   resultsEl.style.display = 'block';
