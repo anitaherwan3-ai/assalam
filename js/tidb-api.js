@@ -69,7 +69,7 @@
     return payload;
   }
 
-  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.location && String(window.location.hostname || "").includes("assalam-mysql-preview"));
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.location && (String(window.location.hostname || "").includes("assalam-mysql-preview") || String(window.location.hostname || "").includes("klinik-assalaam")));
 
   window.assalamTiDBApi = Object.freeze({
     request,
