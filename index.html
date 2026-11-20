@@ -9,10 +9,10 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2">
   <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=2">
 
-  <!-- Google Font: Inter -->
+  <!-- Google Fonts: Plus Jakarta Sans & Inter (Modern, Clean & Eye-Friendly) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="css/style.css">
@@ -30,6 +30,9 @@
     <div class="header-right">
       <button class="btn-tv-header" onclick="openTvDisplay()" title="Buka Layar Antrean untuk Layar TV (HDMI)">
         <span>📺</span> <span>Buka Layar TV</span>
+      </button>
+      <button id="btn-theme-toggle" class="btn-theme-header" onclick="cycleThemeMode()" title="Ganti Mode Tampilan (Terang / Gelap / Mode Baca)">
+        <span id="theme-icon">☀️</span> <span id="theme-label">Mode</span>
       </button>
       <span id="sync-badge" class="sync-badge local">
         <span>●</span> <span>Mode Lokal (Offline)</span>
@@ -56,6 +59,9 @@
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <button class="btn-tv-header" onclick="openTvDisplay()" style="background:#f0fdfa;border:1.5px solid #99f6e4;color:#0d9488;padding:8px 18px;border-radius:10px;font-weight:600;font-size:13.5px;cursor:pointer;display:flex;align-items:center;gap:6px;">
             <span>📺</span> <span>Layar TV Antrean</span>
+          </button>
+          <button class="btn-theme-header" onclick="cycleThemeMode()" style="background:#f8fafc;border:1px solid #cbd5e1;color:#334155;padding:8px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;" title="Ganti Mode Tampilan (Terang / Gelap / Mode Baca)">
+            <span id="landing-theme-icon">☀️</span> <span id="landing-theme-label">Mode Tampilan</span>
           </button>
           <button class="p" onclick="openStaffLoginModal()" style="background:#0f766e;border:1px solid #0f766e;color:#ffffff;padding:9px 22px;border-radius:10px;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 2px 8px rgba(15,118,110,0.25);display:flex;align-items:center;gap:6px;">
             <span>🔐</span> <span>Portal Petugas</span>
@@ -146,7 +152,7 @@
       <p id="login-error" class="bad" style="font-size:12px;margin:6px 0;"></p>
       <button class="p" style="width:100%;padding:10px;font-weight:600;" onclick="doLogin()">Masuk ke Sistem</button>
       <button class="s" style="width:100%;margin-top:6px;" onclick="resetLoginPassword()">Lupa password?</button>
-      <button id="preview-owner-bootstrap" class="s" style="width:100%;margin-top:8px;display:none;" onclick="activatePreviewOwnerBootstrap()">Aktivasi Awal Pimpinan TiDB</button>
+      <button id="preview-owner-bootstrap" class="s" style="display:none;" onclick="activatePreviewOwnerBootstrap()" aria-hidden="true" tabindex="-1"></button>
       <button class="s" style="width:100%;margin-top:8px;border:none;background:transparent;color:var(--mu);" onclick="closeStaffLoginModal()">← Kembali ke Halaman Utama</button>
     </div>
   </div>

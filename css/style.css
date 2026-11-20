@@ -34,18 +34,98 @@
   --gn-light: rgba(52, 211, 153, 0.18);
 }
 
+/* Mode Baca / Eye-Care (Warm Soft Sepia) */
+[data-theme="read"] {
+  --bg: #f5efe6;
+  --card: #fdfbf7;
+  --tx: #292524;
+  --mu: #78716c;
+  --bd: #e7dfd5;
+  --pr: #0d766e;
+  --pr-hover: #0f5f59;
+  --pr-light: rgba(13, 118, 110, 0.12);
+  --rd: #dc2626;
+  --rd-light: rgba(220, 38, 38, 0.12);
+  --am: #d97706;
+  --am-light: rgba(217, 119, 6, 0.12);
+  --gn: #15803d;
+  --gn-light: rgba(21, 128, 61, 0.12);
+}
+
 *, *::before, *::after {
   box-sizing: inherit;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   background-color: var(--bg);
   color: var(--tx);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Tombol Toggle Tema Header */
+.btn-theme-header {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-theme-header:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+[data-theme="dark"] #landing-page {
+  background: #0b1120 !important;
+  color: #f1f5f9 !important;
+}
+[data-theme="dark"] #landing-page header {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+[data-theme="dark"] #landing-page h1,
+[data-theme="dark"] #landing-page h2,
+[data-theme="dark"] #landing-page h3 {
+  color: #f8fafc !important;
+}
+[data-theme="dark"] #landing-page p {
+  color: #94a3b8 !important;
+}
+[data-theme="dark"] #landing-page > div > div {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="read"] #landing-page {
+  background: #f5efe6 !important;
+  color: #292524 !important;
+}
+[data-theme="read"] #landing-page header {
+  background: #fdfbf7 !important;
+  border-color: #e7dfd5 !important;
+}
+[data-theme="read"] #landing-page h1,
+[data-theme="read"] #landing-page h2,
+[data-theme="read"] #landing-page h3 {
+  color: #1c1917 !important;
+}
+[data-theme="read"] #landing-page p {
+  color: #57534e !important;
+}
+[data-theme="read"] #landing-page > div > div {
+  background: #fdfbf7 !important;
+  border-color: #e7dfd5 !important;
 }
 
 /* Header */

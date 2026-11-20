@@ -175,8 +175,6 @@ function calculateFinancials() {
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
-  const bootstrapButton = $('preview-owner-bootstrap');
-  if (bootstrapButton && isTiDBCatalogPreview()) bootstrapButton.style.display = 'block';
   if (isTiDBCatalogPreview()) restoreTiDBPreviewSession().then(ready => {
     if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
     const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
@@ -191,12 +189,46 @@ function initApp() {
   renderApp();
 }
 
+function cycleThemeMode() {
+  const current = document.documentElement.dataset.theme || 'light';
+  let next = 'light';
+  if (current === 'light' || !current) next = 'dark';
+  else if (current === 'dark') next = 'read';
+  else next = 'light';
+
+  const set = store.state.set || {};
+  set.tema = next;
+  store.saveLocal();
+  applyAppSettings();
+}
+
+function updateThemeToggleButtons(theme) {
+  const themeMap = {
+    'dark': { icon: '🌙', label: 'Mode Gelap' },
+    'read': { icon: '📖', label: 'Mode Baca' },
+    'light': { icon: '☀️', label: 'Mode Terang' }
+  };
+  const active = themeMap[theme] || themeMap['light'];
+
+  const iconEl = $('theme-icon');
+  const labelEl = $('theme-label');
+  if (iconEl) iconEl.textContent = active.icon;
+  if (labelEl) labelEl.textContent = active.label;
+
+  const landingIconEl = $('landing-theme-icon');
+  const landingLabelEl = $('landing-theme-label');
+  if (landingIconEl) landingIconEl.textContent = active.icon;
+  if (landingLabelEl) landingLabelEl.textContent = active.label;
+}
+
 function applyAppSettings() {
   const set = store.state.set || {};
   const root = document.documentElement;
   if (set.warna) root.style.setProperty('--pr', set.warna);
-  root.dataset.theme = set.tema === 'auto' ? '' : set.tema;
+  const activeTheme = set.tema === 'auto' ? '' : (set.tema || 'light');
+  root.dataset.theme = activeTheme;
   document.body.style.fontSize = (set.font || '14') + 'px';
+  updateThemeToggleButtons(activeTheme);
   
   const logoHtml = set.logoImg 
     ? `<img class="lg" src="${esc(set.logoImg)}" alt="Logo">`
@@ -4302,9 +4334,10 @@ function viewPengaturan() {
         </label>
         <label>Tema Warna
           <select id="set-tema">
-            <option value="auto" ${set.tema === 'auto' ? 'selected' : ''}>Ikuti Pengaturan Perangkat</option>
             <option value="light" ${set.tema === 'light' ? 'selected' : ''}>Mode Terang (Light)</option>
             <option value="dark" ${set.tema === 'dark' ? 'selected' : ''}>Mode Gelap (Dark)</option>
+            <option value="read" ${set.tema === 'read' ? 'selected' : ''}>Mode Baca (Eye-Care / Warm Soft)</option>
+            <option value="auto" ${set.tema === 'auto' ? 'selected' : ''}>Ikuti Pengaturan Perangkat</option>
           </select>
         </label>
         <label>Ukuran Font
