@@ -35,3 +35,13 @@ test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  assert.match(html,/tidb-auth2/);
  assert.equal(html.split("\n").filter(line=>line.includes("document.write")&&line.includes("<\\\\/script>")).length,0,"dynamic script tags must close correctly");
 });
+
+test("owner bootstrap adopts the existing protected clinic identity without duplicating roles",()=>{
+ const owner=fs.readFileSync(require.resolve("../lib/preview-owner-bootstrap"),"utf8");
+ assert.match(owner,/SELECT user_id,display_name,active FROM users WHERE protected_owner=1 FOR UPDATE/);
+ assert.match(owner,/reuseExistingOwner=true/);
+ assert.match(owner,/SELECT role_assignment_id,role_code,scope_type,scope_id,granted_by_user_id FROM role_assignments/);
+ assert.match(owner,/INSERT INTO \`user\`/);
+ assert.match(owner,/if\(!reuseExistingOwner\)/);
+ assert.match(owner,/PREVIEW_OWNER_MULTIPLE_RESERVED/);
+});
