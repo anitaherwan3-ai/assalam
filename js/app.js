@@ -359,7 +359,9 @@ function doLogout() {
       await window.firebaseBackend.performPush(store.state);
       await window.firebaseBackend.auth.signOut().catch(err => console.warn('Firebase signOut:', err));
     }
-    $('login-modal').style.display = 'flex';
+    const landing = $('landing-page');
+    if (landing) landing.style.display = 'block';
+    $('login-modal').style.display = 'none';
     renderApp();
   });
 }

@@ -529,7 +529,7 @@ span.badge-bad { background: var(--rd-light); }
 
 /* Login Modal */
 #login-modal {
-  display: flex;
+  display: none;
 }
 
 #login-modal .modal-content {
