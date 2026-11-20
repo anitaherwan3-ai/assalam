@@ -44,5 +44,6 @@ test("owner bootstrap adopts the existing protected clinic identity without dupl
  assert.match(owner,/INSERT INTO \`user\`/);
  assert.match(owner,/if\(!reuseExistingOwner\)/);
  assert.match(owner,/PREVIEW_OWNER_MULTIPLE_RESERVED/);
- assert.match(owner,/now=Date\.now\(\)/,"Better Auth timestamp fields must be initialized before inserts");
+ assert.match(owner,/const now=new Date\(\)/,"Better Auth DATETIME(3) fields must receive Date values");
+ assert.doesNotMatch(owner,/now=Date\.now\(\)/,"Unix milliseconds must not be inserted into DATETIME fields");
 });
