@@ -6,3 +6,17 @@ test("packages retain package selling price and source component snapshots",()=>
 test("normalizer rejects unsupported units and orphan package references",()=>{const bad=structuredClone(fixture);bad.collections.k_obat[0].data.satuan="sachet";assert.throws(()=>buildFirebaseMasterPlan(bad),{code:"MASTER_UNIT_NOT_ALLOWED"});const orphan=structuredClone(fixture);orphan.collections.k_paket[0].data.items[0].id="missing";assert.throws(()=>buildFirebaseMasterPlan(orphan),{code:"MASTER_PACKAGE_REFERENCE_UNRESOLVED"});});
 test("bootstrap route and one-time safeguards remain within existing auth catch-all",()=>{const fs=require("node:fs"),route=fs.readFileSync(require.resolve("../api/auth/[...all].js"),"utf8"),owner=fs.readFileSync(require.resolve("../lib/preview-owner-bootstrap"),"utf8");assert.match(route,/preview-bootstrap/);assert.match(route,/preview-import-dry-run/);assert.match(owner,/VERCEL_GIT_COMMIT_REF/);assert.match(owner,/FIREBASE_PROJECT_ID/);assert.match(owner,/accounts:lookup/);assert.match(owner,/GET_LOCK/);assert.match(owner,/protected_owner/);assert.throws(()=>require.resolve("../api/auth/preview-bootstrap.js"),{code:"MODULE_NOT_FOUND"});});
 test("package price snapshot migration is included in guarded preview build",()=>{const m=require("../lib/migrations/016_service_package_price_snapshots"),runner=fs.readFileSync(require.resolve("../scripts/apply-preview-migrations"),"utf8");assert.match(m.statements[0],/package_price BIGINT/);assert.match(m.statements[1],/component_price_snapshot BIGINT/);assert.match(m.statements[2],/component_name_snapshot VARCHAR/);assert.match(runner,/016_service_package_price_snapshots/);});
+
+
+test("Pengguna tab always exposes the master dry-run action and Pimpinan session activation", () => {
+  const app = fs.readFileSync(require.resolve("../js/app.js"), "utf8");
+  const viewStart = app.indexOf("function viewTiDBPengguna()");
+  const viewEnd = app.indexOf("async function loadTiDBUsers()", viewStart);
+  assert.ok(viewStart >= 0 && viewEnd > viewStart);
+  const view = app.slice(viewStart, viewEnd);
+  assert.match(view, /Dry-run Master Firebase → TiDB/);
+  assert.match(view, /Aktifkan Sesi Pimpinan TiDB/);
+  assert.match(app, /function activatePreviewTiDBSession\(\)/);
+  assert.match(app, /function restoreTiDBPreviewSession\(\)/);
+  assert.match(app, /catalogError.*sesi autentikasi tetap aktif/);
+});

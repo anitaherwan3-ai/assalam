@@ -264,7 +264,10 @@ function promptPreviewPimpinanTiDBAccess(backend, email) {
       const session=await window.assalamTiDBApi.getSession();
       if(!session||session.ok!==true||!session.actor||session.actor.role!=='pimpinan')throw new Error('Sesi Better Auth Pimpinan belum terverifikasi.');
       window.ASSALAM_TIDB_PREVIEW_SESSION=session;
-      if(window.assalamTiDBCatalog)await window.assalamTiDBCatalog.ensureLoaded(true);
+      if(window.assalamTiDBCatalog){
+        try{await window.assalamTiDBCatalog.ensureLoaded(true);}
+        catch(catalogError){console.warn('[TiDB Preview] Katalog belum dimuat; sesi autentikasi tetap aktif:',catalogError.code||catalogError.message);}
+      }
       showAlert(result.alreadyProvisioned?'Akun Pimpinan TiDB sudah tersedia dan sesi berhasil diverifikasi.':'Bootstrap Pimpinan TiDB berhasil dan sesi berhasil diverifikasi.','TiDB Preview');
       renderApp();
     }catch(err){window.ASSALAM_TIDB_PREVIEW_SESSION=null;console.error('[TiDB Preview] Login Pimpinan:',err.code||err.message);showAlert(err.message||'Login Pimpinan TiDB Preview gagal.','TiDB Preview');}
@@ -4050,9 +4053,48 @@ function viewPengguna() {
 
 function viewTiDBPengguna() {
  const ready=!!(window.ASSALAM_TIDB_PREVIEW_SESSION&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role==='pimpinan');
- return `<div class="card"><h2>Manajemen Akun — TiDB Preview</h2><p class="muted">Sumber otorisasi Better Auth + TiDB. Penonaktifan bersifat soft-disable dan tercatat dalam audit. Lima akun inti tidak dapat diubah identitas/role atau dinonaktifkan.</p>
- ${ready?`<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0;"><button class="p" onclick="actionAddUser()">＋ Tambah Akun</button><button class="s" onclick="loadTiDBUsers()">Muat Ulang Akun</button><button class="s" onclick="runFirebaseMasterImportDryRun()">Dry-run Master Firebase → TiDB</button></div><div id="tidb-users-table"><p class="muted">Memuat akun...</p></div><div id="firebase-master-dryrun-result" style="margin-top:14px;"></div>`:'<p class="bad">Sesi Better Auth Pimpinan belum aktif. Login Pimpinan Utama dan selesaikan aktivasi TiDB Preview.</p>'}</div>`;
+ return '<div class="card"><h2>Manajemen Akun — TiDB Preview</h2><p class="muted">Sumber otorisasi Better Auth + TiDB. Penonaktifan bersifat soft-disable dan tercatat dalam audit. Lima akun inti tidak dapat diubah identitas/role atau dinonaktifkan.</p>' +
+ '<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0;">' +
+ (ready ? '<button class="p" onclick="actionAddUser()">＋ Tambah Akun</button><button class="s" onclick="loadTiDBUsers()">Muat Ulang Akun</button>' :
+ '<button class="p" onclick="activatePreviewTiDBSession()">Aktifkan Sesi Pimpinan TiDB</button>') +
+ '<button class="s" onclick="runFirebaseMasterImportDryRun()">Dry-run Master Firebase → TiDB</button></div>' +
+ (ready ? '<div id="tidb-users-table"><p class="muted">Memuat akun...</p></div>' :
+ '<p class="bad">Sesi Better Auth Pimpinan belum aktif. Tombol Dry-run tetap tersedia; aktifkan sesi Pimpinan TiDB terlebih dahulu sebelum menjalankan pemeriksaan.</p><div id="tidb-users-table"></div>') +
+ '<div id="firebase-master-dryrun-result" style="margin-top:14px;"></div></div>';
 }
+
+function activatePreviewTiDBSession() {
+ const backend=window.firebaseBackend;
+ const firebaseUser=backend&&backend.auth&&backend.auth.currentUser;
+ const email=String((firebaseUser&&firebaseUser.email)||(currentUser&&currentUser.email)||'').trim().toLowerCase();
+ if(!isTiDBCatalogPreview()){showAlert('Aktivasi hanya tersedia pada deployment TiDB Preview.','TiDB Preview');return;}
+ if(currentRole!=='pimpinan'||email!=='praktekrose@gmail.com'){
+  showAlert('Login terlebih dahulu melalui Firebase menggunakan akun Pimpinan Utama praktekrose@gmail.com.','Aktivasi Pimpinan TiDB');return;
+ }
+ if(!firebaseUser||typeof firebaseUser.getIdToken!=='function'){
+  showAlert('Sesi Firebase Pimpinan belum tersedia. Keluar lalu login kembali melalui Firebase.','Aktivasi Pimpinan TiDB');return;
+ }
+ promptPreviewPimpinanTiDBAccess(backend,email);
+}
+
+let tidbSessionRestorePromise=null;
+async function restoreTiDBPreviewSession() {
+ if(window.ASSALAM_TIDB_PREVIEW_SESSION&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role==='pimpinan')return true;
+ if(!window.assalamTiDBApi)return false;
+ if(tidbSessionRestorePromise)return tidbSessionRestorePromise;
+ tidbSessionRestorePromise=(async()=>{
+  try{
+   const session=await window.assalamTiDBApi.getSession();
+   if(session&&session.ok===true&&session.actor&&session.actor.role==='pimpinan'){
+    window.ASSALAM_TIDB_PREVIEW_SESSION=session;
+    return true;
+   }
+  }catch(error){console.warn('[TiDB Preview] Restore sesi:',error.code||error.message);}
+  return false;
+ })().finally(()=>{tidbSessionRestorePromise=null;});
+ return tidbSessionRestorePromise;
+}
+
 async function loadTiDBUsers(){
  const target=$('tidb-users-table');if(!target||!window.ASSALAM_TIDB_PREVIEW_SESSION||window.ASSALAM_TIDB_USERS_LOADING)return;
  window.ASSALAM_TIDB_USERS_LOADING=true;target.innerHTML='<p class="muted">Memuat akun...</p>';
@@ -4093,9 +4135,19 @@ function disableTiDBUser(id){
  showConfirm('Nonaktifkan '+(u.email||u.name)+'? Sesi dicabut; riwayat dan audit tetap disimpan.',async()=>{try{await window.assalamTiDBApi.disableUser(id);await loadTiDBUsers();showAlert('Akun dinonaktifkan tanpa menghapus riwayat.');}catch(e){showAlert(e.message||'Penonaktifan gagal.');}},'Nonaktifkan Akun');
 }
 async function runFirebaseMasterImportDryRun(){
- const target=$('firebase-master-dryrun-result');if(!target)return;target.innerHTML='<p class="muted">Menjalankan pemeriksaan baca-saja...</p>';
- try{const response=await window.assalamTiDBApi.previewImportDryRun();target.innerHTML=`<h3>Hasil Dry-run Master Data</h3><pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:8px;">${esc(JSON.stringify(response.data||response,null,2))}</pre>`;}
- catch(e){target.innerHTML=`<p class="bad">${esc(e.message||'Dry-run gagal.')}</p>`;}
+ const target=$('firebase-master-dryrun-result');
+ if(!target)return;
+ const session=window.ASSALAM_TIDB_PREVIEW_SESSION;
+ if(!session||!session.actor||session.actor.role!=='pimpinan'){
+  target.innerHTML='<p class="bad">Dry-run belum dijalankan. Aktifkan Sesi Pimpinan TiDB terlebih dahulu.</p>';
+  showAlert('Aktifkan Sesi Pimpinan TiDB terlebih dahulu. Tombol aktivasi tersedia di tab Pengguna.','Sesi TiDB Belum Aktif');
+  return;
+ }
+ target.innerHTML='<p class="muted">Menjalankan pemeriksaan baca-saja...</p>';
+ try{
+  const response=await window.assalamTiDBApi.previewImportDryRun();
+  target.innerHTML='<h3>Hasil Dry-run Master Data</h3><pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);padding:10px;border-radius:8px;">'+esc(JSON.stringify(response.data||response,null,2))+'</pre>';
+ }catch(e){target.innerHTML='<p class="bad">'+esc(e.message||'Dry-run gagal.')+'</p>';}
 }
 
 async function actionProvisionStaffAccounts() {
@@ -5006,10 +5058,17 @@ function renderApp() {
   }
 
   $('main-content').innerHTML = content;
-  if (isTiDBCatalogPreview() && activeTab === 'Pengguna' &&
-      window.ASSALAM_TIDB_PREVIEW_SESSION &&
-      window.ASSALAM_TIDB_PREVIEW_SESSION.actor &&
-      window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role === 'pimpinan') loadTiDBUsers();
+  if (isTiDBCatalogPreview() && activeTab === 'Pengguna' && currentRole === 'pimpinan') {
+    if (window.ASSALAM_TIDB_PREVIEW_SESSION &&
+        window.ASSALAM_TIDB_PREVIEW_SESSION.actor &&
+        window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role === 'pimpinan') {
+      loadTiDBUsers();
+    } else {
+      restoreTiDBPreviewSession().then(ready => {
+        if (ready && activeTab === 'Pengguna') renderApp();
+      });
+    }
+  }
 
   if (activeTab === 'Dashboard') {
     setTimeout(() => {
