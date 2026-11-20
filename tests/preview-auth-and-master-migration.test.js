@@ -14,9 +14,23 @@ test("Pengguna tab always exposes the master dry-run action and Pimpinan session
   const viewEnd = app.indexOf("async function loadTiDBUsers()", viewStart);
   assert.ok(viewStart >= 0 && viewEnd > viewStart);
   const view = app.slice(viewStart, viewEnd);
-  assert.match(view, /Dry-run Master Firebase → TiDB/);
+  assert.match(view, /Dry-run Master Data → TiDB/);
   assert.match(view, /Aktifkan Sesi Pimpinan TiDB/);
   assert.match(app, /function activatePreviewTiDBSession\(\)/);
   assert.match(app, /function restoreTiDBPreviewSession\(\)/);
-  assert.match(app, /catalogError.*sesi autentikasi tetap aktif/);
+  assert.match(app, /signInTiDBPreview\(email,password\)/);
+});
+
+test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ const api=fs.readFileSync(require.resolve("../api/auth/[...all].js"),"utf8");
+ const html=fs.readFileSync(require.resolve("../index.html"),"utf8");
+ assert.match(app,/async function signInTiDBPreview/);
+ assert.match(app,/async function activatePreviewOwnerBootstrap/);
+ assert.match(app,/if \(isTiDBCatalogPreview\(\)\)/);
+ assert.doesNotMatch(app,/promptPreviewPimpinanTiDBAccess/);
+ assert.match(api,/async function sessionRoute/);
+ assert.match(api,/path==="\/api\/auth\/session"/);
+ assert.match(html,/preview-owner-bootstrap/);
+ assert.match(html,/tidb-auth2/);
 });
