@@ -1101,7 +1101,7 @@
     });
 
         // Firebase Cloud Realtime Sync for TV Display
-    const isProductionDisplayHost = window.location.hostname === 'klinikassalaam.vercel.app';
+    const isProductionDisplayHost = window.location.hostname === 'klinikassalaam.vercel.app' || window.location.hostname === 'klinik-assalaam.vercel.app';
     const firebaseDisplayConfig = isProductionDisplayHost ? {
       apiKey: "AIzaSyBjtSu4c6ObHGM9iUHopw4uG-gGjIIswPc",
       authDomain: "assalam-db.firebaseapp.com",

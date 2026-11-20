@@ -84,7 +84,7 @@ class FirebaseBackend {
   };
 
   init() {
-    const isProductionHost = window.location.hostname === 'klinikassalaam.vercel.app';
+    const isProductionHost = window.location.hostname === 'klinikassalaam.vercel.app' || window.location.hostname === 'klinik-assalaam.vercel.app';
     let config = isProductionHost
       ? (this.store.state.firebaseConfig || FirebaseBackend.DEFAULT_CONFIG)
       : window.ASSALAM_FIREBASE_CONFIG;
