@@ -31,6 +31,7 @@ test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  assert.doesNotMatch(app,/promptPreviewPimpinanTiDBAccess/);
  assert.match(api,/async function sessionRoute/);
  assert.match(api,/path==="\/api\/auth\/session"/);
+ assert.match(api,/preview-owner-status/);
  assert.match(html,/preview-owner-bootstrap/);
  assert.match(html,/tidb-auth2/);
  assert.equal(html.split("\n").filter(line=>line.includes("document.write")&&line.includes("<\\\\/script>")).length,0,"dynamic script tags must close correctly");
@@ -46,4 +47,6 @@ test("owner bootstrap adopts the existing protected clinic identity without dupl
  assert.match(owner,/PREVIEW_OWNER_MULTIPLE_RESERVED/);
  assert.match(owner,/const now=new Date\(\)/,"Better Auth DATETIME(3) fields must receive Date values");
  assert.doesNotMatch(owner,/now=Date\.now\(\)/,"Unix milliseconds must not be inserted into DATETIME fields");
+ assert.match(owner,/refresh_existing_owner_credential/,"A valid protected owner bootstrap retry refreshes the credential without creating another owner");
+ assert.match(owner,/PREVIEW_OWNER_CREDENTIAL_REFRESHED/);
 });
