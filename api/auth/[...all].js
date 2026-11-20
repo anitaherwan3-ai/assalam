@@ -56,15 +56,20 @@ async function dryRunRoute(req,res){
  catch(e){const status=Number(e.statusCode)||503;if(status>=500)console.error("[FIREBASE-MASTER-DRY-RUN]",{code:e.code||"UNKNOWN"});return res.status(status).json({ok:false,code:e.code||"FIREBASE_MASTER_DRY_RUN_FAILED",message:status>=500?"Dry-run master data belum tersedia.":e.message});}
 }
 async function handler(req,res){
- const path=String(req.url||"").split("?")[0];
+ const originalUrl=String(req.headers["x-matched-path"]||req.url||"");
+ const urlObj=new URL(originalUrl,"http://localhost");
+ const path=urlObj.pathname;
  if(path==="/api/auth/preview-owner-status")return previewOwnerStatusRoute(req,res);
  if(path==="/api/auth/session")return sessionRoute(req,res);
  if(path==="/api/auth/preview-bootstrap")return bootstrapRoute(req,res);
  if(path==="/api/auth/preview-import-dry-run")return dryRunRoute(req,res);
+ if(path.startsWith("/api/auth/")&&req.url!==originalUrl){
+  req.url=originalUrl;
+ }
  try{
-  if(!nodeHandlerPromise){nodeHandlerPromise=Promise.all([import("better-auth/node"),getBetterAuth()]).then(([adapter,auth])=>adapter.toNodeHandler(auth.handler));nodeHandlerPromise.catch(()=>{nodeHandlerPromise=null;});}
+  if(!nodeHandlerPromise){nodeHandlerPromise=Promise.all([import("better-auth/node"),getBetterAuth()]).then(([adapter,auth])=>adapter.toNodeHandler(auth.handler||auth));nodeHandlerPromise.catch(()=>{nodeHandlerPromise=null;});}
   return await (await nodeHandlerPromise)(req,res);
- }catch(e){console.error("[BETTER-AUTH]",{code:e&&e.code?e.code:"AUTH_HANDLER_ERROR"});res.statusCode=503;res.setHeader("Cache-Control","no-store");return res.end(JSON.stringify({ok:false,code:"AUTH_SERVICE_UNAVAILABLE"}));}
+ }catch(e){console.error("[BETTER-AUTH]",{code:e&&e.code?e.code:"AUTH_HANDLER_ERROR",message:e&&e.message});res.statusCode=503;res.setHeader("Cache-Control","no-store");return res.end(JSON.stringify({ok:false,code:"AUTH_SERVICE_UNAVAILABLE"}));}
 }
 module.exports=handler;
 module.exports.config={api:{bodyParser:false}};
