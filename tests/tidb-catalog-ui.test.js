@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 function installCatalogUI({ enabled = true, api = {} } = {}) {
+  if (typeof api.listInventory !== "function") api.listInventory = async () => ({ ok: true, data: [] });
   const window = {
     ASSALAM_TIDB_PREVIEW_BOOTSTRAP: enabled,
     assalamTiDBApi: api
@@ -95,4 +96,43 @@ test("TiDB catalog UI mutation helpers send expected versions and refresh server
   assert.equal(calls[0].key, "idempotency-uuid");
   assert.equal(calls[1].data.expectedVersion, "1");
   assert.equal(calls[2].op, "deactivateSupplier");
+});
+
+
+test("TiDB catalog UI hydrates medicine masters from inventory and creates medicines without stock/HPP writes", async () => {
+  const calls = [];
+  const api = {
+    newIdempotencyKey: () => "medicine-idempotency-key",
+    getSession: async () => ({ ok: true }),
+    listTariffs: async () => ({ ok: true, data: [] }),
+    listSuppliers: async () => ({ ok: true, data: [] }),
+    listInventory: async () => ({ ok: true, data: [{
+      medicineId: "41", publicId: "medicine-public-41", name: "Vitamin C 500mg",
+      unit: "botol", sellingPrice: "20000", minimumStock: "5",
+      physicalQuantity: "12", sellableQuantity: "10", unknownHppQuantity: "0",
+      weightedHpp: "12000", profitCalculationStatus: "calculated", active: 1
+    }] }),
+    inventoryCommand: async (body, key) => { calls.push({ body, key }); }
+  };
+  const window = installCatalogUI({ api });
+  window.clinicStore = { state: { obat: [] } };
+  await window.assalamTiDBCatalog.ensureLoaded();
+  assert.deepEqual(JSON.parse(JSON.stringify(window.assalamTiDBCatalog.getMedicines()[0])), {
+    id: "41", medicineId: "41", publicId: "medicine-public-41",
+    nama: "Vitamin C 500mg", satuan: "botol", jual: 20000, hpp: 12000,
+    stok: 10, min: 5, physicalStock: 12, unknownHppQuantity: 0,
+    profitCalculationStatus: "calculated", active: true
+  });
+  assert.equal(window.clinicStore.state.obat[0].id, "41");
+  await window.assalamTiDBCatalog.createMedicine({
+    name: "Paracetamol 500mg", canonicalUnit: "tablet",
+    sellingPrice: 5000, minimumStock: 10
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.action, "create_medicine");
+  assert.equal(calls[0].body.medicine.canonicalUnit, "tablet");
+  assert.equal(calls[0].body.medicine.quantityScale, 0);
+  assert.equal(Object.hasOwn(calls[0].body.medicine, "stock"), false);
+  assert.equal(Object.hasOwn(calls[0].body.medicine, "hpp"), false);
+  assert.equal(calls[0].key, "medicine-idempotency-key");
 });
