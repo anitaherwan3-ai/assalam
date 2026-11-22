@@ -73,6 +73,7 @@ function createHarness(overrides = {}) {
     async getPurchaseReceiptPolicy() { return { mode: "split_receipts" }; },
     async createPurchaseReceipt(_c, data) { state.receipts.push(data); return "receipt-" + state.receipts.length; },
     async createBatch(_c, data) {
+      state.lastBatchCreate = { ...data };
       const batch = { batchId: "batch-new-" + state.batches.length, remainingQty: data.remainingQty, version: "1", ...data };
       state.batches.push(batch);
       return batch.batchId;
@@ -359,6 +360,10 @@ test("purchase receipt atomically creates receipt, batch, movement, HPP and supp
   assert.equal(result.body.data.stockQty, "10");
   assert.equal(result.body.data.hpp, "1500");
   assert.equal(state.receipts.length, 1);
+  assert.equal(state.lastBatchCreate.sourcePurchaseLineId, "line-1");
+  assert.equal(state.lastBatchCreate.medicineId, "med-1");
+  assert.equal(state.lastBatchCreate.receivedQty, "5");
+  assert.equal(state.lastBatchCreate.remainingQty, "5");
   assert.equal(state.batches.length, 2);
   assert.equal(state.movements.length, 1);
   assert.equal(state.purchaseLine.receivedQty, "5");
