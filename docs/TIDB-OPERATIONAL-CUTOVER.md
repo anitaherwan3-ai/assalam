@@ -34,3 +34,24 @@ This document tracks the seven migration workstreams. The production branch and 
 All mutation wrappers carry an idempotency key; requests remain same-origin and no-store. A Node test verifies the route allowlist, methods, request headers, and rejection of unlisted endpoints.
 
 The Preview medicine master read/create flow is now connected, but only this narrow slice is live in the UI. Existing medicine edit/deactivate controls are blocked in TiDB Preview rather than writing to local storage. Stock receipt/history, service packages (no package master/component tables or catalog API are present in the current migration set), patient, queue, shift, checkout, returns, and finance workflows remain incomplete at the UI/data-source boundary. This is adapter and partial UI groundwork, not proof that the application is fully TiDB-backed. Do not mark the cutover ready until every operational screen stops using Firebase/localStorage for operational reads and writes and the full test matrix passes.
+
+## Verified blockers found during the next implementation pass
+
+### Queue and cashier shift custody
+
+- Migration `005_patient_shift_queue_v1` creates `cashier_shifts`, `active_shift_slots`, and `cashier_queue_assignments`, but it does not seed cashier-to-lane assignments and there is no shift-open command in `lib/clinic-domain-commands.js` or shift-open method in the repositories.
+- The existing queue registration command requires an already-open shift owned by the acting user. It then requires an effective `cashier_queue_assignments` row for the selected A/B prefix. The database foreign keys correctly bind each encounter and queue ticket to the shift owner.
+- Therefore, exposing queue registration before a reviewed shift-open flow and assignment setup would leave the UI unable to register safely or tempt callers to bypass ownership checks. Do not synthesize shift IDs or silently create lane assignments during patient registration.
+- Existing close/verify shift commands and repository methods are present, but they do not substitute for opening a shift. The opening-float source, allowed opener roles, one-active-shift invariant, cashier-to-lane assignment lifecycle, and UI handoff must be covered by tests before enabling the workflow.
+
+### Service package schema
+
+- The migration inventory currently contains migrations 001–016. No migration creates `service_packages` or `package_components`.
+- Migration `016_service_package_price_snapshots` only alters those two tables, so it cannot bootstrap a clean database by itself. Package catalog APIs/UI must remain disabled until the base DDL, constraints, component quantity rules, package price authority, and migration ordering are supplied and tested.
+
+### Next safe implementation gates
+
+1. Define and test the shift-open contract against the already-created shift tables, including active-slot locking, opening cash, shift code, and audit/idempotency.
+2. Add an explicit, authorized cashier A/B assignment workflow (or a reviewed one-time seed) before queue registration is enabled.
+3. Add the missing service-package base migration before applying migration 016 on a clean TiDB database.
+4. Only then wire patient registration, queue calls/transfers, package checkout, and their UI state to TiDB. Keep production and the main branch unchanged until the full Preview test matrix passes.
