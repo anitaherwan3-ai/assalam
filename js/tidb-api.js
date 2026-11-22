@@ -28,7 +28,11 @@
       "/api/auth/preview-import-dry-run",
       "/api/admin/users",
       "/api/catalog/tariffs",
-      "/api/catalog/suppliers"
+      "/api/catalog/suppliers",
+      "/api/inventory",
+      "/api/sales",
+      "/api/finance",
+      "/api/queue"
     ]);
     if (!allowedPaths.has(path)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
@@ -91,6 +95,13 @@
     listSuppliers: () => request("/api/catalog/suppliers"),
     createSupplier: (data, key) => request("/api/catalog/suppliers", { method: "POST", body: data, idempotencyKey: key }),
     updateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "PATCH", body: data, idempotencyKey: key }),
-    deactivateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "DELETE", body: data, idempotencyKey: key })
+    deactivateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "DELETE", body: data, idempotencyKey: key }),
+    listInventory: () => request("/api/inventory"),
+    inventoryCommand: (data, key) => request("/api/inventory", { method: "POST", body: data, idempotencyKey: key }),
+    salesCommand: (data, key) => request("/api/sales", { method: "POST", body: data, idempotencyKey: key }),
+    financeCommand: (data, key) => request("/api/finance", { method: "POST", body: data, idempotencyKey: key }),
+    listQueue: () => request("/api/queue"),
+    queueCommand: (data, key) => request("/api/queue", { method: "POST", body: data, idempotencyKey: key }),
+    getDisplayQueue: () => request("/api/queue?display=1")
   });
 })();
