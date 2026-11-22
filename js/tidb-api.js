@@ -32,7 +32,8 @@
       "/api/inventory",
       "/api/sales",
       "/api/finance",
-      "/api/queue"
+      "/api/queue",
+      "/api/queue?display=1"
     ]);
     if (!allowedPaths.has(path)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
