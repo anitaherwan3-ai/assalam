@@ -33,7 +33,7 @@ This document tracks the seven migration workstreams. The production branch and 
 
 All mutation wrappers carry an idempotency key; requests remain same-origin and no-store. A Node test verifies the route allowlist, methods, request headers, and rejection of unlisted endpoints.
 
-The Preview medicine master read/create flow is now connected, but only this narrow slice is live in the UI. Existing medicine edit/deactivate controls are blocked in TiDB Preview rather than writing to local storage. Stock receipt/history, service packages (no package master/component tables or catalog API are present in the current migration set), patient, queue, shift, checkout, returns, and finance workflows remain incomplete at the UI/data-source boundary. This is adapter and partial UI groundwork, not proof that the application is fully TiDB-backed. Do not mark the cutover ready until every operational screen stops using Firebase/localStorage for operational reads and writes and the full test matrix passes.
+The Preview medicine master read/create flow is now connected, but only this narrow slice is live in the UI. Existing medicine edit/deactivate controls are blocked in TiDB Preview rather than writing to local storage. Stock receipt/history, service-package catalog API/UI and package checkout expansion, patient, queue, shift, checkout, returns, and finance workflows remain incomplete at the UI/data-source boundary. This is adapter and partial UI groundwork, not proof that the application is fully TiDB-backed. Do not mark the cutover ready until every operational screen stops using Firebase/localStorage for operational reads and writes and the full test matrix passes.
 
 ## Verified blockers found during the next implementation pass
 
@@ -44,16 +44,16 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - Therefore, exposing queue registration before a reviewed shift-open flow and assignment setup would leave the UI unable to register safely or tempt callers to bypass ownership checks. Do not synthesize shift IDs or silently create lane assignments during patient registration.
 - Existing close/verify shift commands and repository methods are present, but they do not substitute for opening a shift. The opening-float source, allowed opener roles, one-active-shift invariant, cashier-to-lane assignment lifecycle, and UI handoff must be covered by tests before enabling the workflow.
 
-### Service package schema
+### Service package checkout and catalog
 
-- The migration inventory currently contains migrations 001–016. No migration creates `service_packages` or `package_components`.
-- Migration `016_service_package_price_snapshots` only alters those two tables, so it cannot bootstrap a clean database by itself. Package catalog APIs/UI must remain disabled until the base DDL, constraints, component quantity rules, package price authority, and migration ordering are supplied and tested.
+- Migration `009_operational_controls_v1` creates the base `service_packages` and `package_components` tables; migration `016_service_package_price_snapshots` adds the package price and component snapshots. The base schema is therefore present in the migration sequence.
+- The remaining blocker is functional: there is no package catalog API/UI integration and the authoritative checkout snapshot accepts medicine or tariff references only; it does not expand package components. Package checkout must remain disabled until component quantity rules, price authority, immutable snapshots, return quotas, and tests are implemented.
 
 ### Next safe implementation gates
 
 1. Define and test the shift-open contract against the already-created shift tables, including active-slot locking, opening cash, shift code, and audit/idempotency.
 2. Add an explicit, authorized cashier A/B assignment workflow (or a reviewed one-time seed) before queue registration is enabled.
-3. Add the missing service-package base migration before applying migration 016 on a clean TiDB database.
+3. Add package catalog API/UI and server-side package expansion in checkout, using the existing base tables from migration 009 and snapshot columns from migration 016.
 4. Only then wire patient registration, queue calls/transfers, package checkout, and their UI state to TiDB. Keep production and the main branch unchanged until the full Preview test matrix passes.
 
 ## Full operational source-of-truth audit (2026-11-22)
@@ -72,17 +72,17 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - Therefore the Preview must not be described as fully TiDB-backed while any operational screen can mutate local collections or while production Firebase push paths remain reachable. The Firebase integration must be removed from the production runtime only after every affected UI workflow has a tested TiDB replacement; do not simply disable persistence globally because that would silently lose unfinished workflows.
 - The initial local medicine fixtures still include the legacy unit `strip`; the Preview medicine master form now constrains new records to tablet/kapsul/botol/pcs, but existing local fixture state is not a TiDB source and must not be imported as-is.
 
-### Migration ordering issue: package tables
+### Migration ordering and clean-schema verification
 
-- The migration runner applies the supplied migrations in order and verifies each migration's `expectedTables` immediately after its statements.
-- Migration 016 alters `service_packages` and `package_components`, but no earlier migration creates either table. A later migration cannot repair this ordering because 016 will fail first on a clean database.
-- Do not create guessed package tables: checkout currently does not support package expansion, and the intended component constraints, package snapshot semantics, and quantity/unit treatment need to match the application policy. Add the base DDL before 016 only after the package domain contract and repository queries are specified.
+- The migration runner applies migrations in order and verifies each migration's `expectedTables` immediately after its statements.
+- Migration 009 creates `service_packages` and `package_components`; migration 016 then adds snapshot columns. Add a regression test that locks this ordering and confirms both expected table sets before changing migration definitions.
+- The preview migration script is deliberately guarded by Vercel environment, exact branch, database name, explicit enable flag, and a confirmation token. Do not weaken that guard to make an arbitrary branch deploy run schema writes.
 
 ### Explicit gates before production cutover
 
 1. Add an audited open-shift command and API after confirming the opening-float and shift-code rules; enforce one active slot per cashier and idempotency under row lock.
 2. Add an authorized A/B lane assignment lifecycle tied to the five approved accounts; do not guess user IDs or infer lane from role alone.
-3. Implement the package base migration before 016, package catalog CRUD, and server-side package expansion in checkout; add regression tests for component quantities, snapshots, returns, and package-level discounts policy.
+3. Implement package catalog CRUD and server-side package expansion in checkout using the existing 009/016 schema; add regression tests for component quantities, snapshots, returns, and package-level discounts policy.
 4. Wire every operational UI read and mutation to its corresponding TiDB route, with stable TiDB/public IDs and server-authoritative totals. Cover patients, queue, shifts, purchasing/receipts, batch stock/FEFO, quarantine, stocktake, sales, returns/refunds, supplier obligations/returns, expenses, cash ledger, and reports.
 5. Remove Firebase SDK/config/push runtime paths from production only after a repository-wide call-site audit proves no active operational workflow depends on them. Keep Firebase dummy import tooling separate and read-only.
 6. Run the complete Node test suite, migration smoke tests on an empty Preview schema, API authorization/idempotency/transaction tests, and browser regression tests for all five accounts. Then verify Preview runtime and obtain explicit production cutover approval.
