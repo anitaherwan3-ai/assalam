@@ -2015,9 +2015,25 @@ function viewMaster() {
   `;
 }
 
-function actionAddObat() {
+async function actionAddObat() {
   const nama = val('m-o-nama').trim();
   if (!nama) { showAlert('Nama obat wajib diisi'); return; }
+  if (isTiDBCatalogPreview()) {
+    try {
+      await window.assalamTiDBCatalog.createMedicine({
+        name: nama,
+        canonicalUnit: val('m-o-satuan').trim().toLowerCase(),
+        sellingPrice: numVal('m-o-jual'),
+        minimumStock: numVal('m-o-min') || 5
+      });
+      $('m-o-nama').value = '';
+      renderApp();
+      showAlert('Master obat tersimpan di TiDB. Stok dan HPP awal tetap nol sampai penerimaan pembelian dicatat.', 'Berhasil');
+    } catch (error) {
+      showAlert(error.message || 'Gagal menyimpan master obat ke TiDB.', 'TiDB');
+    }
+    return;
+  }
   store.state.obat.push({
     id: uid(),
     nama: nama,
