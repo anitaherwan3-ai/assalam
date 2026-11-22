@@ -1975,11 +1975,9 @@ function viewMaster() {
           <input id="m-o-nama" placeholder="Contoh: Paracetamol 500mg">
         </label>
         <label style="width:100px;">Satuan
-          <input id="m-o-satuan" value="strip">
+          <select id="m-o-satuan"><option value="tablet">tablet</option><option value="kapsul">kapsul</option><option value="botol">botol</option><option value="pcs">pcs</option></select>
         </label>
-        <label>Harga Beli (HPP)
-          <input id="m-o-hpp" type="number" placeholder="3000">
-        </label>
+        ${isTiDBCatalogPreview() ? '' : '<label>Harga Beli (HPP)<input id="m-o-hpp" type="number" placeholder="3000"></label>'}
         <label>Harga Jual
           <input id="m-o-jual" type="number" placeholder="5000">
         </label>
@@ -2050,6 +2048,7 @@ async function actionAddObat() {
 }
 
 function editObat(id) {
+  if (isTiDBCatalogPreview()) { showAlert('Perubahan master obat melalui TiDB memerlukan endpoint revisi dengan kontrol versi. Operasi lokal dinonaktifkan agar data tidak menyimpang.'); return; }
   const o = store.getObat(id);
   if (!o) return;
   showFormModal('Edit Obat', [
@@ -2073,6 +2072,7 @@ function editObat(id) {
 }
 
 function delObat(id) {
+  if (isTiDBCatalogPreview()) { showAlert('Penghapusan master obat lokal dinonaktifkan. Gunakan penonaktifan master melalui endpoint TiDB setelah fitur tersebut tersedia.'); return; }
   showConfirm('Hapus data master obat ini?', () => {
     const o = store.getObat(id);
     if (o) {
