@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - migration/tidb-foundation
+      - migration/tidb-operational-cutover
   pull_request:
     branches:
+      - main
       - migration/tidb-foundation
 
 jobs:
