@@ -92,3 +92,25 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - Changes are isolated to `migration/tidb-operational-cutover`; `main` and production database are unchanged.
 - No test suite, migration application, Preview browser test, or production deployment has been run in this work session. GitHub status checks returned no status entries; that is not evidence of passing tests.
 - This audit intentionally records unimplemented gates rather than claiming the app is fully connected.
+
+
+## Additional implementation pass (2026-11-23)
+
+### Purchase receipt batch lineage correction
+
+- The command validated an authoritative purchase line and receipt quantity, but the repository batch writer also requires `sourcePurchaseLineId`, `medicineId`, and receipt quantities. The command previously forwarded only the validated batch payload and receipt ID, so a real purchase receipt could fail at batch insertion.
+- The command now explicitly supplies the locked/validated purchase line ID and medicine ID, and sets batch received/remaining quantity from the authoritative receipt quantity (not a client-supplied batch quantity).
+- The command harness now asserts this lineage and quantity contract. This is a source-level regression test addition; it has not yet been executed in CI/runtime.
+
+### Preview migration gate mismatch
+
+- `scripts/apply-preview-migrations.js` currently runs migrations only when `VERCEL_GIT_COMMIT_REF === "migration/tidb-foundation"`, while this operational work is on `migration/tidb-operational-cutover`.
+- Therefore a Preview deployment from this branch will skip the migration step even if the TiDB migration enable flag is true. Do not weaken or broaden the guard until the intended Preview branch and exact deployment environment have been confirmed; otherwise an unintended deployment could execute schema writes.
+- This needs an explicit, controlled Preview deployment plan and environment check before runtime migration verification.
+
+### Current work added
+
+- Corrected the package schema audit: base package tables are created in migration 009, and migration 016 adds snapshots.
+- Added migration-order regression coverage for those package tables.
+- Corrected purchase receipt batch lineage and added command-harness assertions.
+- No CI workflow runs or commit status checks are currently returned by GitHub for the branch head. These source changes must still be executed with `npm test` before any merge.
