@@ -147,3 +147,11 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - The app still contains legacy Firebase and localStorage operational paths. They must not be removed or treated as production-safe until purchasing, package catalog/checkout, sales, returns/refunds, finance, stock history, quarantine, stocktake, and reports have their own TiDB read/write UI paths and regression coverage.
 - `api/sales.js` and `api/finance.js` currently expose mutation commands but no complete list/read endpoints; purchasing invoice creation/list UI and package checkout expansion also remain incomplete.
 - No production branch merge, production deployment, production DB write, or Firebase import occurred.
+
+
+### Operational source-of-truth safety gate
+- In TiDB Preview, only the already integrated tabs (Shift, Pasien/Antrean, Obat & Tarif, Pengguna) are allowed to render their current operational UI.
+- Other operational tabs now show an explicit not-yet-integrated notice instead of rendering localStorage/Firebase workflows. This is a temporary safety gate, not completion of those modules.
+- The patient/queue UI uses TiDB endpoints for registration, call/recall and reason-required transfer. The shift UI uses TiDB for open, close and verification.
+- Cashier shift verification now requires two distinct Admin users; an Admin shift requires one Pimpinan approval. Migration 017 creates an immutable verifier event table with unique (shift, verifier) enforcement.
+- The operational rollback-only smoke test now exercises the two-Admin approval sequence. It has not yet been run against TiDB because the Preview migration trigger remains inactive.
