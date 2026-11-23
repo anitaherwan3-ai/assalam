@@ -439,7 +439,43 @@ function calcShiftCash(shift) {
   return Number(shift.modal || 0) + tunaiTrx - kasKecil;
 }
 
+
+function viewTiDBShift() {
+  setTimeout(loadTiDBShifts, 0);
+  return '<div class="card"><h2>Shift Kasir — TiDB</h2><p class="muted">Pembukaan dan riwayat shift disimpan di TiDB. Kasir 1 menggunakan shift pagi; Kasir 2 menggunakan shift sore. Modal awal dicatat sebagai saldo pembuka dan menjadi dasar rekonsiliasi kas.</p>' +
+    '<div class="row" style="gap:8px;flex-wrap:wrap"><button class="p" onclick="actionOpenTiDBShift()">Buka Shift TiDB</button><button class="s" onclick="loadTiDBShifts()">Muat Ulang</button></div>' +
+    '<div id="tidb-shifts-table" style="margin-top:12px"><p class="muted">Memuat riwayat shift...</p></div></div>';
+}
+async function loadTiDBShifts() {
+  const target=$('tidb-shifts-table');
+  if(!target||!isTiDBCatalogPreview()||!window.assalamTiDBApi)return;
+  target.innerHTML='<p class="muted">Memuat riwayat shift TiDB...</p>';
+  try {
+    const response=await window.assalamTiDBApi.listShifts();
+    const rows=Array.isArray(response.data)?response.data:[];
+    if(!rows.length){target.innerHTML='<p class="muted">Belum ada shift tercatat di TiDB.</p>';return;}
+    const html=rows.map(s=>'<tr><td>'+esc(String(s.businessDate||''))+'</td><td>'+esc(String(s.cashierName||s.cashierUserId||''))+'</td><td>'+esc(String(s.shiftCode||''))+'</td><td>'+rp(s.openingFloat)+'</td><td>'+esc(String(s.status||''))+'</td><td>'+esc(String(s.shiftId||''))+'</td></tr>').join('');
+    target.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Tanggal</th><th>Petugas</th><th>Shift</th><th>Modal Awal</th><th>Status</th><th>ID</th></tr></thead><tbody>'+html+'</tbody></table></div>';
+  } catch(e) { target.innerHTML='<p class="bad">'+esc(e.message||'Gagal memuat shift TiDB.')+'</p>'; }
+}
+function actionOpenTiDBShift() {
+  if(!isTiDBCatalogPreview()||!window.assalamTiDBApi){showAlert('Pembukaan shift TiDB hanya tersedia pada Preview.');return;}
+  if(!['kasir','admin'].includes(currentRole)){showAlert('Hanya Kasir atau Admin yang dapat membuka shift.');return;}
+  showFormModal('Buka Shift Kasir TiDB',[
+    ['openingFloat','Modal awal kas (Rupiah)','number','0']
+  ],async values=>{
+    const openingFloat=String(values.openingFloat||'0').trim();
+    if(!/^(0|[1-9]\\d*)$/.test(openingFloat)){showAlert('Modal awal harus berupa angka Rupiah bulat non-negatif.');return;}
+    try{
+      await window.assalamTiDBApi.openShift({action:'open',openingFloat},window.assalamTiDBApi.newIdempotencyKey());
+      await loadTiDBShifts();
+      showAlert('Shift berhasil dibuka dan dicatat di TiDB.','Shift Dibuka');
+    }catch(e){showAlert(e.message||'Pembukaan shift TiDB gagal.','Gagal Membuka Shift');}
+  });
+}
+
 function viewShift() {
+  if (isTiDBCatalogPreview()) return viewTiDBShift();
   const shift = getCurrentShift();
   const myShifts = (store.state.shift || []).filter(s => s.kasir === (currentUser ? currentUser.u : '')).slice().reverse();
 
@@ -4186,11 +4222,29 @@ async function loadTiDBUsers(){
   if(!users.length){target.innerHTML='<p class="muted">Belum ada akun TiDB.</p>';return;}
   const rows=users.map(u=>{const locked=!!u.protectedOwner||['praktekrose@gmail.com','nursalim42@gmail.com','assalamkasir1@gmail.com','assalamkasir2@gmail.com','assalamadmin1@gmail.com'].includes(String(u.email||'').toLowerCase());
    const status=u.active&&!u.banned?'<span class="badge-ok">Aktif</span>':'<span class="badge-warn">Nonaktif</span>';
-   const actions=`<button class="s" onclick="editTiDBUser('${esc(u.userId)}')">Kelola</button>`+(locked||!u.active?'':` <button class="s btn-danger" onclick="disableTiDBUser('${esc(u.userId)}')">Nonaktifkan</button>`);
+   const lane=u.role==='kasir'&&u.active&&!u.banned?` <button class="s" onclick="assignTiDBQueueLane('${esc(u.userId)}','${esc(u.email||'')}')">Atur Jalur A/B</button>`:'';
+   const actions=`<button class="s" onclick="editTiDBUser('${esc(u.userId)}')">Kelola</button>`+(locked||!u.active?'':` <button class="s btn-danger" onclick="disableTiDBUser('${esc(u.userId)}')">Nonaktifkan</button>`)+lane;
    return `<tr><td>${esc(u.name||'-')}</td><td>${esc(u.email||'-')}</td><td>${esc(u.role||'-')}</td><td>${status}</td><td>${locked?'<span class="muted">Akun inti</span> ':''}${actions}</td></tr>`;
   }).join('');
   target.innerHTML=`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Total akun: ${users.length}. Akun nonaktif tetap tersimpan untuk audit.</p>`;
  }catch(e){target.innerHTML=`<p class="bad">${esc(e.message||'Gagal memuat akun.')}</p>`;}finally{window.ASSALAM_TIDB_USERS_LOADING=false;}
+}
+
+function assignTiDBQueueLane(userId,email) {
+ const normalized=String(email||'').trim().toLowerCase();
+ const prefix=normalized==='assalamkasir1@gmail.com'?'A':normalized==='assalamkasir2@gmail.com'?'B':'';
+ if(!prefix){showAlert('Akun Kasir ini belum memiliki penugasan jalur yang ditetapkan. Jalur otomatis hanya tersedia untuk Kasir 1 (A) dan Kasir 2 (B).');return;}
+ showFormModal('Tetapkan Jalur Antrean '+prefix,[
+  ['validFrom','Mulai berlaku (tanggal WIB)','date',getClinicTodayStr()]
+ ],async values=>{
+  const validFrom=String(values.validFrom||'');
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(validFrom)){showAlert('Tanggal mulai berlaku tidak valid.');return;}
+  try{
+   await window.assalamTiDBApi.assignQueueLane({cashierUserId:userId,prefix,validFrom},window.assalamTiDBApi.newIdempotencyKey());
+   await loadTiDBUsers();
+   showAlert('Jalur '+prefix+' berhasil ditetapkan untuk '+normalized+'.','Penugasan Antrean');
+  }catch(e){showAlert(e.message||'Penetapan jalur antrean gagal.');}
+ });
 }
 function actionAddUser(){
  if(!isTiDBCatalogPreview()){showAlert('Pembuatan akun lokal dinonaktifkan.');return;}
