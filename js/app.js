@@ -5291,6 +5291,35 @@ function closeStaffLoginModal() {
 // -------------------------------------------------------------
 // MAIN RENDERER
 // -------------------------------------------------------------
+
+function viewTiDBPendingModule(title) {
+  const details = {
+    'Transaksi':'Checkout dan pembayaran belum memiliki antarmuka TiDB lengkap; transaksi lokal sengaja tidak diizinkan.',
+    'Pembelian':'Pembuatan faktur pembelian dan penerimaan lengkap masih dalam integrasi TiDB.',
+    'Paket Pelayanan':'Katalog paket dan ekspansi komponen checkout belum selesai.',
+    'Kas Kecil':'Kas kecil dan jurnal kas belum tersambung ke antarmuka TiDB.',
+    'Biaya':'Pencatatan dan persetujuan biaya belum terhubung penuh.',
+    'Stok Opname':'Form opname dan persetujuan belum terhubung penuh.',
+    'Kartu Stok':'Riwayat mutasi batch belum tersedia pada antarmuka TiDB.',
+    'Kedaluwarsa':'Daftar batch dan tindakan kedaluwarsa belum terhubung penuh.',
+    'Riwayat Transaksi':'Daftar faktur dan detail transaksi TiDB belum tersedia.',
+    'Verifikasi':'Daftar antrean persetujuan transaksi belum terhubung penuh.',
+    'Pengawasan Retur':'Alur retur, karantina, refund dan persetujuan belum tersedia di antarmuka.',
+    'Dashboard':'Ringkasan operasional belum seluruhnya memakai agregat TiDB.',
+    'Data Pasien':'Laporan data pasien administratif belum terhubung penuh.',
+    'Stok Obat':'Ringkasan stok batch TiDB belum terhubung penuh.',
+    'Laba Rugi':'Laporan laba rugi TiDB belum terhubung penuh.',
+    'Arus Kas':'Laporan arus kas TiDB belum terhubung penuh.',
+    'Utang':'Daftar utang dan pembayaran supplier belum terhubung penuh.',
+    'Approval':'Pusat persetujuan belum terhubung penuh.',
+    'Log Aktivitas':'Penampil audit log TiDB belum terhubung penuh.',
+    'Pengaturan':'Pengaturan klinik belum seluruhnya dipindahkan ke TiDB.',
+    'Ekspor':'Ekspor laporan dan arsip belum terhubung penuh.',
+    'Display TV':'Tampilan antrean TV belum dialihkan ke endpoint display TiDB.'
+  };
+  return '<div class="card"><h2>'+esc(title)+' — Integrasi TiDB belum selesai</h2><p>'+esc(details[title]||'Modul ini masih dalam proses integrasi backend TiDB.')+'</p><p class="muted">Untuk mencegah transaksi tersimpan hanya di perangkat, modul lokal dinonaktifkan pada Preview TiDB. Data tidak akan ditulis ke localStorage atau Firebase dari halaman ini.</p><button class="s" onclick="setTab(\'Shift\')">Kembali ke Shift TiDB</button></div>';
+}
+
 function renderApp() {
   window.renderCurrentTab = renderApp;
   const userHeaderEl = $('header-user-info');
@@ -5361,6 +5390,12 @@ function renderApp() {
             esc(err.message || 'Periksa sesi dan koneksi database.') + '</p></div>';
         });
     }
+    return;
+  }
+
+  const tidbPreviewConnectedTabs = ['Shift','Pasien','Obat & Tarif','Pengguna'];
+  if (isTiDBCatalogPreview() && !tidbPreviewConnectedTabs.includes(activeTab)) {
+    $('main-content').innerHTML = viewTiDBPendingModule(activeTab);
     return;
   }
 
