@@ -74,7 +74,13 @@
     return payload;
   }
 
-  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.location && (String(window.location.hostname || "").includes("assalam-mysql-preview") || String(window.location.hostname || "").includes("klinik-assalaam")));
+  const previewHost = String(window.location && window.location.hostname || "").toLowerCase();
+  const productionHost = previewHost === "klinikassalaam.vercel.app";
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !productionHost && (
+    previewHost.includes("assalam-mysql-preview") ||
+    previewHost.includes("klinik-assalaam") ||
+    previewHost.includes("klinikassalaam-git-migration-tidb-operational-cutover")
+  );
 
   window.assalamTiDBApi = Object.freeze({
     request,
