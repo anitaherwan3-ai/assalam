@@ -95,3 +95,11 @@ test("TiDB Preview patient registration and queue handoff use server-owned shift
  assert.match(app,/toCashierUserId/);
  assert.match(app,/Alasan pelimpahan/);
 });
+
+test("TiDB shift UI closes shifts and displays two-Admin verification progress",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/action:'close_shift',shiftId,countedCash/);
+ assert.match(app,/action:'verify_shift',shiftId/);
+ assert.match(app,/verificationCount/);
+ assert.match(app,/requiredApprovals/);
+});
