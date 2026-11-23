@@ -63,3 +63,13 @@ test("operational TiDB Preview branch is enabled for diagnostics but migration e
  assert.match(workflow,/I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_016/);
  assert.match(workflow,/environment: tidb-preview/);
 });
+
+test("Preview owner bootstrap action is visible only on the TiDB Preview login modal",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/const bootstrapButton = \$\('preview-owner-bootstrap'\)/);
+ assert.match(app,/bootstrapButton\.style\.display = preview \? 'block' : 'none'/);
+ assert.match(app,/Aktifkan \/ Pulihkan Pimpinan TiDB/);
+ const api=fs.readFileSync(require.resolve("../js/tidb-api.js"),"utf8");
+ assert.match(api,/klinikassalaam-git-migration-tidb-operational-cutover/);
+ assert.match(api,/productionHost = previewHost === "klinikassalaam\.vercel\.app"/);
+});
