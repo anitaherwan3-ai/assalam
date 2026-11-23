@@ -37,3 +37,13 @@ test("finance and evidence ledgers retain rows through RESTRICT relationships", 
   assert.match(sql, /FOREIGN KEY \(reversal_of_entry_id\) REFERENCES cash_ledger_entries/);
   assert.match(sql, /FOREIGN KEY \(reversal_of_entry_id\) REFERENCES bank_ledger_entries/);
 });
+
+test("migration 017 records distinct shift verifiers without overwriting earlier approvals",()=>{
+ const migration=require("../lib/migrations/017_two_admin_shift_verification");
+ assert.equal(migration.version,"017_two_admin_shift_verification");
+ assert.ok(migration.expectedTables.includes("shift_verification_events"));
+ const sql=migration.statements.join("\\n");
+ assert.match(sql,/UNIQUE KEY uq_shift_verifier_once \\(shift_id, verifier_user_id\\)/);
+ assert.match(sql,/FOREIGN KEY \\(shift_id\\) REFERENCES cashier_shifts/);
+ assert.match(sql,/FOREIGN KEY \\(verifier_user_id\\) REFERENCES users/);
+});
