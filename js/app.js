@@ -454,9 +454,44 @@ async function loadTiDBShifts() {
     const response=await window.assalamTiDBApi.listShifts();
     const rows=Array.isArray(response.data)?response.data:[];
     if(!rows.length){target.innerHTML='<p class="muted">Belum ada shift tercatat di TiDB.</p>';return;}
-    const html=rows.map(s=>'<tr><td>'+esc(String(s.businessDate||''))+'</td><td>'+esc(String(s.cashierName||s.cashierUserId||''))+'</td><td>'+esc(String(s.shiftCode||''))+'</td><td>'+rp(s.openingFloat)+'</td><td>'+esc(String(s.status||''))+'</td><td>'+esc(String(s.shiftId||''))+'</td></tr>').join('');
-    target.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Tanggal</th><th>Petugas</th><th>Shift</th><th>Modal Awal</th><th>Status</th><th>ID</th></tr></thead><tbody>'+html+'</tbody></table></div>';
+    const html=rows.map(s=>{
+      const own=String(s.cashierUserId)===String(currentUser&&currentUser.id);
+      const canClose=s.status==='open'&&own;
+      const expectedRole=s.shiftCode==='admin'?'pimpinan':'admin';
+      const canVerify=s.status==='pending_verification'&&currentRole===expectedRole&&!own;
+      const action=canClose?'<button class="s btn-danger" onclick="actionCloseTiDBShift(\''+esc(s.shiftId)+'\')">Tutup Shift</button>':
+        canVerify?'<button class="s" onclick="actionVerifyTiDBShift(\''+esc(s.shiftId)+'\')">Verifikasi ('+Number(s.verificationCount||0)+'/'+Number(s.requiredApprovals||1)+')</button>':'';
+      return '<tr><td>'+esc(String(s.businessDate||''))+'</td><td>'+esc(String(s.cashierName||s.cashierUserId||''))+'</td><td>'+esc(String(s.shiftCode||''))+'</td><td>'+rp(s.openingFloat)+'</td><td>'+esc(String(s.status||''))+'</td><td>'+esc(String(s.verificationCount||0))+'/'+esc(String(s.requiredApprovals||1))+'</td><td>'+action+'</td></tr>';
+    }).join('');
+    target.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Tanggal</th><th>Petugas</th><th>Shift</th><th>Modal Awal</th><th>Status</th><th>Verifikasi</th><th>Aksi</th></tr></thead><tbody>'+html+'</tbody></table></div>';
   } catch(e) { target.innerHTML='<p class="bad">'+esc(e.message||'Gagal memuat shift TiDB.')+'</p>'; }
+}
+
+async function actionCloseTiDBShift(shiftId) {
+  showFormModal('Tutup Shift TiDB',[
+    ['countedCash','Kas fisik yang dihitung (Rupiah)','number','0'],
+    ['varianceReason','Alasan selisih (wajib bila berbeda)','text','']
+  ],async values=>{
+    const countedCash=String(values.countedCash||'0').trim();
+    if(!/^(0|[1-9]\d*)$/.test(countedCash)){showAlert('Kas fisik harus berupa angka Rupiah bulat non-negatif.');return;}
+    try{
+      await window.assalamTiDBApi.financeCommand({action:'close_shift',shiftId,countedCash,varianceReason:String(values.varianceReason||'').trim()},window.assalamTiDBApi.newIdempotencyKey());
+      await loadTiDBShifts();
+      showAlert('Shift ditutup dan menunggu verifikasi sesuai aturan.','Shift Ditutup');
+    }catch(e){showAlert(e.message||'Penutupan shift gagal.');}
+  });
+}
+async function actionVerifyTiDBShift(shiftId) {
+  showFormModal('Verifikasi Shift TiDB',[
+    ['reason','Catatan verifikasi (opsional)','text','']
+  ],async values=>{
+    try{
+      const response=await window.assalamTiDBApi.financeCommand({action:'verify_shift',shiftId,reason:String(values.reason||'').trim()},window.assalamTiDBApi.newIdempotencyKey());
+      await loadTiDBShifts();
+      const data=response.data||{};
+      showAlert(data.status==='verified'?'Verifikasi lengkap. Shift sudah disahkan.':'Verifikasi tercatat ('+data.verificationCount+'/'+data.requiredApprovals+'). Menunggu verifikator berikutnya.','Verifikasi Shift');
+    }catch(e){showAlert(e.message||'Verifikasi shift gagal.');}
+  });
 }
 function actionOpenTiDBShift() {
   if(!isTiDBCatalogPreview()||!window.assalamTiDBApi){showAlert('Pembukaan shift TiDB hanya tersedia pada Preview.');return;}
