@@ -103,3 +103,11 @@ test("TiDB shift UI closes shifts and displays two-Admin verification progress",
  assert.match(app,/verificationCount/);
  assert.match(app,/requiredApprovals/);
 });
+
+test("Preview blocks operational tabs that still fall back to localStorage or Firebase",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/const tidbPreviewConnectedTabs = \['Shift','Pasien','Obat & Tarif','Pengguna'\]/);
+ assert.match(app,/if \(isTiDBCatalogPreview\(\) && !tidbPreviewConnectedTabs\.includes\(activeTab\)\)/);
+ assert.match(app,/viewTiDBPendingModule\(activeTab\)/);
+ assert.match(app,/transaksi lokal sengaja tidak diizinkan/);
+});
