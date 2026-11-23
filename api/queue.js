@@ -40,7 +40,8 @@ module.exports = async function handler(req, res) {
     const value = { ...body, actor, idempotencyKey, requestId };
 
     let result;
-    if (body.action === "register") result = await commands.registerEncounter(value);
+    if (body.action === "assign_lane") result = await commands.assignQueueLane(value);
+    else if (body.action === "register") result = await commands.registerEncounter(value);
     else if (body.action === "call") result = await commands.appendQueueCallEvent(value);
     else if (body.action === "transfer") result = await commands.transferQueue(value);
     else return res.status(400).json({ ok: false, code: "QUEUE_ACTION_INVALID" });
