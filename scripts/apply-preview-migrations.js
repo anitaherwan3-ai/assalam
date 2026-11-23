@@ -5,8 +5,12 @@
 const { execFileSync } = require("node:child_process");
 
 function migrationBuildEnabled() {
+  const branch = process.env.VERCEL_GIT_COMMIT_REF;
+  const foundationBranch = branch === "migration/tidb-foundation";
+  const operationalBranch = branch === "migration/tidb-operational-cutover" &&
+    process.env.TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions";
   return process.env.VERCEL_ENV === "preview" &&
-    process.env.VERCEL_GIT_COMMIT_REF === "migration/tidb-foundation" &&
+    (foundationBranch || operationalBranch) &&
     process.env.TIDB_DATABASE === "assalam_db" &&
     process.env.TIDB_MIGRATIONS_ENABLED === "true";
 }
