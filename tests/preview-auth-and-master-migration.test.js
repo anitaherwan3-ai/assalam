@@ -60,7 +60,7 @@ test("operational TiDB Preview branch is enabled for diagnostics but migration e
  assert.match(runner,/TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions"/);
  const workflow=fs.readFileSync(require.resolve("../.github/workflows/tidb-preview-migrate.yml"),"utf8");
  assert.match(workflow,/RUN-TIDB-PREVIEW-MIGRATIONS/);
- assert.match(workflow,/I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_016/);
+ assert.match(workflow,/I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_017/);
  assert.match(workflow,/environment: tidb-preview/);
 });
 
