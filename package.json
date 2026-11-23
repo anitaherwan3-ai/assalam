@@ -4,7 +4,7 @@
   "private": true,
   "description": "Isolated MySQL-compatible TiDB migration backend for Klinik Assalaam",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "npm test && node scripts/apply-preview-migrations.js",
