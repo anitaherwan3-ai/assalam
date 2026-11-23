@@ -88,3 +88,14 @@ test("package base tables are created before snapshot migration 016 on a clean s
   assert.ok(packageBasePosition >= 0, "base package migration must be included");
   assert.ok(packageSnapshotPosition > packageBasePosition, "package snapshot migration must run after base tables");
 });
+
+test("two-Admin shift verification migration is ordered after operational schema 016",()=>{
+ const fs=require("node:fs"),path=require("node:path");
+ const buildScript=fs.readFileSync(path.join(__dirname,"..","scripts","apply-preview-migrations.js"),"utf8");
+ const base=buildScript.indexOf('require("../lib/migrations/016_service_package_price_snapshots")');
+ const approvals=buildScript.indexOf('require("../lib/migrations/017_two_admin_shift_verification")');
+ const migration=require("../lib/migrations/017_two_admin_shift_verification");
+ assert.ok(base>=0&&approvals>base);
+ assert.deepEqual(migration.expectedTables,["shift_verification_events"]);
+ assert.ok(migration.statements[0].includes("UNIQUE KEY uq_shift_verifier_once (shift_id, verifier_user_id)"));
+});
