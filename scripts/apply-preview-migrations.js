@@ -41,7 +41,8 @@ async function main() {
     require("../lib/migrations/013_quarantine_disposition_approval"),
     require("../lib/migrations/014_better_auth_admin_fields"),
     require("../lib/migrations/015_widen_operational_status_columns"),
-    require("../lib/migrations/016_service_package_price_snapshots")
+    require("../lib/migrations/016_service_package_price_snapshots"),
+    require("../lib/migrations/017_two_admin_shift_verification")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
