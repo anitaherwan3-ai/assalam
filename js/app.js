@@ -778,7 +778,7 @@ async function loadTiDBQueue() {
       const owned=String(q.cashierUserId)===String(currentUser&&currentUser.id);
       const canAct=owned||['admin','pimpinan'].includes(currentRole);
       const call=['waiting','called'].includes(q.status)&&canAct?`<button class="s" onclick="callTiDBQueueTicket('${esc(q.ticketId)}','${esc(q.laneCode)}','${q.status==='called'?'recall':'call'}')">${q.status==='called'?'Panggil Ulang':'Panggil'}</button>`:'';
-      const transfer=canAct&&q.status!=='completed'?` <button class="s" onclick="actionTransferTiDBQueue('${esc(q.ticketId)}')">Limpahkan</button>`:'';
+      const transfer=canAct&&['waiting','called'].includes(q.status)?` <button class="s" onclick="actionTransferTiDBQueue('${esc(q.ticketId)}')">Limpahkan</button>`:'';
       return '<tr><td>'+esc(q.queueNumber||'')+'</td><td>'+esc(q.patientName||'')+'</td><td>'+esc(q.laneCode||'')+'</td><td>'+esc(q.cashierName||'')+'</td><td>'+esc(q.status||'')+'</td><td>'+call+transfer+'</td></tr>';
     }).join('');
     target.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nomor</th><th>Pasien</th><th>Jalur</th><th>Petugas</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+html+'</tbody></table></div>';
@@ -821,7 +821,7 @@ async function callTiDBQueueTicket(ticketId,laneCode,eventType) {
 async function actionTransferTiDBQueue(ticketId) {
   try{
     const response=await window.assalamTiDBApi.listShifts();
-    const targets=(Array.isArray(response.data)?response.data:[]).filter(s=>s.status==='open'&&String(s.cashierUserId)!==String(currentUser&&currentUser.id));
+    const targets=(Array.isArray(response.data)?response.data:[]).filter(s=>s.status==='open'&&s.shiftCode!=='admin'&&String(s.cashierUserId)!==String(currentUser&&currentUser.id));
     if(!targets.length){showAlert('Belum ada shift tujuan yang aktif untuk menerima pelimpahan.');return;}
     const options=targets.map(s=>({value:String(s.shiftId),label:String(s.cashierName||s.cashierUserId)+' — '+String(s.shiftCode||'')+' ('+String(s.businessDate||'')+')'}));
     showFormModal('Pelimpahan Antrean',[
