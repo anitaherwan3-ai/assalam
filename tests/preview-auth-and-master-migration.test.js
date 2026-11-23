@@ -84,3 +84,14 @@ test("TiDB Preview shift screen and Pimpinan lane assignment UI use TiDB API onl
  assert.match(app,/assalamkasir1@gmail\.com/);
  assert.match(app,/assalamkasir2@gmail\.com/);
 });
+
+test("TiDB Preview patient registration and queue handoff use server-owned shifts and idempotent APIs",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/if \(isTiDBCatalogPreview\(\)\) return viewTiDBPasien\(\)/);
+ assert.match(app,/action:'register',patient:/);
+ assert.match(app,/queuePrefix/);
+ assert.match(app,/window\.assalamTiDBApi\.queueCommand/);
+ assert.match(app,/action:'transfer',ticketId/);
+ assert.match(app,/toCashierUserId/);
+ assert.match(app,/Alasan pelimpahan/);
+});
