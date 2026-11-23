@@ -155,3 +155,11 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - The patient/queue UI uses TiDB endpoints for registration, call/recall and reason-required transfer. The shift UI uses TiDB for open, close and verification.
 - Cashier shift verification now requires two distinct Admin users; an Admin shift requires one Pimpinan approval. Migration 017 creates an immutable verifier event table with unique (shift, verifier) enforcement.
 - The operational rollback-only smoke test now exercises the two-Admin approval sequence. It has not yet been run against TiDB because the Preview migration trigger remains inactive.
+
+
+### Preview migration execution attempt — blocked safely (2026-11-23)
+- The explicit Preview migration workflow was invoked for migrations 001–017 after the ordered work request.
+- It stopped at the first validation step because the GitHub Environment `tidb-preview` did not provide `TIDB_HOST`, `TIDB_PORT`, `TIDB_USER`, `TIDB_PASSWORD`, `BETTER_AUTH_URL`, and `BETTER_AUTH_SECRET`.
+- The TiDB connection preflight, migration runner, and smoke tests were skipped. No database connection was opened and no schema/data writes occurred.
+- The trigger marker was returned to its inactive prepared state to prevent an accidental repeat. After Vercel team access is approved and the required GitHub Environment secrets are configured, rerun the controlled migration workflow.
+- The Vercel project-domain inspection also requires approval for team `salims-projects-b5dee623`; the single-use consent link was provided in chat.
