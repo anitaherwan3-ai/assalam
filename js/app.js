@@ -812,7 +812,8 @@ async function loadTiDBQueue() {
     const html=rows.map(q=>{
       const owned=String(q.cashierUserId)===String(currentUser&&currentUser.id);
       const canAct=owned||['admin','pimpinan'].includes(currentRole);
-      const call=['waiting','called'].includes(q.status)&&canAct?`<button class="s" onclick="callTiDBQueueTicket('${esc(q.ticketId)}','${esc(q.laneCode)}','${q.status==='called'?'recall':'call'}')">${q.status==='called'?'Panggil Ulang':'Panggil'}</button>`:'';
+      const canCall=owned||currentRole==='pimpinan';
+      const call=['waiting','called'].includes(q.status)&&canCall?`<button class="s" onclick="callTiDBQueueTicket('${esc(q.ticketId)}','${esc(q.laneCode)}','${q.status==='called'?'recall':'call'}')">${q.status==='called'?'Panggil Ulang':'Panggil'}</button>`:'';
       const transfer=canAct&&['waiting','called'].includes(q.status)?` <button class="s" onclick="actionTransferTiDBQueue('${esc(q.ticketId)}')">Limpahkan</button>`:'';
       return '<tr><td>'+esc(q.queueNumber||'')+'</td><td>'+esc(q.patientName||'')+'</td><td>'+esc(q.laneCode||'')+'</td><td>'+esc(q.cashierName||'')+'</td><td>'+esc(q.status||'')+'</td><td>'+call+transfer+'</td></tr>';
     }).join('');
