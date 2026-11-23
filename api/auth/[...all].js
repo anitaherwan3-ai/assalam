@@ -4,6 +4,7 @@ const {bootstrapPreviewOwner}=require("../../lib/preview-owner-bootstrap");
 const {getPool}=require("../../lib/tidb");
 const {requireBetterAuthActor,requireRole}=require("../../lib/require-better-auth-actor");
 const {dryRunFirebaseMasterImport}=require("../../lib/firebase-master-dry-run");
+const {isAllowedTidbPreviewBranch}=require("../../lib/preview-branch-policy");
 let nodeHandlerPromise;
 async function readJsonBody(req){
  if(req.body&&typeof req.body==="object")return req.body;
@@ -20,7 +21,7 @@ async function bootstrapRoute(req,res){
 async function previewOwnerStatusRoute(req,res){
  res.setHeader("Cache-Control","no-store, private");
  if(req.method!=="GET"){res.setHeader("Allow","GET");return res.status(405).json({ok:false,code:"METHOD_NOT_ALLOWED"});}
- if(process.env.VERCEL_ENV!=="preview"||process.env.VERCEL_GIT_COMMIT_REF!=="migration/tidb-foundation"||process.env.TIDB_DATABASE!=="assalam_db"||String(process.env.TIDB_PREVIEW_OWNER_EMAIL||"").trim().toLowerCase()!=="praktekrose@gmail.com"){
+ if(process.env.VERCEL_ENV!=="preview"||!isAllowedTidbPreviewBranch(process.env.VERCEL_GIT_COMMIT_REF)||process.env.TIDB_DATABASE!=="assalam_db"||String(process.env.TIDB_PREVIEW_OWNER_EMAIL||"").trim().toLowerCase()!=="praktekrose@gmail.com"){
   return res.status(404).json({ok:false,code:"PREVIEW_OWNER_STATUS_UNAVAILABLE"});
  }
  try{
