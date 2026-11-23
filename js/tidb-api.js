@@ -33,6 +33,7 @@
       "/api/sales",
       "/api/finance",
       "/api/queue",
+      "/api/shifts",
       "/api/queue?display=1"
     ]);
     if (!allowedPaths.has(path)) {
@@ -107,8 +108,11 @@
     inventoryCommand: (data, key) => request("/api/inventory", { method: "POST", body: data, idempotencyKey: key }),
     salesCommand: (data, key) => request("/api/sales", { method: "POST", body: data, idempotencyKey: key }),
     financeCommand: (data, key) => request("/api/finance", { method: "POST", body: data, idempotencyKey: key }),
+    listShifts: () => request("/api/shifts"),
+    openShift: (data, key) => request("/api/shifts", { method: "POST", body: data, idempotencyKey: key }),
     listQueue: () => request("/api/queue"),
     queueCommand: (data, key) => request("/api/queue", { method: "POST", body: data, idempotencyKey: key }),
+    assignQueueLane: (data, key) => request("/api/queue", { method: "POST", body: { ...data, action: "assign_lane" }, idempotencyKey: key }),
     getDisplayQueue: () => request("/api/queue?display=1")
   });
 })();
