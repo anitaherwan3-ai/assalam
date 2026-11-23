@@ -113,4 +113,37 @@ The Preview medicine master read/create flow is now connected, but only this nar
 - Corrected the package schema audit: base package tables are created in migration 009, and migration 016 adds snapshots.
 - Added migration-order regression coverage for those package tables.
 - Corrected purchase receipt batch lineage and added command-harness assertions.
-- No CI workflow runs or commit status checks are currently returned by GitHub for the branch head. These source changes must still be executed with `npm test` before any merge.
+- Historical snapshot at the time of the preceding note: CI results were not yet available. See the dated implementation update below for the newer verified run results.
+
+
+## Implementation update — ordered work 1–5 (2026-11-23)
+
+### 1. CI/runtime alignment
+- Updated the package Node engine requirement and both TiDB GitHub workflows to Node.js 22.12.0. This resolves the earlier mismatch where Better Auth dependencies required Node 22 but CI ran Node 20.
+- CI on commit `70b4a4cf6038ea1437ad5b614baacc974ca9b5ad` completed with 223 tests passing and zero failures.
+- Additional tests were added after that run for operational Preview auth, shift opening, lane assignment, and patient/queue UI. Their latest CI run must be checked before treating them as passed.
+
+### 2. Preview migration and auth branch gates
+- Added a shared allowlist for the two exact TiDB Preview branches: `migration/tidb-foundation` and `migration/tidb-operational-cutover`. Preview owner status and protected-owner bootstrap now recognize the operational branch.
+- The migration runner accepts the operational branch only when `TIDB_MIGRATION_EXECUTION_CONTEXT=github-actions`; the dedicated migration workflow sets this context and checks out the operational branch.
+- The migration workflow now validates migrations 001–016, Node.js 22.12.0, the `tidb-preview` GitHub environment, required secrets, database name, and an exact trigger commit title.
+- The trigger file currently contains `PREPARED_ONLY_AWAITING_EXPLICIT_PREVIEW_SCHEMA_APPROVAL`, not the approval token. The migration job therefore cannot apply schema yet. This is intentional: no TiDB schema writes were performed in this implementation pass.
+
+### 3. Preview authentication UI
+- The login modal now exposes the Pimpinan bootstrap/recovery action on a recognized TiDB Preview hostname. It remains hidden on the production hostname `klinikassalaam.vercel.app`.
+- The owner status and bootstrap APIs are guarded to the allowlisted Preview branches, Preview environment, database `assalam_db`, configured owner email, origin, and one-time secret.
+- The approved five-account roster remains: Pimpinan `praktekrose@gmail.com` and `nursalim42@gmail.com`; Kasir 1 `assalamkasir1@gmail.com`; Kasir 2 `assalamkasir2@gmail.com`; Admin `assalamadmin1@gmail.com`.
+- The initial roster remains protected from identity/role changes; password updates are handled through the Pimpinan account-management API. No passwords or credentials were written during this pass.
+
+### 4. Queue and shift integration
+- Added an audited, idempotent shift-open command and `GET/POST /api/shifts`.
+- Shift code is server-derived: Kasir 1 = `morning`, Kasir 2 = `afternoon`, Admin = `admin`. The opening float is a non-negative Rupiah integer and initializes expected cash. A unique active-shift slot prevents multiple active shifts for the same cashier.
+- Added Pimpinan-only A/B lane assignment. The server enforces Kasir 1 → A and Kasir 2 → B; other Kasir accounts are not silently assigned a lane.
+- TiDB Preview UI now has shift opening/listing, patient registration into the assigned queue, queue list, call/recall, and reason-required transfer to another active cashier shift.
+- Queue registration still requires a valid open shift and effective A/B assignment. The UI does not bypass those backend checks.
+
+### 5. Source-of-truth audit and remaining work
+- Preview UI paths now include TiDB shift, patient/queue, user management, and medicine master slices.
+- The app still contains legacy Firebase and localStorage operational paths. They must not be removed or treated as production-safe until purchasing, package catalog/checkout, sales, returns/refunds, finance, stock history, quarantine, stocktake, and reports have their own TiDB read/write UI paths and regression coverage.
+- `api/sales.js` and `api/finance.js` currently expose mutation commands but no complete list/read endpoints; purchasing invoice creation/list UI and package checkout expansion also remain incomplete.
+- No production branch merge, production deployment, production DB write, or Firebase import occurred.
