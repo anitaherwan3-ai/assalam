@@ -73,3 +73,14 @@ test("Preview owner bootstrap action is visible only on the TiDB Preview login m
  assert.match(api,/klinikassalaam-git-migration-tidb-operational-cutover/);
  assert.match(api,/productionHost = previewHost === "klinikassalaam\.vercel\.app"/);
 });
+
+test("TiDB Preview shift screen and Pimpinan lane assignment UI use TiDB API only",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/if \(isTiDBCatalogPreview\(\)\) return viewTiDBShift\(\)/);
+ assert.match(app,/window\.assalamTiDBApi\.openShift/);
+ assert.match(app,/window\.assalamTiDBApi\.listShifts/);
+ assert.match(app,/window\.assalamTiDBApi\.assignQueueLane/);
+ assert.match(app,/Atur Jalur A\/B/);
+ assert.match(app,/assalamkasir1@gmail\.com/);
+ assert.match(app,/assalamkasir2@gmail\.com/);
+});
