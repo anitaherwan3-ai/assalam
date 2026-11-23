@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(cat MIGRATE_TIDB_PREVIEW.trigger)" = "I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_016"
+          test "$(cat MIGRATE_TIDB_PREVIEW.trigger)" = "I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_017"
           for name in TIDB_HOST TIDB_PORT TIDB_USER TIDB_PASSWORD BETTER_AUTH_URL BETTER_AUTH_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub Environment secret: $name"
@@ -101,5 +101,5 @@ jobs:
           });
           NODE
 
-      - name: Apply migrations 001-016 and rollback-only smoke tests
+      - name: Apply migrations 001-017 and rollback-only smoke tests
         run: node scripts/apply-preview-migrations.js
