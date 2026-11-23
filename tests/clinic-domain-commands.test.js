@@ -473,3 +473,25 @@ test("queue transfer requires an active target shift and rolls back on invalid t
   assert.equal(state.transfer, undefined);
   assert.equal(state.audits.length, 0);
 });
+
+test("cashier shift opening derives approved shift code from the five-account roster and audits the opening float",async()=>{
+ const {state,commands}=createHarness({
+  async getClinicBusinessDate(){return "2026-11-23";},
+  async createCashierShift(_c,input){state.openedShift={...input};return {shiftId:"shift-1",shiftCode:input.shiftCode,businessDate:input.businessDate};}
+ });
+ const result=await commands.openShift({actor:{userId:"cashier-1",role:"kasir",email:"assalamkasir1@gmail.com"},openingFloat:"150000",idempotencyKey:"open-shift-001",requestId:"open-shift-req"});
+ assert.equal(result.body.data.shiftCode,"morning");
+ assert.equal(state.openedShift.openingFloat,"150000");
+ assert.equal(state.openedShift.businessDate,"2026-11-23");
+ assert.equal(state.audits.at(-1).actionCode,"SHIFT_OPENED");
+ await assert.rejects(commands.openShift({actor:{userId:"other",role:"kasir",email:"newcashier@example.org"},openingFloat:"0",idempotencyKey:"open-shift-002",requestId:"open-shift-req-2"}),{code:"CASHIER_SHIFT_ACCOUNT_NOT_ASSIGNED"});
+});
+
+test("queue lane assignment is Pimpinan-only and records the selected cashier A/B lane",async()=>{
+ const {state,commands}=createHarness({async assignCashierQueueLane(_c,input){state.laneAssignment={...input};return "assignment-1";}});
+ const result=await commands.assignQueueLane({actor:lead,cashierUserId:"cashier-1",prefix:"A",validFrom:"2026-11-23",idempotencyKey:"lane-assign-001",requestId:"lane-assign-req"});
+ assert.equal(result.body.data.assignmentId,"assignment-1");
+ assert.equal(state.laneAssignment.prefix,"A");
+ assert.equal(state.laneAssignment.assignedByUserId,"lead-1");
+ await assert.rejects(commands.assignQueueLane({actor:cashier,cashierUserId:"cashier-2",prefix:"B",validFrom:"2026-11-23",idempotencyKey:"lane-assign-002",requestId:"lane-assign-req-2"}),{code:"DOMAIN_FORBIDDEN"});
+});
