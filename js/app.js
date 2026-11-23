@@ -5092,6 +5092,18 @@ function openStaffLoginModal() {
   const loginModal = $('login-modal');
   if (landing) landing.style.display = 'none';
   if (loginModal) loginModal.style.display = 'flex';
+  const bootstrapButton = $('preview-owner-bootstrap');
+  if (bootstrapButton) {
+    const preview = isTiDBCatalogPreview();
+    bootstrapButton.style.display = preview ? 'block' : 'none';
+    bootstrapButton.setAttribute('aria-hidden', preview ? 'false' : 'true');
+    if (preview) {
+      bootstrapButton.removeAttribute('tabindex');
+      bootstrapButton.textContent = 'Aktifkan / Pulihkan Pimpinan TiDB';
+    } else {
+      bootstrapButton.setAttribute('tabindex', '-1');
+    }
+  }
 }
 
 function closeStaffLoginModal() {
