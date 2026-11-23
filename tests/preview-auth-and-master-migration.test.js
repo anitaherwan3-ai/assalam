@@ -50,3 +50,16 @@ test("owner bootstrap adopts the existing protected clinic identity without dupl
  assert.match(owner,/refresh_existing_owner_credential/,"A valid protected owner bootstrap retry refreshes the credential without creating another owner");
  assert.match(owner,/PREVIEW_OWNER_CREDENTIAL_REFRESHED/);
 });
+
+test("operational TiDB Preview branch is enabled for diagnostics but migration execution stays separately gated",()=>{
+ const {isAllowedTidbPreviewBranch}=require("../lib/preview-branch-policy");
+ assert.equal(isAllowedTidbPreviewBranch("migration/tidb-foundation"),true);
+ assert.equal(isAllowedTidbPreviewBranch("migration/tidb-operational-cutover"),true);
+ assert.equal(isAllowedTidbPreviewBranch("main"),false);
+ const runner=fs.readFileSync(require.resolve("../scripts/apply-preview-migrations"),"utf8");
+ assert.match(runner,/TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions"/);
+ const workflow=fs.readFileSync(require.resolve("../.github/workflows/tidb-preview-migrate.yml"),"utf8");
+ assert.match(workflow,/RUN-TIDB-PREVIEW-MIGRATIONS/);
+ assert.match(workflow,/I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_016/);
+ assert.match(workflow,/environment: tidb-preview/);
+});
