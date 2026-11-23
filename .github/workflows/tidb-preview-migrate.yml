@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - migration/tidb-foundation
+      - migration/tidb-operational-cutover
     paths:
       - MIGRATE_TIDB_PREVIEW.trigger
 
@@ -31,19 +32,20 @@ jobs:
       BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
       BETTER_AUTH_TRUSTED_ORIGINS: ${{ secrets.BETTER_AUTH_TRUSTED_ORIGINS }}
       VERCEL_ENV: preview
-      VERCEL_GIT_COMMIT_REF: migration/tidb-foundation
+      VERCEL_GIT_COMMIT_REF: migration/tidb-operational-cutover
+      TIDB_MIGRATION_EXECUTION_CONTEXT: github-actions
       TIDB_MIGRATIONS_ENABLED: "true"
       TIDB_MIGRATION_BUILD_CONFIRM: ASSALAM_OPERATIONAL_SCHEMA_V1_PASS66
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: migration/tidb-foundation
+          ref: migration/tidb-operational-cutover
 
       - name: Validate explicit trigger and required secrets
         shell: bash
         run: |
           set -euo pipefail
-          test "$(cat MIGRATE_TIDB_PREVIEW.trigger)" = "I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_013"
+          test "$(cat MIGRATE_TIDB_PREVIEW.trigger)" = "I_APPROVE_PREVIEW_SCHEMA_MIGRATIONS_001_016"
           for name in TIDB_HOST TIDB_PORT TIDB_USER TIDB_PASSWORD BETTER_AUTH_URL BETTER_AUTH_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing required GitHub Environment secret: $name"
@@ -99,5 +101,5 @@ jobs:
           });
           NODE
 
-      - name: Apply migrations 001-013 and rollback-only smoke tests
+      - name: Apply migrations 001-016 and rollback-only smoke tests
         run: node scripts/apply-preview-migrations.js
