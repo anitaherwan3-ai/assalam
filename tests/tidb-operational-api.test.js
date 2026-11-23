@@ -29,12 +29,14 @@ test("operational GET adapters call the TiDB inventory and queue endpoints", asy
   const { api, calls } = loadAdapter();
   await api.listInventory();
   await api.listQueue();
+  await api.listShifts();
   await api.getDisplayQueue();
 
   assert.deepEqual(calls.map(call => call.url), [
     "/api/inventory",
     "/api/queue",
-    "/api/queue?display=1"
+    "/api/queue?display=1",
+    "/api/shifts"
   ]);
   assert.ok(calls.every(call => call.init.method === "GET"));
 });
@@ -46,6 +48,8 @@ test("operational command adapters send JSON and idempotency keys", async () => 
   await api.salesCommand(payload, "sales-key-123");
   await api.financeCommand({ action: "record_payment" }, "finance-key-123");
   await api.queueCommand({ action: "register" }, "queue-key-123");
+  await api.openShift({ action: "open", openingFloat: "0" }, "shift-key-123");
+  await api.assignQueueLane({ cashierUserId: "cashier-1", prefix: "A", validFrom: "2026-11-23" }, "lane-key-123");
 
   assert.deepEqual(calls.map(call => call.url), [
     "/api/inventory", "/api/sales", "/api/finance", "/api/queue"
