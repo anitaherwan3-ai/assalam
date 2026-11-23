@@ -465,7 +465,7 @@ function actionOpenTiDBShift() {
     ['openingFloat','Modal awal kas (Rupiah)','number','0']
   ],async values=>{
     const openingFloat=String(values.openingFloat||'0').trim();
-    if(!/^(0|[1-9]\\d*)$/.test(openingFloat)){showAlert('Modal awal harus berupa angka Rupiah bulat non-negatif.');return;}
+    if(!/^(0|[1-9]\d*)$/.test(openingFloat)){showAlert('Modal awal harus berupa angka Rupiah bulat non-negatif.');return;}
     try{
       await window.assalamTiDBApi.openShift({action:'open',openingFloat},window.assalamTiDBApi.newIdempotencyKey());
       await loadTiDBShifts();
@@ -759,7 +759,89 @@ function printShiftSlip(shiftId) {
 // -------------------------------------------------------------
 // MODULE: PASIEN & ANTREAN
 // -------------------------------------------------------------
+
+function viewTiDBPasien() {
+  setTimeout(loadTiDBQueue,0);
+  return '<div class="card"><h2>Pendaftaran & Antrean — TiDB</h2><p class="muted">Pendaftaran pasien hanya menyimpan identitas dasar dan kunjungan administratif. Kasir 1 mendapat antrean A; Kasir 2 mendapat antrean B. Pendaftaran mensyaratkan shift aktif dan penugasan jalur yang sudah disetujui Pimpinan.</p>' +
+    '<div class="row" style="gap:8px;flex-wrap:wrap"><button class="p" onclick="actionRegisterTiDBEncounter()">＋ Daftarkan Pasien & Antrean</button><button class="s" onclick="loadTiDBQueue()">Muat Ulang Antrean</button></div>' +
+    '<div id="tidb-queue-table" style="margin-top:12px"><p class="muted">Memuat antrean TiDB...</p></div></div>';
+}
+async function loadTiDBQueue() {
+  const target=$('tidb-queue-table');
+  if(!target||!isTiDBCatalogPreview()||!window.assalamTiDBApi)return;
+  target.innerHTML='<p class="muted">Memuat antrean TiDB...</p>';
+  try {
+    const response=await window.assalamTiDBApi.listQueue();
+    const rows=Array.isArray(response.data)?response.data:[];
+    if(!rows.length){target.innerHTML='<p class="muted">Belum ada antrean hari ini.</p>';return;}
+    const html=rows.map(q=>{
+      const owned=String(q.cashierUserId)===String(currentUser&&currentUser.id);
+      const canAct=owned||['admin','pimpinan'].includes(currentRole);
+      const call=['waiting','called'].includes(q.status)&&canAct?`<button class="s" onclick="callTiDBQueueTicket('${esc(q.ticketId)}','${esc(q.laneCode)}','${q.status==='called'?'recall':'call'}')">${q.status==='called'?'Panggil Ulang':'Panggil'}</button>`:'';
+      const transfer=canAct&&q.status!=='completed'?` <button class="s" onclick="actionTransferTiDBQueue('${esc(q.ticketId)}')">Limpahkan</button>`:'';
+      return '<tr><td>'+esc(q.queueNumber||'')+'</td><td>'+esc(q.patientName||'')+'</td><td>'+esc(q.laneCode||'')+'</td><td>'+esc(q.cashierName||'')+'</td><td>'+esc(q.status||'')+'</td><td>'+call+transfer+'</td></tr>';
+    }).join('');
+    target.innerHTML='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nomor</th><th>Pasien</th><th>Jalur</th><th>Petugas</th><th>Status</th><th>Aksi</th></tr></thead><tbody>'+html+'</tbody></table></div>';
+  } catch(e) { target.innerHTML='<p class="bad">'+esc(e.message||'Gagal memuat antrean TiDB.')+'</p>'; }
+}
+async function actionRegisterTiDBEncounter() {
+  if(!isTiDBCatalogPreview()||!window.assalamTiDBApi||currentRole!=='kasir'){showAlert('Pendaftaran antrean hanya dapat dilakukan Kasir pada Preview TiDB.');return;}
+  const email=String(currentUser&&currentUser.email||'').toLowerCase();
+  const queuePrefix=email==='assalamkasir1@gmail.com'?'A':email==='assalamkasir2@gmail.com'?'B':'';
+  if(!queuePrefix){showAlert('Akun Kasir belum dipetakan ke jalur A/B. Hubungi Pimpinan untuk pemeriksaan akun.');return;}
+  let shifts;
+  try{const r=await window.assalamTiDBApi.listShifts();shifts=Array.isArray(r.data)?r.data:[];}
+  catch(e){showAlert(e.message||'Tidak dapat memeriksa shift aktif.');return;}
+  const shift=shifts.find(s=>String(s.cashierUserId)===String(currentUser.id)&&s.status==='open');
+  if(!shift){showAlert('Buka shift TiDB terlebih dahulu sebelum mendaftarkan antrean.');return;}
+  showFormModal('Pendaftaran Pasien & Antrean '+queuePrefix,[
+    ['fullName','Nama Pasien','text',''],
+    ['phone','Nomor Telepon (opsional)','text',''],
+    ['serviceCode','Layanan / Poli','text','Poli Umum']
+  ],async values=>{
+    const fullName=String(values.fullName||'').trim();
+    if(!fullName||fullName.length>160){showAlert('Nama pasien wajib diisi (maksimal 160 karakter).');return;}
+    try{
+      const result=await window.assalamTiDBApi.queueCommand({
+        action:'register',patient:{fullName,phone:String(values.phone||'').trim()},
+        shiftId:String(shift.shiftId),serviceCode:String(values.serviceCode||'Poli Umum').trim(),
+        queuePrefix
+      },window.assalamTiDBApi.newIdempotencyKey());
+      await loadTiDBQueue();
+      showAlert('Pendaftaran berhasil. Nomor antrean: '+(result.data&&result.data.queueNumber||'-'),'Antrean Terdaftar');
+    }catch(e){showAlert(e.message||'Pendaftaran antrean gagal.');}
+  });
+}
+async function callTiDBQueueTicket(ticketId,laneCode,eventType) {
+  try{
+    await window.assalamTiDBApi.queueCommand({action:'call',ticketId,laneCode,eventType},window.assalamTiDBApi.newIdempotencyKey());
+    await loadTiDBQueue();
+  }catch(e){showAlert(e.message||'Panggilan antrean gagal.');}
+}
+async function actionTransferTiDBQueue(ticketId) {
+  try{
+    const response=await window.assalamTiDBApi.listShifts();
+    const targets=(Array.isArray(response.data)?response.data:[]).filter(s=>s.status==='open'&&String(s.cashierUserId)!==String(currentUser&&currentUser.id));
+    if(!targets.length){showAlert('Belum ada shift tujuan yang aktif untuk menerima pelimpahan.');return;}
+    const options=targets.map(s=>({value:String(s.shiftId),label:String(s.cashierName||s.cashierUserId)+' — '+String(s.shiftCode||'')+' ('+String(s.businessDate||'')+')'}));
+    showFormModal('Pelimpahan Antrean',[
+      ['toShiftId','Shift Kasir Tujuan','select',options[0].value,options],
+      ['reason','Alasan pelimpahan','text','']
+    ],async values=>{
+      const target=targets.find(s=>String(s.shiftId)===String(values.toShiftId));
+      const reason=String(values.reason||'').trim();
+      if(!target||!reason){showAlert('Shift tujuan dan alasan pelimpahan wajib diisi.');return;}
+      try{
+        await window.assalamTiDBApi.queueCommand({action:'transfer',ticketId,toCashierUserId:String(target.cashierUserId),toShiftId:String(target.shiftId),reason},window.assalamTiDBApi.newIdempotencyKey());
+        await loadTiDBQueue();
+        showAlert('Antrean berhasil dilimpahkan dan alasannya tercatat.','Pelimpahan Berhasil');
+      }catch(e){showAlert(e.message||'Pelimpahan antrean gagal.');}
+    });
+  }catch(e){showAlert(e.message||'Tidak dapat memuat shift tujuan.');}
+}
+
 function viewPasien() {
+  if (isTiDBCatalogPreview()) return viewTiDBPasien();
   const todayPatients = (store.state.pasien || []).filter(p => p.tgl === todayStr && !p.deletedAt && p.status !== 'dihapus');
   // Pasien yang belum dilayani tampil lebih dahulu, diurutkan dari waktu kedatangan.
   // Pasien yang sudah dilayani otomatis pindah ke bagian paling bawah.
@@ -4238,7 +4320,7 @@ function assignTiDBQueueLane(userId,email) {
   ['validFrom','Mulai berlaku (tanggal WIB)','date',getClinicTodayStr()]
  ],async values=>{
   const validFrom=String(values.validFrom||'');
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(validFrom)){showAlert('Tanggal mulai berlaku tidak valid.');return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(validFrom)){showAlert('Tanggal mulai berlaku tidak valid.');return;}
   try{
    await window.assalamTiDBApi.assignQueueLane({cashierUserId:userId,prefix,validFrom},window.assalamTiDBApi.newIdempotencyKey());
    await loadTiDBUsers();
