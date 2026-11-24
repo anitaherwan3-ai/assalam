@@ -700,17 +700,17 @@ function viewShift() {
         <div class="row">
           <label>Pilihan Shift *
             <select id="input-shift-code">
-              <option value="morning">Shift Pagi</option>
-              <option value="evening">Shift Sore</option>
-              <option value="admin">Shift Admin</option>
+              ${currentRole === 'admin'
+                ? '<option value="admin">Shift Admin</option>'
+                : '<option value="morning">Shift Pagi</option><option value="evening">Shift Sore</option>'}
             </select>
           </label>
-          <label>Penetapan Jalur Antrean *
+          ${currentRole === 'admin' ? '' : `<label>Penetapan Jalur Antrean *
             <select id="input-shift-lane">
               <option value="A">Jalur A (Kasir 1 / Pagi)</option>
               <option value="B">Jalur B (Kasir 2 / Sore)</option>
             </select>
-          </label>
+          </label>`}
           <label>Modal Awal Uang Laci (Rp)
             <input id="input-shift-modal" type="number" value="100000">
           </label>
