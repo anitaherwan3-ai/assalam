@@ -298,6 +298,37 @@ async function signInTiDBPreview(email,password) {
   window.currentUser=currentUser;currentRole=actor.role;activeTab=(ROLE_TABS[currentRole]||[])[0]||"";cartItems=[];
   $("login-error").textContent="";$("login-password").value="";$("login-modal").style.display="none";
   if(window.assalamTiDBCatalog){try{await window.assalamTiDBCatalog.ensureLoaded(true);}catch(e){console.warn("[TiDB Preview] Katalog belum dimuat:",e.code||e.message);}}
+  if(isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    try {
+      const [medRes, queueRes] = await Promise.all([
+        window.assalamTiDBApi.listMedicines().catch(() => null),
+        window.assalamTiDBApi.listQueueTickets().catch(() => null)
+      ]);
+      if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
+        medRes.data.forEach(m => {
+          const existing = (store.state.obat || []).find(o => o.id === m.publicId || o.nama === m.name);
+          if (existing) {
+            existing.stok = Number(m.physicalQuantity || existing.stok || 0);
+            existing.min = Number(m.minimumStock || existing.min || 0);
+            existing.jual = Number(m.sellingPrice || existing.jual || 0);
+          } else if (m.active) {
+            store.state.obat.push({
+              id: m.publicId || String(m.medicineId),
+              nama: m.name,
+              satuan: m.unit || 'pcs',
+              stok: Number(m.physicalQuantity || 0),
+              min: Number(m.minimumStock || 0),
+              jual: Number(m.sellingPrice || 0),
+              hpp: m.weightedHpp ? Number(m.weightedHpp) : 0,
+              _t: Date.now()
+            });
+          }
+        });
+      }
+    } catch(err) {
+      console.warn("[TiDB Initial Hydration]:", err.message || err);
+    }
+  }
   renderApp();
 }
 async function activatePreviewOwnerBootstrap() {
@@ -558,6 +589,15 @@ function actionTutupShift() {
 
     store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(shift.selisih)}`);
     store.saveLocal();
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      window.assalamTiDBApi.closeShift({
+        shiftId: shift.id || ("sh_" + Date.now()),
+        cashPhysicallyCounted: String(shift.fisik),
+        expectedCash: String(shift.sistem),
+        varianceReason: shift.selisih !== 0 ? ("Selisih kas laci " + rp(shift.selisih)) : "Sesuai sistem"
+      }, tidbKey).catch(e => console.warn("[TiDB Shift] closeShift:", e.code || e.message));
+    }
 
     const waRes = sendShiftRecapWA(shift, store);
     showShiftCloseModal(shift, waRes);
@@ -2706,7 +2746,7 @@ function actionAddBeli() {
     return;
   }
 
-  const success = store.recordPurchase({
+  const purchasePayload = {
     supplier: sup,
     faktur: val('beli-fak').trim(),
     oid: oid,
@@ -2716,7 +2756,20 @@ function actionAddBeli() {
     batchNo: val('beli-batch').trim(),
     ed: ed,
     isLunas: val('beli-lunas') === 'tunai'
-  });
+  };
+  const success = store.recordPurchase(purchasePayload);
+  if (success && isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+    window.assalamTiDBApi.receivePurchase({
+      supplierName: purchasePayload.supplier,
+      invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
+      medicineId: purchasePayload.oid,
+      quantity: String(purchasePayload.qty),
+      totalBilled: String(purchasePayload.total),
+      batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
+      expiryDate: purchasePayload.ed
+    }, tidbKey).catch(e => console.warn("[TiDB Purchase] receivePurchase:", e.code || e.message));
+  }
 
   if (success) {
     showAlert('Pembelian obat berhasil dicatat dan HPP telah diperbarui secara otomatis.', 'Sukses');
@@ -3105,6 +3158,12 @@ function actionVerifShift(id) {
   s.verif = true;
   s.oleh = currentUser ? currentUser.nama : 'Admin';
   s._t = Date.now();
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+    window.assalamTiDBApi.verifyShift({
+      shiftId: s.id || String(id)
+    }, tidbKey).catch(e => console.warn("[TiDB Shift] verifyShift:", e.code || e.message));
+  }
   store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
   store.saveLocal();
   showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
