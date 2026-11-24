@@ -187,27 +187,19 @@ async function syncOperationalDataFromTiDB() {
       window.assalamTiDBApi.listFinance().catch(() => null)
     ]);
 
-    if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
-      medRes.data.forEach(m => {
-        const existing = (store.state.obat || []).find(o => o.id === m.publicId || o.nama === m.name);
-        if (existing) {
-          existing.stok = Number(m.physicalQuantity || existing.stok || 0);
-          existing.min = Number(m.minimumStock || existing.min || 0);
-          existing.jual = Number(m.sellingPrice || existing.jual || 0);
-          existing.satuan = m.unit || existing.satuan || 'tablet';
-        } else if (m.active) {
-          store.state.obat.push({
-            id: m.publicId || String(m.medicineId),
-            nama: m.name,
-            satuan: m.unit || 'tablet',
-            stok: Number(m.physicalQuantity || 0),
-            min: Number(m.minimumStock || 0),
-            jual: Number(m.sellingPrice || 0),
-            hpp: m.weightedHpp ? Number(m.weightedHpp) : 0,
-            _t: Date.now()
-          });
-        }
-      });
+    if (medRes && medRes.ok === true && Array.isArray(medRes.data)) {
+      // A successful TiDB response is authoritative, including an empty catalog.
+      // Do not retain seeded/localStorage medicine rows when TiDB has no active items.
+      store.state.obat = medRes.data.map(m => ({
+        id: m.publicId || String(m.medicineId),
+        nama: String(m.name || ''),
+        satuan: m.unit || 'tablet',
+        stok: Number(m.physicalQuantity || 0),
+        min: Number(m.minimumStock || 0),
+        jual: Number(m.sellingPrice || 0),
+        hpp: m.weightedHpp === null || m.weightedHpp === undefined ? 0 : Number(m.weightedHpp),
+        _t: Date.now()
+      }));
     }
 
     if (salesRes && salesRes.ok && salesRes.data) {
@@ -346,12 +338,14 @@ function initApp() {
   applyAppSettings();
   if (isTiDBCatalogPreview()) {
     renderApp();
-    restoreTiDBPreviewSession().then(ready => {
+    restoreTiDBPreviewSession().then(async ready => {
       if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
       const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
       currentUser = {id:actor.userId,u:actor.userId,nama:actor.displayName,email:actor.email||'',role:actor.role,active:true};
       window.currentUser = currentUser; currentRole = actor.role; activeTab = (ROLE_TABS[currentRole]||[])[0]||'';
-      $('login-modal').style.display = 'none'; renderApp(); syncOperationalDataFromTiDB();
+      $('login-modal').style.display = 'none';
+      await syncOperationalDataFromTiDB();
+      renderApp();
     });
   }
   store.subscribe(() => {
@@ -470,38 +464,7 @@ async function signInTiDBPreview(email,password) {
   window.currentUser=currentUser;currentRole=actor.role;activeTab=(ROLE_TABS[currentRole]||[])[0]||"";cartItems=[];
   $("login-error").textContent="";$("login-password").value="";$("login-modal").style.display="none";
   if(window.assalamTiDBCatalog){try{await window.assalamTiDBCatalog.ensureLoaded(true);}catch(e){console.warn("[TiDB Preview] Katalog belum dimuat:",e.code||e.message);}}
-  syncOperationalDataFromTiDB();
-  if(isTiDBCatalogPreview() && window.assalamTiDBApi) {
-    try {
-      const [medRes, queueRes] = await Promise.all([
-        window.assalamTiDBApi.listMedicines().catch(() => null),
-        window.assalamTiDBApi.listQueueTickets().catch(() => null)
-      ]);
-      if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
-        medRes.data.forEach(m => {
-          const existing = (store.state.obat || []).find(o => o.id === m.publicId || o.nama === m.name);
-          if (existing) {
-            existing.stok = Number(m.physicalQuantity || existing.stok || 0);
-            existing.min = Number(m.minimumStock || existing.min || 0);
-            existing.jual = Number(m.sellingPrice || existing.jual || 0);
-          } else if (m.active) {
-            store.state.obat.push({
-              id: m.publicId || String(m.medicineId),
-              nama: m.name,
-              satuan: m.unit || 'pcs',
-              stok: Number(m.physicalQuantity || 0),
-              min: Number(m.minimumStock || 0),
-              jual: Number(m.sellingPrice || 0),
-              hpp: m.weightedHpp ? Number(m.weightedHpp) : 0,
-              _t: Date.now()
-            });
-          }
-        });
-      }
-    } catch(err) {
-      console.warn("[TiDB Initial Hydration]:", err.message || err);
-    }
-  }
+  await syncOperationalDataFromTiDB();
   renderApp();
 }
 async function activatePreviewOwnerBootstrap() {
