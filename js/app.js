@@ -347,8 +347,10 @@ async function syncOperationalDataFromTiDB() {
     }
 
     renderApp();
+    return !!(queueRes && queueRes.ok === true && Array.isArray(queueRes.data));
   } catch (err) {
     console.warn("[TiDB Sync]:", err.message || err);
+    return false;
   }
 }
 
@@ -1327,14 +1329,24 @@ async function actionAddPasien() {
     patient.id = allocation.id;
     patient.no = allocation.no;
     patient._t = Date.now();
-    // Listener Firestore mungkin sudah memasukkan dokumen ini sebelum
-    // promise transaksi selesai. Cegah pasien yang sama tampil dua kali.
-    if (!store.get('pasien', patient.id)) {
-      store.state.pasien.push(patient);
+    if (isTiDBCatalogPreview()) {
+      // The TiDB command has already committed the encounter and queue ticket.
+      // Re-read the authoritative queue projection; never append this record to
+      // the browser's operational snapshot or create a local sequence number.
+      const synced = await syncOperationalDataFromTiDB();
+      if (!synced) {
+        showAlert('Antrean sudah dikirim ke TiDB, tetapi daftar antrean belum berhasil dimuat ulang. Jangan daftarkan ulang; muat ulang data terlebih dahulu.', 'Antrean Tersimpan, Sinkronisasi Tertunda');
+        return;
+      }
+    } else {
+      // Legacy Firebase/local path only. The TiDB path above is read-after-write.
+      if (!store.get('pasien', patient.id)) {
+        store.state.pasien.push(patient);
+      }
+      store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
+      store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
+      store.saveLocal();
     }
-    store.state.seq[todayStr] = Math.max(Number(store.state.seq[todayStr]) || 0, allocation.number);
-    store.logActivity('Tambah', 'Pasien', `${patient.no} - ${patient.nama}`);
-    store.saveLocal();
     if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
     $('p-nama').value = '';
     $('p-hp').value = '';
