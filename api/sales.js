@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
         "SELECT i.sales_invoice_id AS invoiceId, i.public_id AS publicId, DATE_FORMAT(i.business_date, '%Y-%m-%d') AS tgl, " +
         "i.gross_amount AS grossAmount, i.discount_amount AS discountAmount, i.net_amount AS total, " +
         "i.status, i.cashier_user_id AS cashierUserId, u.display_name AS cashierName, " +
-        "p.patient_id AS patientId, p.full_name AS patientName, p.phone_number AS phone " +
+        "p.patient_id AS patientId, p.full_name AS patientName, p.phone AS phone " +
         "FROM sales_invoices i " +
         "JOIN patients p ON p.patient_id = i.patient_id " +
         "JOIN users u ON u.user_id = i.cashier_user_id " +

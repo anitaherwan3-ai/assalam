@@ -5,10 +5,22 @@ const assert = require("node:assert/strict");
 const { createClinicDomainCommands } = require("../lib/clinic-domain-commands");
 
 function makeCommands(shift) {
-  const state = { closed: null, verified: null, verifications: [] };
+  const state = { closed: null, verified: null, verifications: [], activeShift: false, opened: null, assignedLane: null };
   const repository = {
+    async findActiveShiftSlot(_c, userId) {
+      return state.activeShift ? { shiftId: "active-1", cashierUserId: userId } : null;
+    },
+    async openShift(_c, input) {
+      state.opened = input;
+      state.activeShift = true;
+      return { shiftId: "shift-new-1", publicId: "sh-pub-1" };
+    },
+    async assignQueueLane(_c, input) {
+      state.assignedLane = input;
+      return { assignmentId: "assign-1" };
+    },
     async lockShiftForClose() { return { ...shift, status: "open", expectedCash: "100000" }; },
-    async closeShift(_c, input) { state.closed = input; return "recon-1"; },
+    async closeShift(_c, input) { state.closed = input; state.activeShift = false; return "recon-1"; },
     async lockShiftForVerification() { return { ...shift, status: "pending_verification" }; },
     async recordShiftVerification(_c, input) {
       if (state.verifications.some(x => x.verifierUserId === input.verifierUserId)) {
@@ -84,4 +96,42 @@ test("cashier shift requires two distinct Admin approvals; Admin shift requires 
   });
   assert.equal(final.body.data.status, "verified");
   assert.equal(final.body.data.requiredApprovals, 1);
+});
+
+test("cashier opens shift with opening float and lane assignment", async () => {
+  const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
+  const result = await commands.openShift({
+    actor: { userId: "cashier-1", role: "kasir" },
+    shiftCode: "morning", openingFloat: "100000", laneCode: "A",
+    idempotencyKey: "shift-open-1", requestId: "shift-open-req-1"
+  });
+  assert.equal(result.body.data.shiftCode, "morning");
+  assert.equal(result.body.data.openingFloat, "100000");
+  assert.equal(result.body.data.laneCode, "A");
+  assert.equal(result.body.data.status, "open");
+  assert.equal(state.opened.cashierUserId, "cashier-1");
+
+  await assert.rejects(commands.openShift({
+    actor: { userId: "cashier-1", role: "kasir" },
+    shiftCode: "morning", openingFloat: "100000", laneCode: "A",
+    idempotencyKey: "shift-open-dup", requestId: "shift-open-req-dup"
+  }), { code: "CASHIER_ALREADY_HAS_ACTIVE_SHIFT" });
+});
+
+test("admin assigns queue lane A or B to cashier", async () => {
+  const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
+  const res = await commands.assignQueueLane({
+    actor: { userId: "admin-1", role: "admin" },
+    userId: "cashier-2", laneCode: "B",
+    idempotencyKey: "lane-assign-1", requestId: "lane-assign-req-1"
+  });
+  assert.equal(res.body.data.laneCode, "B");
+  assert.equal(res.body.data.userId, "cashier-2");
+  assert.equal(state.assignedLane.laneCode, "B");
+
+  await assert.rejects(commands.assignQueueLane({
+    actor: { userId: "admin-1", role: "admin" },
+    userId: "cashier-2", laneCode: "C",
+    idempotencyKey: "lane-assign-inv", requestId: "lane-assign-req-inv"
+  }), { code: "LANE_CODE_INVALID" });
 });

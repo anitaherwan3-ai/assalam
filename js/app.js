@@ -275,6 +275,64 @@ async function syncOperationalDataFromTiDB() {
           });
         }
       });
+      if (Array.isArray(financeRes.data.shifts)) {
+        financeRes.data.shifts.forEach(s => {
+          const idx = (store.state.shift || []).findIndex(x => x.id === s.publicId || String(x.shiftId || x.id) === String(s.shiftId));
+          const shiftItem = {
+            id: s.publicId || String(s.shiftId),
+            shiftId: String(s.shiftId),
+            publicId: s.publicId || String(s.shiftId),
+            tgl: s.tgl,
+            jam: '07:00',
+            kasir: s.cashierUserId,
+            nama: s.cashierName,
+            modal: Number(s.openingFloat || 0),
+            sistem: s.expectedCash !== null ? Number(s.expectedCash) : 0,
+            fisik: s.countedCash !== null ? Number(s.countedCash) : null,
+            selisih: s.varianceAmount !== null ? Number(s.varianceAmount) : null,
+            alasan: s.varianceReason || '',
+            status: s.status === 'open' ? 'buka' : 'tutup',
+            verif: s.status === 'verified',
+            laneCode: s.laneCode || '',
+            shiftCode: s.shiftCode || '',
+            _t: Date.now()
+          };
+          if (idx >= 0) {
+            Object.assign(store.state.shift[idx], shiftItem);
+          } else {
+            store.state.shift.push(shiftItem);
+          }
+        });
+      }
+    }
+
+    if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
+      queueRes.data.forEach(q => {
+        const existing = (store.state.pasien || []).find(p => p.no === q.queueNumber || p.id === String(q.ticketId));
+        if (existing) {
+          existing.status = q.status;
+          existing.calling = q.status === 'calling';
+          existing.done = q.status === 'completed';
+          existing.laneCode = q.laneCode;
+        } else {
+          store.state.pasien.push({
+            id: String(q.ticketId),
+            no: q.queueNumber,
+            nama: q.patientName,
+            hp: '',
+            layanan: q.serviceName || 'UMUM',
+            tgl: todayStr,
+            jam: q.registeredAtUtc ? q.registeredAtUtc.slice(11, 16) : '07:00',
+            kasir: q.cashierName || q.cashierUserId,
+            sh: q.shiftId,
+            status: q.status,
+            calling: q.status === 'calling',
+            done: q.status === 'completed',
+            laneCode: q.laneCode,
+            _t: Date.now()
+          });
+        }
+      });
     }
 
     renderApp();
@@ -615,7 +673,7 @@ function viewShift() {
 
     activeCard = `
       <div class="card">
-        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)})</h2>
+        <h2>Shift Berjalan: ${esc(shift.jam)} (${esc(shift.tgl)}) ${shift.laneCode ? ('- Jalur ' + esc(shift.laneCode)) : ''}</h2>
         <div class="grid">
           <div class="kpi"><span>Modal Awal Laci</span><b>${rp(shift.modal)}</b></div>
           <div class="kpi"><span>Jumlah Transaksi</span><b>${trxs.length}</b></div>
@@ -626,6 +684,9 @@ function viewShift() {
           <label>Hitung Kas Fisik di Laci (Rp)
             <input id="input-shift-fisik" type="number" placeholder="Contoh: 750000">
           </label>
+          <label style="flex:1;min-width:200px;">Alasan Selisih Kas (jika ada)
+            <input id="input-shift-alasan" placeholder="Wajib diisi jika ada selisih kas fisik">
+          </label>
           <button class="p btn-danger" onclick="actionTutupShift()">Tutup Shift &amp; Kirim Rekap ke WA Owner</button>
         </div>
         ${waNotice}
@@ -635,8 +696,21 @@ function viewShift() {
     activeCard = `
       <div class="card">
         <h2>Buka Shift Kasir Baru</h2>
-        <p style="color:var(--mu);margin-bottom:12px;">Masukkan modal awal uang kembalian di laci kasir sebelum memulai transaksi.</p>
+        <p style="color:var(--mu);margin-bottom:12px;">Pilih jenis shift dan jalur antrean, lalu tentukan modal awal uang kembalian di laci kasir.</p>
         <div class="row">
+          <label>Pilihan Shift *
+            <select id="input-shift-code">
+              <option value="morning">Shift Pagi</option>
+              <option value="evening">Shift Sore</option>
+              <option value="admin">Shift Admin</option>
+            </select>
+          </label>
+          <label>Penetapan Jalur Antrean *
+            <select id="input-shift-lane">
+              <option value="A">Jalur A (Kasir 1 / Pagi)</option>
+              <option value="B">Jalur B (Kasir 2 / Sore)</option>
+            </select>
+          </label>
           <label>Modal Awal Uang Laci (Rp)
             <input id="input-shift-modal" type="number" value="100000">
           </label>
@@ -648,7 +722,7 @@ function viewShift() {
 
   const shiftRows = myShifts.map(s => [
     esc(s.tgl),
-    esc(s.jam),
+    esc(s.jam) + (s.laneCode ? (' (' + esc(s.laneCode) + ')') : ''),
     esc(s.jamT || '-'),
     rp(s.modal),
     s.status === 'tutup' ? rp(s.sistem) : '-',
@@ -676,21 +750,59 @@ function viewShift() {
   `;
 }
 
-function actionBukaShift() {
+async function actionBukaShift() {
+  if (window._shiftActionInProgress) { showAlert('Proses shift sedang berlangsung, harap tunggu...', 'Mohon Tunggu'); return; }
   const modal = numVal('input-shift-modal');
+  if (modal < 0) { showAlert('Modal awal tidak boleh bernilai negatif.'); return; }
+  const codeEl = $('input-shift-code');
+  const laneEl = $('input-shift-lane');
+  const shiftCode = codeEl ? codeEl.value : (currentRole === 'admin' ? 'admin' : 'morning');
+  const laneCode = laneEl ? laneEl.value : (shiftCode === 'evening' ? 'B' : 'A');
+
+  let tidbShift = null;
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    window._shiftActionInProgress = true;
+    try {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      const res = await window.assalamTiDBApi.openShift({
+        shiftCode,
+        openingFloat: String(modal),
+        laneCode
+      }, tidbKey);
+      tidbShift = (res && res.data) || (res && res.body && res.body.data) || res || {};
+    } catch (err) {
+      window._shiftActionInProgress = false;
+      showAlert(err.message || 'Gagal membuka shift di server TiDB.', 'Gagal Buka Shift');
+      return;
+    }
+    window._shiftActionInProgress = false;
+  }
+
   const now = new Date();
-  store.state.shift.push({
-    id: uid(),
+  const shiftRecord = {
+    id: tidbShift ? (tidbShift.publicId || String(tidbShift.shiftId)) : uid(),
+    shiftId: tidbShift ? String(tidbShift.shiftId) : undefined,
+    publicId: tidbShift ? tidbShift.publicId : undefined,
     tgl: todayStr,
     jam: now.toTimeString().slice(0, 5),
-    kasir: currentUser.u,
-    nama: currentUser.nama,
+    jamT: null,
+    kasir: currentUser ? currentUser.u : 'kasir',
+    nama: currentUser ? currentUser.nama : 'Kasir',
     modal: Number(modal) || 0,
+    sistem: 0,
+    fisik: null,
+    selisih: null,
     status: 'buka',
+    verif: false,
+    shiftCode,
+    laneCode,
     _t: Date.now()
-  });
-  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)}`);
+  };
+  store.state.shift.push(shiftRecord);
+  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)} - Jalur ${laneCode}`);
   store.saveLocal();
+  renderApp();
+  showAlert(`Shift kasir (${shiftCode}, Jalur ${laneCode}) berhasil dibuka dengan modal ${rp(modal)}.`, 'Shift Dibuka');
 }
 
 function actionTutupShift() {
@@ -711,29 +823,43 @@ function actionTutupShift() {
     window._shiftActionInProgress = true;
     try {
       const sistem = calcShiftCash(shift);
+      const selisih = Number(fisik) - Number(sistem);
+      const alasanEl = $('input-shift-alasan');
+      const alasan = (alasanEl && alasanEl.value.trim()) || (selisih !== 0 ? 'Selisih kas laci vs sistem' : 'Sesuai perhitungan sistem');
+
+      if (selisih !== 0 && !alasan) {
+        window._shiftActionInProgress = false;
+        showAlert('Terdapat selisih kas fisik vs sistem. Alasan selisih kas wajib diisi.', 'Alasan Diperlukan');
+        return;
+      }
+
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        const targetShiftId = shift.shiftId || shift.id || String(shift.publicId || "1");
+        await window.assalamTiDBApi.closeShift({
+          shiftId: targetShiftId,
+          countedCash: String(fisik),
+          varianceReason: alasan
+        }, tidbKey);
+      }
+
       shift.status = 'tutup';
       shift.jamT = new Date().toTimeString().slice(0, 5);
       shift.sistem = Number(sistem);
       shift.fisik = Number(fisik);
-      shift.selisih = Number(fisik) - Number(sistem);
+      shift.selisih = selisih;
+      shift.alasan = alasan;
       shift.verif = false;
       shift._t = Date.now();
 
       store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(shift.selisih)}`);
       store.saveLocal();
-      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.closeShift({
-          shiftId: shift.id || ("sh_" + Date.now()),
-          cashPhysicallyCounted: String(shift.fisik),
-          expectedCash: String(shift.sistem),
-          varianceReason: shift.selisih !== 0 ? ("Selisih kas laci " + rp(shift.selisih)) : "Sesuai sistem"
-        }, tidbKey).catch(e => console.warn("[TiDB Shift] closeShift:", e.code || e.message));
-      }
 
       const waRes = sendShiftRecapWA(shift, store);
       showShiftCloseModal(shift, waRes);
       renderApp();
+    } catch (err) {
+      showAlert(err.message || 'Penutupan shift ke TiDB gagal. Silakan coba lagi.', 'Gagal Tutup Shift');
     } finally {
       window._shiftActionInProgress = false;
     }
@@ -1122,20 +1248,24 @@ async function actionAddPasien() {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        const assignedLane = (shift && shift.laneCode) || (currentUser && currentUser.u && String(currentUser.u).includes('2') ? 'B' : 'A');
         const res = await window.assalamTiDBApi.registerEncounter({
           patient: { fullName: patient.nama, phone: patient.hp, nik: null },
           serviceCode: patient.layanan || "UMUM",
           shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
-          queuePrefix: "A"
+          queuePrefix: assignedLane
         }, tidbKey);
         const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
         const qNum = data.queueNumber || res.queueNumber;
         if (qNum) {
           allocation = {
             id: data.encounterId || res.encounterId || ("enc_" + Date.now()),
+            ticketId: data.queueTicketId || data.ticketId,
             no: qNum,
             number: parseInt(qNum.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1)
           };
+          patient.ticketId = allocation.ticketId;
+          patient.laneCode = assignedLane;
         } else {
           throw new Error("Nomor antrean tidak ditemukan pada respons server TiDB.");
         }
@@ -2923,7 +3053,7 @@ function openModalReturBeli(beliId) {
   });
 }
 
-function actionAddBeli() {
+async function actionAddBeli() {
   const sup = val('beli-sup').trim();
   const oid = val('beli-oid');
   const qty = numVal('beli-qty');
@@ -2946,23 +3076,29 @@ function actionAddBeli() {
     ed: ed,
     isLunas: val('beli-lunas') === 'tunai'
   };
-  const success = store.recordPurchase(purchasePayload);
-  if (success && isTiDBCatalogPreview() && window.assalamTiDBApi) {
-    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-    const tidbMedicines = window.assalamTiDBCatalog ? (window.assalamTiDBCatalog.getMedicines() || []) : [];
-    const localObat = (store.state.obat || []).find(o => o.id === purchasePayload.oid);
-    const tidbMed = localObat ? tidbMedicines.find(m => m.publicId === localObat.publicId || m.name === localObat.nama) : null;
-    const tidbMedicineId = (tidbMed && tidbMed.publicId) || purchasePayload.oid;
-    window.assalamTiDBApi.receivePurchase({
-      supplierName: purchasePayload.supplier,
-      invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
-      medicineId: tidbMedicineId,
-      quantity: String(purchasePayload.qty),
-      totalBilled: String(purchasePayload.total),
-      batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
-      expiryDate: purchasePayload.ed
-    }, tidbKey).catch(e => console.warn("[TiDB Purchase] receivePurchase:", e.code || e.message));
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    try {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      const tidbMedicines = window.assalamTiDBCatalog ? (window.assalamTiDBCatalog.getMedicines() || []) : [];
+      const localObat = (store.state.obat || []).find(o => o.id === purchasePayload.oid);
+      const tidbMed = localObat ? tidbMedicines.find(m => m.publicId === localObat.publicId || m.name === localObat.nama) : null;
+      const tidbMedicineId = (tidbMed && tidbMed.publicId) || purchasePayload.oid;
+      await window.assalamTiDBApi.receivePurchase({
+        supplierName: purchasePayload.supplier,
+        invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
+        medicineId: tidbMedicineId,
+        quantity: String(purchasePayload.qty),
+        totalBilled: String(purchasePayload.total),
+        batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
+        expiryDate: purchasePayload.ed
+      }, tidbKey);
+    } catch (e) {
+      showAlert(e.message || 'Pencatatan pembelian ke TiDB gagal. Transaksi dibatalkan.', 'Gagal');
+      return;
+    }
   }
+
+  const success = store.recordPurchase(purchasePayload);
 
   if (success) {
     showAlert('Pembelian obat berhasil dicatat dan HPP telah diperbarui secara otomatis.', 'Sukses');

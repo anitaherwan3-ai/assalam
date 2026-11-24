@@ -139,6 +139,9 @@
     listFinance: () => request("/api/finance"),
     createExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "create_expense" }, data), idempotencyKey: key }),
     closeShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "close_shift" }, data), idempotencyKey: key }),
-    verifyShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "verify_shift" }, data), idempotencyKey: key })
+    openShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "open_shift" }, data), idempotencyKey: key }),
+    verifyShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "verify_shift" }, data), idempotencyKey: key }),
+    assignLane: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "assign_lane" }, data), idempotencyKey: key }),
+    listQueueAssignments: () => request("/api/queue?assignments=1")
   });
 })();

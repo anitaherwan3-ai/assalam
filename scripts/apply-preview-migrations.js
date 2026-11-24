@@ -54,14 +54,12 @@ async function main() {
     const result = await applyMigrations(connection, migrations);
     const smoke = await runFoundationSmokeTest(connection);
     const operationalSmoke = await runOperationalSmokeTest(connection);
-    const operationalSmoke = await runOperationalSmokeTest(connection);
     execFileSync("npm", ["run", "auth:schema-check"], { stdio: "inherit", env: process.env });
     console.log("[ASSALAM-MIGRATION] Preview operational schema and Better Auth schema verified", {
       applied: result.applied,
       alreadyApplied: result.alreadyApplied,
       current: result.current,
       foundationSmokeTest: smoke,
-      operationalSmokeTest: operationalSmoke,
       operationalSmokeTest: operationalSmoke
     });
   } catch (error) {

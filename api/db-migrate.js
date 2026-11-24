@@ -5,7 +5,21 @@ const { getPool } = require("../lib/tidb");
 const migrations = [
   require("../lib/migrations/001_identity_foundation"),
   require("../lib/migrations/002_audit_idempotency_outbox"),
-  require("../lib/migrations/003_catalog_masters")
+  require("../lib/migrations/003_catalog_masters"),
+  require("../lib/migrations/004_better_auth_core"),
+  require("../lib/migrations/005_patient_shift_queue_v1"),
+  require("../lib/migrations/006_inventory_purchasing_v1"),
+  require("../lib/migrations/007_sales_returns_refunds_v1"),
+  require("../lib/migrations/008_finance_controls_v1"),
+  require("../lib/migrations/009_operational_controls_v1"),
+  require("../lib/migrations/010_supplier_return_dispatch_reference"),
+  require("../lib/migrations/011_quarantine_inspection_decision"),
+  require("../lib/migrations/012_stocktake_batch_version_snapshot"),
+  require("../lib/migrations/013_quarantine_disposition_approval"),
+  require("../lib/migrations/014_better_auth_admin_fields"),
+  require("../lib/migrations/015_widen_operational_status_columns"),
+  require("../lib/migrations/016_service_package_price_snapshots"),
+  require("../lib/migrations/017_two_admin_shift_verification")
 ];
 const { applyMigrations } = require("../lib/migration-runner");
 
@@ -17,8 +31,13 @@ function safeEqual(left, right) {
 }
 
 function isPreviewMigrationAllowed() {
-  return process.env.VERCEL_ENV === "preview" &&
-    process.env.VERCEL_GIT_COMMIT_REF === "migration/tidb-foundation" &&
+  const branch = process.env.VERCEL_GIT_COMMIT_REF;
+  const allowedBranch = branch === "migration/tidb-foundation" ||
+    branch === "migration/tidb-operational-cutover" ||
+    branch === "main" ||
+    process.env.TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions";
+  return (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production" || !process.env.VERCEL_ENV) &&
+    allowedBranch &&
     process.env.TIDB_DATABASE === "assalam_db" &&
     process.env.TIDB_MIGRATIONS_ENABLED === "true";
 }

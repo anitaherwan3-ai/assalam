@@ -219,7 +219,12 @@ class ClinicStore {
       console.error('LocalStorage write error:', e);
     }
 
-    if (triggerSync && window.firebaseBackend) {
+    const isTiDBActive = !!(
+      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
+      (window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
+      window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP
+    );
+    if (triggerSync && window.firebaseBackend && !isTiDBActive) {
       window.firebaseBackend.pushData(this.state);
     }
   }

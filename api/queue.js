@@ -19,6 +19,16 @@ module.exports = async function handler(req, res) {
 
     const actor = await requireBetterAuthActor(req);
     if (req.method === "GET") {
+      if (req.query && (req.query.assignments === "1" || req.query.assignments === "true")) {
+        const { getPool } = require("../lib/tidb");
+        const [assignments] = await getPool().execute(
+          "SELECT a.assignment_id AS assignmentId, a.user_id AS userId, u.display_name AS userName, " +
+          "a.prefix, DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
+          "FROM cashier_queue_assignments a JOIN users u ON u.user_id = a.user_id " +
+          "WHERE a.valid_to IS NULL ORDER BY a.valid_from DESC"
+        );
+        return res.status(200).json({ ok: true, data: assignments });
+      }
       const rows = await queueRepository.listQueueTickets();
       const visible = actor.role === "kasir"
         ? rows.filter(row => row.cashierUserId === actor.userId)
@@ -43,6 +53,7 @@ module.exports = async function handler(req, res) {
     if (body.action === "register") result = await commands.registerEncounter(value);
     else if (body.action === "call") result = await commands.appendQueueCallEvent(value);
     else if (body.action === "transfer") result = await commands.transferQueue(value);
+    else if (body.action === "assign_lane") result = await commands.assignQueueLane(value);
     else return res.status(400).json({ ok: false, code: "QUEUE_ACTION_INVALID" });
 
     return res.status(result.statusCode).json(result.body);
