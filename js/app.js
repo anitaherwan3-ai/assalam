@@ -347,7 +347,28 @@ function initApp() {
   if (isTiDBCatalogPreview()) {
     renderApp();
     restoreTiDBPreviewSession().then(async ready => {
-      if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
+      if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) {
+        // Expose the one-time owner bootstrap only when the guarded Preview
+        // status endpoint confirms that the protected clinic owner has no
+        // Better Auth identity yet. Never show an activation form on status
+        // errors or on an already-provisioned owner.
+        try {
+          const status = await window.assalamTiDBApi.getPreviewOwnerStatus();
+          const needsBootstrap = status && status.ok === true &&
+            status.protectedOwnerCount === 1 && status.protectedOwnerActive === true &&
+            status.authUserCount === 0;
+          const bootstrapButton = $('preview-owner-bootstrap');
+          if (bootstrapButton && needsBootstrap) {
+            bootstrapButton.textContent = 'Aktivasi Awal Pimpinan TiDB';
+            bootstrapButton.style.display = 'block';
+            bootstrapButton.setAttribute('aria-hidden', 'false');
+            bootstrapButton.removeAttribute('tabindex');
+          }
+        } catch (error) {
+          console.warn('[TiDB Preview] Status bootstrap owner:', error.code || error.message);
+        }
+        return;
+      }
       const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
       currentUser = {id:actor.userId,u:actor.userId,nama:actor.displayName,email:actor.email||'',role:actor.role,active:true};
       window.currentUser = currentUser; currentRole = actor.role; activeTab = (ROLE_TABS[currentRole]||[])[0]||'';
