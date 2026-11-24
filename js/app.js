@@ -2054,9 +2054,17 @@ async function actionBayarTrx(totalCart) {
           };
         });
 
+        const authoritativeEncounterId = String(pasien && pasien.id || '');
+        const authoritativeShiftId = String(shift && shift.shiftId || '');
+        if (!/^\d+$/.test(authoritativeEncounterId)) {
+          throw new Error('ID kunjungan resmi dari TiDB tidak tersedia. Checkout dihentikan agar nota tidak terlepas dari antrean.');
+        }
+        if (!/^\d+$/.test(authoritativeShiftId)) {
+          throw new Error('ID shift resmi dari TiDB tidak tersedia. Checkout dihentikan agar transaksi tidak tercatat pada shift yang salah.');
+        }
         const checkoutPayload = {
-          encounterId: pasien.id || ("enc_" + Date.now()),
-          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          encounterId: authoritativeEncounterId,
+          shiftId: authoritativeShiftId,
           items: checkoutItems,
           payment: {
             method: metode === "Tunai" ? "cash" : metode === "QRIS" ? "qris" : metode === "Transfer" ? "bank_transfer" : metode === "Debit/Kredit" ? "card" : "cash",
