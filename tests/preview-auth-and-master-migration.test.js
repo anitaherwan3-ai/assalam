@@ -119,3 +119,32 @@ test("TiDB queue registration refreshes the authoritative queue instead of appen
  assert.doesNotMatch(tidbWrite,/store\\.state\\.pasien\\.push/);
  assert.doesNotMatch(tidbWrite,/store\\.saveLocal\\(\\)/);
 });
+
+
+test("TiDB Preview blocks local-only operational writes instead of presenting them as persisted data",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/function blockLocalOnlyActionInTiDBPreview/);
+ const guarded=[
+  ["actionAddBeli","function delBeli"],
+  ["actionAddPetty","function editPetty"],
+  ["editPetty","function delPetty"],
+  ["delPetty","MODULE: MASTER OBAT"],
+  ["actionAddLoss","function delLoss"],
+  ["delLoss","MODULE: VERIFIKASI SETORAN SHIFT"],
+  ["editObat","function delObat"],
+  ["delObat","async function actionAddTarif"],
+  ["editPasien","function actionBatalBerobat"],
+  ["actionBatalBerobat","function actionPulihkanBatalBerobat"],
+  ["actionPulihkanBatalBerobat","function delPasien"],
+  ["delPasien","function"]
+ ];
+ for(const [name,endName] of guarded){
+  const start=app.indexOf("function "+name+"(")>=0?app.indexOf("function "+name+"("):app.indexOf("async function "+name+"(");
+  assert.ok(start>=0,name+" exists");
+  const end=app.indexOf(endName,start+1);
+  const body=app.slice(start,end>start?end:start+800);
+  assert.match(body,/blockLocalOnlyActionInTiDBPreview/,"guard "+name);
+ }
+ const purchase=app.slice(app.indexOf("async function actionAddBeli()"),app.indexOf("function delBeli"));
+ assert.doesNotMatch(purchase,/receivePurchase\\(/,"purchase invoice UI must not call receipt API without a purchaseLineId");
+});
