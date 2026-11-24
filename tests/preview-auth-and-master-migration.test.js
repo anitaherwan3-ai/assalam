@@ -102,3 +102,20 @@ test("owner bootstrap adopts the existing protected clinic identity without dupl
  assert.match(owner,/refresh_existing_owner_credential/,"A valid protected owner bootstrap retry refreshes the credential without creating another owner");
  assert.match(owner,/PREVIEW_OWNER_CREDENTIAL_REFRESHED/);
 });
+
+
+test("TiDB queue registration refreshes the authoritative queue instead of appending a local patient snapshot",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ const syncStart=app.indexOf("async function syncOperationalDataFromTiDB()");
+ const syncEnd=app.indexOf("\\n}\\n",syncStart);
+ const sync=app.slice(syncStart,syncEnd);
+ assert.match(sync,/return !!\\(queueRes && queueRes\\.ok === true && Array\\.isArray\\(queueRes\\.data\\)\\)/);
+ const patientStart=app.indexOf("async function actionAddPasien()");
+ const patientEnd=app.indexOf("\\nfunction editPasien",patientStart);
+ const patient=app.slice(patientStart,patientEnd);
+ const committed=patient.slice(patient.indexOf("patient.id = allocation.id;"));
+ const tidbWrite=committed.slice(0,committed.indexOf("} else {"));
+ assert.match(tidbWrite,/await syncOperationalDataFromTiDB\\(\\)/);
+ assert.doesNotMatch(tidbWrite,/store\\.state\\.pasien\\.push/);
+ assert.doesNotMatch(tidbWrite,/store\\.saveLocal\\(\\)/);
+});
