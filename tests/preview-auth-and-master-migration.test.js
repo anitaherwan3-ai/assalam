@@ -143,5 +143,5 @@ test("TiDB Preview blocks local-only operational writes instead of presenting th
   assert.match(body,/blockLocalOnlyActionInTiDBPreview/,"guard "+name);
  }
  const purchase=app.slice(app.indexOf("async function actionAddBeli()"),app.indexOf("function delBeli"));
- assert.doesNotMatch(purchase,/receivePurchase\\(/,"purchase invoice UI must not call receipt API without a purchaseLineId");
+ assert.ok(!purchase.includes("receivePurchase("),"purchase invoice UI must not call receipt API without a purchaseLineId");
 });
