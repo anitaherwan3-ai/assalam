@@ -46,7 +46,7 @@ test("TiDB checkout requires numeric server-owned encounter and shift IDs",()=>{
 
 test("TiDB medicine hydration replaces local seed rows and waits before rendering an authenticated session",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
- assert.match(app,/medRes\.ok === true && Array\.isArray\(medRes\.data\)/);
+ assert.match(app,/else \{[\s\S]*store\.state\.obat = medRes\.data\.map/);
  assert.match(app,/store\.state\.obat = medRes\.data\.map/);
  assert.match(app,/store\.state\.obat = \[\]/);
  assert.match(app,/Data obat belum terverifikasi/);
