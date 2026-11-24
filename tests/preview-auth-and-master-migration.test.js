@@ -71,6 +71,16 @@ test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  assert.equal(html.split("\n").filter(line=>line.includes("document.write")&&line.includes("<\\\\/script>")).length,0,"dynamic script tags must close correctly");
 });
 
+test("TiDB operational sync clears stale local snapshots before applying authoritative reads",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ const start=app.indexOf("async function syncOperationalDataFromTiDB()");
+ const end=app.indexOf("\n}\n",start);
+ const sync=app.slice(start,end);
+ for(const collection of ["trx","returJual","batalTrx","biaya","shift","pasien"]) {
+  assert.match(sync,new RegExp("store\\.state\\."+collection+" = \\[\\]"));
+ }
+ assert.match(sync,/Return line details are not yet exposed by the read model/);
+});
 test("Preview UI exposes owner activation only when the protected owner has no Better Auth identity",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
  assert.match(app,/getPreviewOwnerStatus\(\)/);
