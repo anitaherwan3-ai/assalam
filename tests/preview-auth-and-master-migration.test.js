@@ -68,7 +68,7 @@ test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  assert.match(api,/preview-owner-status/);
  assert.match(html,/preview-owner-bootstrap/);
  assert.match(html,/tidb-queue-fix3/);
- assert.match(html,/store\\.js\\?v=tidb-queue-fix1/);
+ assert.ok(html.includes('store.js?v=tidb-queue-fix1'));
  assert.equal(html.split("\n").filter(line=>line.includes("document.write")&&line.includes("<\\\\/script>")).length,0,"dynamic script tags must close correctly");
 });
 
