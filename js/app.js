@@ -363,6 +363,8 @@ async function syncOperationalDataFromTiDB() {
   }
 }
 
+window.syncOperationalDataFromTiDB = syncOperationalDataFromTiDB;
+
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
