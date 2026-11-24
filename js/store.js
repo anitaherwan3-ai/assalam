@@ -382,15 +382,47 @@ class ClinicStore {
   // Pembatalan transaksi wajib melalui persetujuan Cloud; tidak ada rollback stok lokal.
 
   // Panggil Pasien ke Layar Display TV
-  callPatient(patientId) {
+  async callPatient(patientId) {
+    const patient = (this.state.pasien || []).find(p => p.id === patientId);
+    if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
+
+    // TiDB owns queue-call state. Never update the browser snapshot first.
+    if (window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true && window.assalamTiDBApi) {
+      const ticketId = String(patient.ticketId || patient.id || '');
+      const laneCode = String(patient.laneCode || '').trim().toUpperCase();
+      if (!/^\\d+$/.test(ticketId) || !['A', 'B'].includes(laneCode)) {
+        if (typeof showAlert === 'function') showAlert('ID tiket atau jalur antrean TiDB tidak valid. Panggilan dihentikan.', 'Data Antrean Tidak Valid');
+        return false;
+      }
+      try {
+        await window.assalamTiDBApi.callQueue({
+          ticketId, laneCode, eventType: 'call'
+        }, window.assalamTiDBApi.newIdempotencyKey());
+        const sync = window.syncOperationalDataFromTiDB;
+        if (typeof sync !== 'function' || !(await sync())) {
+          if (typeof showAlert === 'function') showAlert('Panggilan sudah dikirim ke TiDB, tetapi status antrean belum berhasil dimuat ulang.', 'Sinkronisasi Tertunda');
+          return false;
+        }
+        const refreshed = (this.state.pasien || []).find(p => String(p.id) === ticketId);
+        if (!refreshed || !refreshed.calling) {
+          if (typeof showAlert === 'function') showAlert('Status panggilan belum terkonfirmasi dari TiDB. Jangan panggil ulang sebelum memuat ulang antrean.', 'Konfirmasi Diperlukan');
+          return false;
+        }
+        if (typeof broadcastCall === 'function') broadcastCall(refreshed, refreshed.layanan);
+        if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+        return true;
+      } catch (error) {
+        if (typeof showAlert === 'function') showAlert(error.message || 'Panggilan antrean ke TiDB gagal.', 'Gagal Memanggil');
+        return false;
+      }
+    }
+
     const dateParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
     }).formatToParts(new Date());
     const part = type => (dateParts.find(item => item.type === type) || {}).value || '';
     const today = `${part('year')}-${part('month')}-${part('day')}`;
     const now = Date.now();
-    const patient = (this.state.pasien || []).find(p => p.id === patientId);
-    if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
     // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
     (this.state.pasien || []).forEach(p => {
@@ -406,11 +438,7 @@ class ClinicStore {
     this.logActivity('Panggil', 'Antrean', `${patient.no} - ${patient.nama} (${patient.layanan})`);
     this.saveLocal();
 
-    // Broadcast ke Layar TV
-    if (typeof broadcastCall === 'function') {
-      broadcastCall(patient, patient.layanan);
-    }
-
+    if (typeof broadcastCall === 'function') broadcastCall(patient, patient.layanan);
     return true;
   }
 
