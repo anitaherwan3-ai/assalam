@@ -10,6 +10,7 @@ function makeCommands(shift) {
     async findActiveShiftSlot(_c, userId) {
       return state.activeShift ? { shiftId: "active-1", cashierUserId: userId } : null;
     },
+    async getCashierLaneAssignment() { return { laneCode: "A", email: "assalamkasir1@gmail.com" }; },
     async openShift(_c, input) {
       state.opened = input;
       state.activeShift = true;
