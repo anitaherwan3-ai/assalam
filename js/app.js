@@ -778,6 +778,20 @@ async function actionBukaShift() {
     window._shiftActionInProgress = false;
   }
 
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    await syncOperationalDataFromTiDB();
+    const persistedShift = (store.state.shift || []).find(item => String(item.shiftId || '') === String(tidbShift.shiftId));
+    if (!persistedShift) {
+      showAlert('Shift berhasil dikirim ke TiDB, tetapi belum dapat dibaca kembali. Muat ulang data sebelum melakukan transaksi.', 'Konfirmasi Shift Diperlukan');
+      return;
+    }
+    store.logActivity('Buka Shift', 'Shift', 'Shift TiDB ' + persistedShift.shiftId + ' - Jalur ' + (persistedShift.laneCode || 'belum ditetapkan'));
+    store.saveLocal();
+    renderApp();
+    showAlert('Shift berhasil dibuka dan dikonfirmasi kembali dari TiDB.', 'Shift Dibuka');
+    return;
+  }
+
   const now = new Date();
   const shiftRecord = {
     id: tidbShift ? (tidbShift.publicId || String(tidbShift.shiftId)) : uid(),
@@ -836,11 +850,27 @@ function actionTutupShift() {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
         const targetShiftId = shift.shiftId || shift.id || String(shift.publicId || "1");
-        await window.assalamTiDBApi.closeShift({
+        const closeResult = await window.assalamTiDBApi.closeShift({
           shiftId: targetShiftId,
           countedCash: String(fisik),
           varianceReason: alasan
         }, tidbKey);
+        const closeData = (closeResult && closeResult.data) || (closeResult && closeResult.body && closeResult.body.data) || closeResult || {};
+        await syncOperationalDataFromTiDB();
+        const persistedShift = (store.state.shift || []).find(item => String(item.shiftId || '') === String(targetShiftId));
+        if (!persistedShift || persistedShift.status !== 'tutup') {
+          throw new Error('Penutupan diterima server, tetapi status shift belum dapat dikonfirmasi melalui pembacaan TiDB. Jangan ulangi transaksi sebelum memuat ulang.');
+        }
+        persistedShift.sistem = closeData.expectedCash !== undefined ? Number(closeData.expectedCash) : persistedShift.sistem;
+        persistedShift.fisik = closeData.countedCash !== undefined ? Number(closeData.countedCash) : persistedShift.fisik;
+        persistedShift.selisih = closeData.varianceAmount !== undefined ? Number(closeData.varianceAmount) : persistedShift.selisih;
+        persistedShift.alasan = alasan;
+        store.logActivity('Tutup Shift', 'Shift', 'Rekonsiliasi TiDB ' + targetShiftId);
+        store.saveLocal();
+        const waRes = sendShiftRecapWA(persistedShift, store);
+        showShiftCloseModal(persistedShift, waRes);
+        renderApp();
+        return;
       }
 
       shift.status = 'tutup';
@@ -3507,23 +3537,19 @@ async function actionVerifShift(id) {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
       const res = await window.assalamTiDBApi.verifyShift({
-        shiftId: s.id || String(id),
+        shiftId: s.shiftId || s.id || String(id),
         reason: "Verifikasi Admin shift"
       }, tidbKey);
-      const data = (res && res.data) || res || {};
+      const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
+      await syncOperationalDataFromTiDB();
+      const refreshed = (store.state.shift || []).find(item => String(item.shiftId || '') === String(s.shiftId || s.id || id));
+      if (!refreshed) throw new Error('Verifikasi tercatat, tetapi status shift belum dapat dibaca ulang dari TiDB.');
       if (data.status === "verified") {
-        s.verif = true;
-        s.oleh = currentUser ? currentUser.nama : 'Admin';
-        s.verifCount = data.verificationCount || 2;
-        s._t = Date.now();
-        store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)}) - Terverifikasi Penuh`);
+        store.logActivity('Verifikasi', 'Setoran Shift', `Shift ${refreshed.shiftId} - Terverifikasi Penuh di TiDB`);
         store.saveLocal();
         showAlert('Setoran kasir berhasil diverifikasi penuh (2 dari 2 Admin telah menyetujui).', 'Sukses');
       } else {
-        s.verif = false;
-        s.verifCount = data.verificationCount || 1;
-        s._t = Date.now();
-        store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)}) - Verifikasi Ke-1`);
+        store.logActivity('Verifikasi', 'Setoran Shift', `Shift ${refreshed.shiftId} - Verifikasi TiDB ${data.verificationCount || 1}`);
         store.saveLocal();
         showAlert(`Verifikasi Admin ke-${data.verificationCount || 1} berhasil dicatat. Menunggu verifikasi dari Admin kedua yang berbeda untuk menyelesaikan rekonsiliasi.`, 'Menunggu Admin Kedua');
       }
