@@ -21,6 +21,19 @@ test("Pengguna tab always exposes the master dry-run action and Pimpinan session
   assert.match(app, /signInTiDBPreview\(email,password\)/);
 });
 
+test("TiDB expenses use backend dates, optional evidence, and Pimpinan approval",()=>{
+ const domain=fs.readFileSync(require.resolve("../lib/clinic-domain-commands.js"),"utf8");
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ const api=fs.readFileSync(require.resolve("../js/tidb-api.js"),"utf8");
+ const create=domain.slice(domain.indexOf("async function createExpense"),domain.indexOf("async function approveExpense"));
+ assert.doesNotMatch(create,/!evidenceFileId/);
+ assert.match(app,/businessDate: todayStr/);
+ assert.match(app,/approveExpense\(/);
+ assert.match(api,/action: "approve_expense"/);
+ assert.match(app,/e\.status === 'requested' \? 'pending'/);
+ assert.match(app,/Perubahan pengeluaran TiDB harus melalui alur koreksi/);
+});
+
 test("TiDB checkout requires numeric server-owned encounter and shift IDs",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
  const checkout=app.slice(app.indexOf("const checkoutPayload"),app.indexOf("const checkoutRes",app.indexOf("const checkoutPayload")));
