@@ -208,6 +208,18 @@ test("checkout failure rolls back the invoice, batch and ledger writes together"
   assert.equal(state.audits.length, 0);
 });
 
+test("encounter registration uses the TiDB-assigned cashier lane, not the browser request", async () => {
+  const { state, commands } = createHarness();
+  const result = await commands.registerEncounter({
+    actor: cashier, patient: { fullName: "Pasien Uji Jalur" },
+    shiftId: "shift-1", serviceCode: "KONSULTASI", queuePrefix: "B",
+    idempotencyKey: "registration-server-lane", requestId: "req-server-lane"
+  });
+  assert.equal(result.body.data.queueNumber, "A-001");
+  assert.equal(state.encounters[0].queuePrefix, "A");
+  assert.equal(state.tickets[0].prefix, "A");
+});
+
 test("concurrent encounter registration creates separate visit rows and unique queue numbers", async () => {
   const { state, commands } = createHarness();
   const register = (suffix, name) => commands.registerEncounter({
