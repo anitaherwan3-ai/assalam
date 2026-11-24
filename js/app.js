@@ -1754,7 +1754,7 @@ async function actionBayarTrx(totalCart) {
             discount: "0"
           })),
           payment: {
-            method: metode === "tunai" ? "cash" : "transfer",
+            method: metode === "Tunai" ? "cash" : metode === "QRIS" ? "qris" : metode === "Transfer" ? "bank_transfer" : metode === "Debit/Kredit" ? "card" : "cash",
             amountPaid: String(bayarTunai)
           }
         }, tidbKey).catch(e => console.warn("[TiDB Sales] checkout:", e.code || e.message));
@@ -2096,9 +2096,28 @@ function viewMaster() {
   `;
 }
 
-function actionAddObat() {
+async function actionAddObat() {
   const nama = val('m-o-nama').trim();
   if (!nama) { showAlert('Nama obat wajib diisi'); return; }
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    try {
+      const key = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.createMedicine({
+        name: nama,
+        unit: val('m-o-satuan').trim() || 'strip',
+        purchasePrice: String(numVal('m-o-hpp')),
+        sellingPrice: String(numVal('m-o-jual')),
+        minimumStock: String(numVal('m-o-min') || 5)
+      }, key);
+      store.logActivity('Tambah', 'Master Obat', nama);
+      $('m-o-nama').value = '';
+      renderApp();
+      showAlert('Obat berhasil disimpan ke TiDB.', 'Sukses');
+    } catch (err) {
+      showAlert(err.message || 'Gagal menyimpan obat ke TiDB.', 'Gagal');
+    }
+    return;
+  }
   store.state.obat.push({
     id: uid(),
     nama: nama,
@@ -3317,7 +3336,12 @@ function actionApproveReturJual(id) {
   if (currentRole !== 'admin') return;
   showConfirm('Verifikasi pengajuan retur dan teruskan kepada Pimpinan? Stok dan batch belum akan berubah pada tahap ini.', async () => {
     try {
-      await window.firebaseBackend.approveReturJual(id);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.reviewSalesReturn({ returnId: id, decision: 'forward_to_pimpinan' }, key);
+      } else {
+        await window.firebaseBackend.approveReturJual(id);
+      }
       showAlert('Verifikasi Admin berhasil. Pengajuan diteruskan kepada Pimpinan; stok belum berubah.', 'Diteruskan ke Pimpinan');
     } catch (err) {
       console.error('Persetujuan retur gagal:', err);
@@ -3331,7 +3355,12 @@ function actionFinalizeReturJual(id) {
   if (currentRole !== 'pimpinan') return;
   showConfirm('Setujui retur ini sebagai keputusan akhir? Jika disetujui, stok dan batch obat asal akan dipulihkan sekarang. Retur jasa/tindakan tidak mengubah stok.', async () => {
     try {
-      await window.firebaseBackend.finalizeReturJual(id);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.approveSalesReturn({ returnId: id }, key);
+      } else {
+        await window.firebaseBackend.finalizeReturJual(id);
+      }
       showAlert('Retur disetujui Pimpinan. Stok/batch obat dipulihkan bila item berupa obat atau paket; pengembalian uang menunggu pencatatan Pimpinan.', 'Persetujuan Akhir Berhasil');
     } catch (err) {
       console.error('Persetujuan akhir retur gagal:', err);
@@ -3345,7 +3374,12 @@ function actionRejectReturJual(id) {
   if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
   showFormModal('Alasan Penolakan Retur', [['alasan', 'Alasan penolakan', 'text', 'Barang tidak memenuhi syarat retur']], async res => {
     try {
-      await window.firebaseBackend.rejectReturJual(id, res.alasan);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.reviewSalesReturn({ returnId: id, decision: 'reject', rejectionReason: res.alasan }, key);
+      } else {
+        await window.firebaseBackend.rejectReturJual(id, res.alasan);
+      }
       showAlert('Retur ditolak. Stok dan uang tidak berubah.', 'Retur Ditolak');
     } catch (err) {
       showAlert(err.message || 'Retur tidak dapat ditolak.', 'Gagal');
@@ -3367,7 +3401,12 @@ function actionPayReturJual(id) {
     ['referensi', 'Nomor referensi/bukti transfer (wajib untuk transfer)', 'text', '']
   ], async res => {
     try {
-      await window.firebaseBackend.payReturJual(id, res.metode, res.referensi);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.refundSalesReturn({ returnId: id, refundMethod: res.metode === 'Tunai' ? 'cash' : 'bank_transfer', referenceNumber: res.referensi || '' }, key);
+      } else {
+        await window.firebaseBackend.payReturJual(id, res.metode, res.referensi);
+      }
       showAlert('Pengembalian uang tercatat satu kali. Saldo kas tunai akan diperbarui bila metode Tunai.', 'Pengembalian Tercatat');
     } catch (err) {
       showAlert(err.message || 'Pengembalian uang gagal dicatat.', 'Gagal');
@@ -3440,10 +3479,22 @@ function openModalReturJual(trxId) {
     const localRetur = (store.state.returJual || [])[0];
     try {
       if (!localRetur) throw new Error('Data pengajuan retur lokal tidak ditemukan.');
-      const saved = await window.firebaseBackend.submitReturJual(localRetur);
-      Object.assign(localRetur, saved);
-      store.saveLocal(false);
-      showAlert('Pengajuan retur berhasil dikirim dan kuotanya terkunci di Cloud. Stok belum berubah.', 'Retur Menunggu Verifikasi');
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.requestSalesReturn({
+          encounterId: trx.pid || trx.id,
+          saleId: trx.id,
+          itemIndex: idx,
+          quantity: Number(res.qty),
+          reason: res.alasan
+        }, key);
+        store.saveLocal(false);
+      } else {
+        const saved = await window.firebaseBackend.submitReturJual(localRetur);
+        Object.assign(localRetur, saved);
+        store.saveLocal(false);
+      }
+      showAlert('Pengajuan retur berhasil dikirim. Stok belum berubah.', 'Retur Menunggu Verifikasi');
     } catch (err) {
       store.state.returJual = (store.state.returJual || []).filter(r => r.id !== (localRetur && localRetur.id));
       store.saveLocal(false);
@@ -3467,9 +3518,14 @@ function actionCancelTrx(id) {
     ['alasan', 'Alasan pembatalan', 'text', 'Kesalahan input transaksi']
   ], async res => {
     try {
-      const request = await window.firebaseBackend.submitCancelRequest(id, res.alasan);
-      store.state.batalTrx.unshift(request);
-      store.saveLocal(false);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.cancelTransaction({ saleId: id, reason: res.alasan }, key);
+      } else {
+        const request = await window.firebaseBackend.submitCancelRequest(id, res.alasan);
+        store.state.batalTrx.unshift(request);
+        store.saveLocal(false);
+      }
       store.logActivity('Ajukan Pembatalan', 'Transaksi', 'Nota ' + trx.no + ' menunggu persetujuan Admin');
       showAlert('Pengajuan pembatalan terkirim. Nota dan stok belum berubah sampai Admin menyetujui.', 'Menunggu Persetujuan');
     } catch (err) {
@@ -3483,7 +3539,12 @@ function actionProcessCancelTrx(id, decision) {
   if (currentRole !== 'admin' && currentRole !== 'pimpinan') return;
   const process = async reason => {
     try {
-      await window.firebaseBackend.processCancelRequest(id, decision, reason);
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.cancelTransaction({ saleId: id, decision, reason }, key);
+      } else {
+        await window.firebaseBackend.processCancelRequest(id, decision, reason);
+      }
       showAlert(decision === 'disetujui'
         ? 'Pembatalan disetujui. Nota dibatalkan dan stok/batch dikembalikan di Cloud.'
         : 'Pengajuan pembatalan ditolak. Nota dan stok tidak berubah.',
@@ -4657,11 +4718,8 @@ function _executeSearchPasienLama() {
     return;
   }
   resultsEl.style.display = 'block';
-  resultsEl.innerHTML = filtered.map(p => {
-    const safeName = p.nama.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const safeHp   = p.hp.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    return `
-      <div onclick="fillPasienLama('${safeName}','${safeHp}')"
+  resultsEl.innerHTML = filtered.map((p, idx) => `
+      <div data-pasien-idx="${idx}"
         style="padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--bdr);display:flex;gap:12px;align-items:center;transition:background .15s;"
         onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
         <span style="font-size:22px;">👤</span>
@@ -4669,8 +4727,12 @@ function _executeSearchPasienLama() {
           <div style="font-weight:700;font-size:14px;">${esc(p.nama)}</div>
           <div style="font-size:12px;color:var(--mu);">${p.hp ? esc(p.hp) : 'Tanpa Nomor HP'}</div>
         </div>
-      </div>`;
-  }).join('');
+      </div>`).join('');
+  resultsEl.querySelectorAll('[data-pasien-idx]').forEach(el => {
+    const idx = parseInt(el.dataset.pasienIdx, 10);
+    const p = filtered[idx];
+    el.addEventListener('click', () => fillPasienLama(p.nama, p.hp));
+  });
 }
 
 function fillPasienLama(nama, hp) {
