@@ -119,7 +119,7 @@ function createHarness(overrides = {}) {
       state.medicine.stockQty = x.stockQty;
       state.medicine.version = String(Number(state.medicine.version) + 1);
     },
-    async lockOpenCashierShift() { return { cashierUserId: "cashier-1", status: "open" }; },
+    async lockOpenCashierShift() { return { cashierUserId: "cashier-1", status: "open", laneCode: "A" }; },
     async getClinicBusinessDate() { return "2026-11-17"; },
     async getServerNowUtc() { return "2026-11-17T00:00:00Z"; },
     async createPatient(_c, patient) { state.patients.push(patient); return "patient-" + state.patients.length; },
