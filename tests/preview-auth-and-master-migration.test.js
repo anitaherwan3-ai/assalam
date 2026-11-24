@@ -150,7 +150,7 @@ test("TiDB Preview blocks local-only operational writes instead of presenting th
 test("TiDB queue calls use the server command and confirm the refreshed status before TV broadcast",()=>{
  const store=fs.readFileSync(require.resolve("../js/store.js"),"utf8");
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
- const start=store.indexOf("async callPatient(patientId)");
+ const start=store.indexOf("callPatient(patientId)");
  const end=store.indexOf("// Kasir hanya mengajukan retur",start);
  const method=store.slice(start,end);
  const tidbStart=method.indexOf("if (window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true");
