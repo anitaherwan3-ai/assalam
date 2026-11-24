@@ -49,7 +49,7 @@ test("TiDB medicine hydration replaces local seed rows and waits before renderin
  assert.match(app,/medRes\.ok === true && Array\.isArray\(medRes\.data\)/);
  assert.match(app,/store\.state\.obat = medRes\.data\.map/);
  assert.match(app,/store\.state\.obat = \[\]/);
- assert.match(app,/Data obat TiDB belum dapat diverifikasi/);
+ assert.match(app,/Data obat belum terverifikasi/);
  const login=app.slice(app.indexOf("async function signInTiDBPreview"),app.indexOf("async function activatePreviewOwnerBootstrap"));
  assert.match(login,/await syncOperationalDataFromTiDB\(\)/);
  assert.doesNotMatch(login,/listMedicines\(\)/);
