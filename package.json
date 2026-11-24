@@ -7,13 +7,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm test && node scripts/apply-preview-migrations.js",
+    "build": "npm test",
     "test": "node --test tests/*.test.js",
     "cutover:check": "node scripts/check-cutover-readiness.js",
     "auth:schema-check": "auth check schema --config ./lib/auth.config.mjs",
     "migration:profile": "node scripts/profile-firebase-export.js",
     "migration:relationships": "node scripts/check-firebase-relationships.js",
-    "migration:identities": "node scripts/reconcile-firebase-identities.js"
+    "migration:identities": "node scripts/reconcile-firebase-identities.js",
+    "migrate:preview": "node scripts/apply-preview-migrations.js"
   },
   "dependencies": {
     "mysql2": "^3.15.3",

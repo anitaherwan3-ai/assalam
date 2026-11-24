@@ -377,6 +377,18 @@ async function resetLoginPassword() {
   }
 }
 
+window.onAssalamTiDBUnauthorized = function(msg) {
+  currentUser = null;
+  window.currentUser = null;
+  currentRole = null;
+  activeTab = '';
+  cartItems = [];
+  if (window.assalamTiDBCatalog) window.assalamTiDBCatalog.clear();
+  window.ASSALAM_TIDB_PREVIEW_SESSION = null;
+  showAlert(msg || 'Sesi login telah berakhir atau akun dinonaktifkan oleh administrator. Silakan login kembali.', 'Sesi Berakhir');
+  renderApp();
+};
+
 function doLogout() {
   showConfirm('Apakah Anda yakin ingin keluar?', async () => {
     store.logActivity('Keluar', 'Sesi', `User ${currentUser ? currentUser.nama : ''} logout`);

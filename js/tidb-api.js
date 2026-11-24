@@ -55,7 +55,24 @@
     }
     if (options.idempotencyKey) headers["Idempotency-Key"] = String(options.idempotencyKey);
 
-    const response = await fetch(path, init);
+    let response;
+    try {
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutMs = Number(options.timeoutMs) || 20000;
+      let timer = null;
+      if (controller) {
+        timer = setTimeout(() => controller.abort(), timeoutMs);
+        init.signal = controller.signal;
+      }
+      response = await fetch(path, init);
+      if (timer) clearTimeout(timer);
+    } catch (networkError) {
+      if (networkError && networkError.name === "AbortError") {
+        throw makeError("Permintaan ke server TiDB melampaui batas waktu (timeout). Periksa koneksi internet Anda.", 0, "NETWORK_TIMEOUT");
+      }
+      throw makeError("Gagal terhubung ke server TiDB. Periksa jaringan internet atau status server.", 0, "NETWORK_DISCONNECTED");
+    }
+
     let payload;
     try { payload = await response.json(); }
     catch (_) { throw makeError("Server TiDB mengirim respons yang tidak valid.", response.status, "TIDB_RESPONSE_INVALID"); }
@@ -66,6 +83,14 @@
         : (nestedMessage || (payload && typeof payload.error === "string" ? payload.error : "")
           || (payload && payload.error_description ? payload.error_description : "")
           || ("Permintaan TiDB ditolak (HTTP " + response.status + ", kode " + code + ")."));
+      
+      if ((response.status === 401 || code === "AUTH_ACCOUNT_DISABLED") &&
+          path !== "/api/auth/sign-in/email" && path !== "/api/auth/session") {
+        if (typeof window.onAssalamTiDBUnauthorized === "function") {
+          window.onAssalamTiDBUnauthorized(message);
+        }
+      }
+
       const error = makeError(message, response.status, code);
       error.requestId = requestId;
       throw error;
