@@ -390,7 +390,7 @@ class ClinicStore {
     if (window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true && window.assalamTiDBApi) {
       const ticketId = String(patient.ticketId || patient.id || '');
       const laneCode = String(patient.laneCode || '').trim().toUpperCase();
-      if (!/^\\d+$/.test(ticketId) || !['A', 'B'].includes(laneCode)) {
+      if (!/^\d+$/.test(ticketId) || !['A', 'B'].includes(laneCode)) {
         if (typeof showAlert === 'function') showAlert('ID tiket atau jalur antrean TiDB tidak valid. Panggilan dihentikan.', 'Data Antrean Tidak Valid');
         return false;
       }
