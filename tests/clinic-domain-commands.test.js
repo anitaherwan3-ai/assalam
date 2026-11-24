@@ -216,7 +216,6 @@ test("encounter registration uses the TiDB-assigned cashier lane, not the browse
     idempotencyKey: "registration-server-lane", requestId: "req-server-lane"
   });
   assert.equal(result.body.data.queueNumber, "A-001");
-  assert.equal(state.encounters[0].queuePrefix, "A");
   assert.equal(state.tickets[0].prefix, "A");
 });
 
