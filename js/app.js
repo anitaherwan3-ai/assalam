@@ -187,6 +187,17 @@ async function syncOperationalDataFromTiDB() {
       window.assalamTiDBApi.listFinance().catch(() => null)
     ]);
 
+    // TiDB is authoritative for these collections in Preview. Clear the
+    // browser's previous local snapshot before applying the fresh responses,
+    // so failed or empty reads cannot leave stale transactions, queues,
+    // expenses, or shifts looking current.
+    store.state.trx = [];
+    store.state.returJual = []; // Return line details are not yet exposed by the read model.
+    store.state.batalTrx = [];
+    store.state.biaya = [];
+    store.state.shift = [];
+    store.state.pasien = [];
+
     if (!medRes || medRes.ok !== true || !Array.isArray(medRes.data)) {
       // Fail closed: never leave seeded/local medicine rows visible as if they
       // were verified stock when the TiDB inventory read failed.
