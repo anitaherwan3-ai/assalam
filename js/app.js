@@ -849,7 +849,10 @@ function actionTutupShift() {
 
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        const targetShiftId = shift.shiftId || shift.id || String(shift.publicId || "1");
+        const targetShiftId = String(shift.shiftId || '');
+        if (!/^\d+$/.test(targetShiftId)) {
+          throw new Error('ID shift resmi dari TiDB tidak tersedia. Penutupan dihentikan agar tidak menutup shift yang salah.');
+        }
         const closeResult = await window.assalamTiDBApi.closeShift({
           shiftId: targetShiftId,
           countedCash: String(fisik),
@@ -3536,8 +3539,12 @@ async function actionVerifShift(id) {
     if (!s) return;
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      const authoritativeShiftId = String(s.shiftId || '');
+      if (!/^\d+$/.test(authoritativeShiftId)) {
+        throw new Error('ID shift resmi dari TiDB tidak tersedia. Verifikasi dihentikan.');
+      }
       const res = await window.assalamTiDBApi.verifyShift({
-        shiftId: s.shiftId || s.id || String(id),
+        shiftId: authoritativeShiftId,
         reason: "Verifikasi Admin shift"
       }, tidbKey);
       const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
