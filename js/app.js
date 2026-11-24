@@ -1254,7 +1254,7 @@ async function actionAddPasien() {
         }
         const assignedLane = String(shift.laneCode).trim().toUpperCase();
         const authoritativeShiftId = String(shift.shiftId);
-        if (!/^\\d+$/.test(authoritativeShiftId) || !['A', 'B'].includes(assignedLane)) {
+        if (!/^\d+$/.test(authoritativeShiftId) || !['A', 'B'].includes(assignedLane)) {
           showAlert('Data shift atau jalur antrean dari TiDB tidak valid. Pendaftaran dihentikan agar nomor antrean tidak salah.', 'Data Shift Tidak Valid');
           return;
         }
