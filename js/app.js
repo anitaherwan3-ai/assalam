@@ -33,6 +33,8 @@ let auditSearchQuery = '';
 let posFilterCategory = 'Semua';
 let selectedKartuStokOid = '';
 let kartuStokSearch = '';
+let riwayatPage = 1;
+const RIWAYAT_PAGE_SIZE = 50;
 
 // Filter rentang tanggal
 function getClinicTodayStr() {
@@ -175,18 +177,21 @@ function calculateFinancials() {
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
-  if (isTiDBCatalogPreview()) restoreTiDBPreviewSession().then(ready => {
-    if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
-    const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
-    currentUser = {id:actor.userId,u:actor.userId,nama:actor.displayName,email:actor.email||'',role:actor.role,active:true};
-    window.currentUser = currentUser; currentRole = actor.role; activeTab = (ROLE_TABS[currentRole]||[])[0]||'';
-    $('login-modal').style.display = 'none'; renderApp();
-  });
+  if (isTiDBCatalogPreview()) {
+    renderApp();
+    restoreTiDBPreviewSession().then(ready => {
+      if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
+      const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
+      currentUser = {id:actor.userId,u:actor.userId,nama:actor.displayName,email:actor.email||'',role:actor.role,active:true};
+      window.currentUser = currentUser; currentRole = actor.role; activeTab = (ROLE_TABS[currentRole]||[])[0]||'';
+      $('login-modal').style.display = 'none'; renderApp();
+    });
+  }
   store.subscribe(() => {
     applyAppSettings();
     renderApp();
   });
-  renderApp();
+  if (!isTiDBCatalogPreview()) renderApp();
 }
 
 function cycleThemeMode() {
@@ -409,19 +414,19 @@ function renderFilterBar() {
   return `
     <div class="card row" style="align-items:center;">
       <label>Dari Tanggal
-        <input type="date" value="${dateFilter.from}" onchange="dateFilter.from=this.value;renderApp();">
+        <input type="date" value="${dateFilter.from}" onchange="dateFilter.from=this.value;riwayatPage=1;renderApp();">
       </label>
       <label>Sampai Tanggal
-        <input type="date" value="${dateFilter.to}" onchange="dateFilter.to=this.value;renderApp();">
+        <input type="date" value="${dateFilter.to}" onchange="dateFilter.to=this.value;riwayatPage=1;renderApp();">
       </label>
       <label>Metode Pembayaran
-        <select onchange="dateFilter.metode=this.value;renderApp();">
+        <select onchange="dateFilter.metode=this.value;riwayatPage=1;renderApp();">
           <option value="">Semua Metode</option>
           ${['Tunai', 'QRIS', 'Transfer', 'Debit/Kredit'].map(m => `<option value="${m}" ${dateFilter.metode === m ? 'selected' : ''}>${m}</option>`).join('')}
         </select>
       </label>
       <label>Kasir
-        <select onchange="dateFilter.kasir=this.value;renderApp();">
+        <select onchange="dateFilter.kasir=this.value;riwayatPage=1;renderApp();">
           <option value="">Semua Kasir</option>
           ${usersKasir.map(u => `<option value="${esc(u.u)}" ${dateFilter.kasir === u.u ? 'selected' : ''}>${esc(u.nama)}</option>`).join('')}
         </select>
@@ -437,6 +442,7 @@ function renderFilterBar() {
 }
 
 function applyDatePreset(days) {
+  riwayatPage = 1;
   dateFilter.to = todayStr;
   if (days < 0) {
     dateFilter.from = '2020-01-01';
@@ -566,6 +572,7 @@ function actionBukaShift() {
 }
 
 function actionTutupShift() {
+  if (window._shiftActionInProgress) { showAlert('Proses shift sedang berlangsung, harap tunggu...', 'Mohon Tunggu'); return; }
   const shift = getCurrentShift();
   if (!shift) return;
   const fisik = numVal('input-shift-fisik');
@@ -577,31 +584,37 @@ function actionTutupShift() {
   const ownerWa = store.getOwnerWa ? store.getOwnerWa() : (store.state.set && store.state.set.waOwner);
   const waInfo = ownerWa ? `\n\n📲 Rekap tutup shift akan otomatis dikirimkan ke WhatsApp Owner (${ownerWa}).` : `\n\n⚠️ Nomor WA Owner belum diatur pada user pimpinan.`;
 
-  showConfirm(`Tutup shift dengan kas fisik ${rp(fisik)}?${waInfo}`, () => {
-    const sistem = calcShiftCash(shift);
-    shift.status = 'tutup';
-    shift.jamT = new Date().toTimeString().slice(0, 5);
-    shift.sistem = Number(sistem);
-    shift.fisik = Number(fisik);
-    shift.selisih = Number(fisik) - Number(sistem);
-    shift.verif = false;
-    shift._t = Date.now();
+  showConfirm(`Tutup shift dengan kas fisik ${rp(fisik)}?${waInfo}`, async () => {
+    if (window._shiftActionInProgress) return;
+    window._shiftActionInProgress = true;
+    try {
+      const sistem = calcShiftCash(shift);
+      shift.status = 'tutup';
+      shift.jamT = new Date().toTimeString().slice(0, 5);
+      shift.sistem = Number(sistem);
+      shift.fisik = Number(fisik);
+      shift.selisih = Number(fisik) - Number(sistem);
+      shift.verif = false;
+      shift._t = Date.now();
 
-    store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(shift.selisih)}`);
-    store.saveLocal();
-    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-      window.assalamTiDBApi.closeShift({
-        shiftId: shift.id || ("sh_" + Date.now()),
-        cashPhysicallyCounted: String(shift.fisik),
-        expectedCash: String(shift.sistem),
-        varianceReason: shift.selisih !== 0 ? ("Selisih kas laci " + rp(shift.selisih)) : "Sesuai sistem"
-      }, tidbKey).catch(e => console.warn("[TiDB Shift] closeShift:", e.code || e.message));
+      store.logActivity('Tutup Shift', 'Shift', `Fisik: ${rp(fisik)}, Sistem: ${rp(sistem)}, Selisih: ${rp(shift.selisih)}`);
+      store.saveLocal();
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.closeShift({
+          shiftId: shift.id || ("sh_" + Date.now()),
+          cashPhysicallyCounted: String(shift.fisik),
+          expectedCash: String(shift.sistem),
+          varianceReason: shift.selisih !== 0 ? ("Selisih kas laci " + rp(shift.selisih)) : "Sesuai sistem"
+        }, tidbKey).catch(e => console.warn("[TiDB Shift] closeShift:", e.code || e.message));
+      }
+
+      const waRes = sendShiftRecapWA(shift, store);
+      showShiftCloseModal(shift, waRes);
+      renderApp();
+    } finally {
+      window._shiftActionInProgress = false;
     }
-
-    const waRes = sendShiftRecapWA(shift, store);
-    showShiftCloseModal(shift, waRes);
-    renderApp();
   });
 }
 
@@ -2779,10 +2792,14 @@ function actionAddBeli() {
   const success = store.recordPurchase(purchasePayload);
   if (success && isTiDBCatalogPreview() && window.assalamTiDBApi) {
     const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+    const tidbMedicines = window.assalamTiDBCatalog ? (window.assalamTiDBCatalog.getMedicines() || []) : [];
+    const localObat = (store.state.obat || []).find(o => o.id === purchasePayload.oid);
+    const tidbMed = localObat ? tidbMedicines.find(m => m.publicId === localObat.publicId || m.name === localObat.nama) : null;
+    const tidbMedicineId = (tidbMed && tidbMed.publicId) || purchasePayload.oid;
     window.assalamTiDBApi.receivePurchase({
       supplierName: purchasePayload.supplier,
       invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
-      medicineId: purchasePayload.oid,
+      medicineId: tidbMedicineId,
       quantity: String(purchasePayload.qty),
       totalBilled: String(purchasePayload.total),
       batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
@@ -3171,28 +3188,38 @@ function viewVerifikasi() {
   `;
 }
 
-function actionVerifShift(id) {
-  const s = store.get('shift', id);
-  if (!s) return;
-  s.verif = true;
-  s.oleh = currentUser ? currentUser.nama : 'Admin';
-  s._t = Date.now();
-  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-    window.assalamTiDBApi.verifyShift({
-      shiftId: s.id || String(id)
-    }, tidbKey).catch(e => console.warn("[TiDB Shift] verifyShift:", e.code || e.message));
+async function actionVerifShift(id) {
+  if (window._shiftActionInProgress) { showAlert('Proses verifikasi shift sedang berlangsung, harap tunggu...', 'Mohon Tunggu'); return; }
+  window._shiftActionInProgress = true;
+  try {
+    const s = store.get('shift', id);
+    if (!s) return;
+    s.verif = true;
+    s.oleh = currentUser ? currentUser.nama : 'Admin';
+    s._t = Date.now();
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.verifyShift({
+        shiftId: s.id || String(id)
+      }, tidbKey).catch(e => console.warn("[TiDB Shift] verifyShift:", e.code || e.message));
+    }
+    store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
+    store.saveLocal();
+    showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
+  } finally {
+    window._shiftActionInProgress = false;
   }
-  store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
-  store.saveLocal();
-  showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
 }
 
 // -------------------------------------------------------------
 // MODULE: RIWAYAT TRANSAKSI (ADMIN / AUDIT)
 // -------------------------------------------------------------
 function viewRiwayat() {
-  const trxList = getFilteredTrx().slice().reverse();
+  const allTrx = getFilteredTrx().slice().reverse();
+  const totalTrx = allTrx.length;
+  const totalPages = Math.max(1, Math.ceil(totalTrx / RIWAYAT_PAGE_SIZE));
+  if (riwayatPage > totalPages) riwayatPage = totalPages;
+  const trxList = allTrx.slice((riwayatPage - 1) * RIWAYAT_PAGE_SIZE, riwayatPage * RIWAYAT_PAGE_SIZE);
   const returList = (store.state.returJual || []).slice().reverse();
   const cancelList = (store.state.batalTrx || []).slice().reverse();
   const rows = trxList.map(t => {
@@ -3245,9 +3272,20 @@ function viewRiwayat() {
     return [esc(r.tgl), esc(r.noNota), esc(r.namaPasien), esc(r.namaItem), Number(r.qty || 0), rp(r.total),
       esc(r.alasan), esc(r.kasir || '-'), badge, decisionDetail, refundBadge, refundDetail, actions];
   });
+  const paginationHtml = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap;">
+      <button class="s" onclick="riwayatPage=1;renderApp();" ${riwayatPage===1?'disabled':''}>« Awal</button>
+      <button class="s" onclick="riwayatPage=Math.max(1,riwayatPage-1);renderApp();" ${riwayatPage===1?'disabled':''}>‹ Sebelumnya</button>
+      <span style="font-size:13px;color:var(--mu);">Halaman ${riwayatPage} dari ${totalPages} (${totalTrx} transaksi)</span>
+      <button class="s" onclick="riwayatPage=Math.min(${totalPages},riwayatPage+1);renderApp();" ${riwayatPage===totalPages?'disabled':''}>Berikutnya ›</button>
+      <button class="s" onclick="riwayatPage=${totalPages};renderApp();" ${riwayatPage===totalPages?'disabled':''}>Akhir »</button>
+    </div>` : `<p style="font-size:12px;color:var(--mu);">Menampilkan ${totalTrx} transaksi</p>`;
   return renderFilterBar() + `
     <div class="card"><h2>Daftar Semua Transaksi Penjualan</h2>
-      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Status Nota','Aksi'], rows, { key: 'all_trx' })}</div>
+      ${paginationHtml}
+      ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Metode','Total Tagihan','Status Nota','Aksi'], rows, { key: 'all_trx' })}
+      ${paginationHtml}
+    </div>
     ${currentRole === 'admin' ? `<div class="card"><h2>Pengajuan Pembatalan Transaksi</h2>
       <p style="color:var(--mu);font-size:13px;">Nota dan stok hanya berubah setelah Admin menyetujui pengajuan.</p>
       ${renderTable(['Tanggal','No. Nota','Pasien','Kasir','Alasan','Status','Tindakan'], cancelRows, { key: 'cancel_trx_tbl' })}</div>` : ''}
