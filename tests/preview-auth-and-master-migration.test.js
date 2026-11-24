@@ -21,6 +21,16 @@ test("Pengguna tab always exposes the master dry-run action and Pimpinan session
   assert.match(app, /signInTiDBPreview\(email,password\)/);
 });
 
+test("TiDB checkout requires numeric server-owned encounter and shift IDs",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ const checkout=app.slice(app.indexOf("const checkoutPayload"),app.indexOf("const checkoutRes",app.indexOf("const checkoutPayload")));
+ assert.match(app,/authoritativeEncounterId = String\(pasien && pasien\.id \|\| ''\)/);
+ assert.match(app,/authoritativeShiftId = String\(shift && shift\.shiftId \|\| ''\)/);
+ assert.match(app,/!\^\\d\+\$/.test\(authoritativeEncounterId\)/);
+ assert.match(app,/!\^\\d\+\$/.test\(authoritativeShiftId\)/);
+ assert.doesNotMatch(checkout,/shift-1|enc_.*Date\.now/);
+});
+
 test("TiDB medicine hydration replaces local seed rows and waits before rendering an authenticated session",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
  assert.match(app,/medRes\.ok === true && Array\.isArray\(medRes\.data\)/);
