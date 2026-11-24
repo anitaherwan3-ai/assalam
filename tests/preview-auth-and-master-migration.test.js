@@ -21,6 +21,15 @@ test("Pengguna tab always exposes the master dry-run action and Pimpinan session
   assert.match(app, /signInTiDBPreview\(email,password\)/);
 });
 
+test("TiDB medicine hydration replaces local seed rows and waits before rendering an authenticated session",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/medRes\.ok === true && Array\.isArray\(medRes\.data\)/);
+ assert.match(app,/store\.state\.obat = medRes\.data\.map/);
+ const login=app.slice(app.indexOf("async function signInTiDBPreview"),app.indexOf("async function activatePreviewOwnerBootstrap"));
+ assert.match(login,/await syncOperationalDataFromTiDB\(\)/);
+ assert.doesNotMatch(login,/listMedicines\(\)/);
+});
+
 test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
  const api=fs.readFileSync(require.resolve("../api/auth/[...all].js"),"utf8");
