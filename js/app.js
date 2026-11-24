@@ -263,11 +263,12 @@ async function syncOperationalDataFromTiDB() {
         } else {
           store.state.biaya.push({
             id: e.publicId || String(e.expenseId),
+            expenseId: String(e.expenseId),
             tgl: e.tgl,
             kat: e.kat,
             ket: e.ket,
             jml: e.jml,
-            status: e.status || 'approved',
+            status: e.status === 'requested' ? 'pending' : (e.status || 'approved'),
             kasir: e.creatorName || '-',
             _t: Date.now()
           });
@@ -3286,7 +3287,7 @@ async function actionAddBiaya() {
 
   const set = store.state.set || {};
   const limitAppr = set.batasApproval || 1000000;
-  const status = total >= limitAppr ? 'pending' : 'approved';
+  const status = isTiDBCatalogPreview() ? 'pending' : (total >= limitAppr ? 'pending' : 'approved');
 
   const biayaItem = {
     id: uid(),
@@ -3302,18 +3303,23 @@ async function actionAddBiaya() {
   if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
     try {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-      await window.assalamTiDBApi.createExpense({
+      const created = await window.assalamTiDBApi.createExpense({
         category: biayaItem.kat,
         description: biayaItem.ket,
-        amount: String(biayaItem.jml)
+        amount: String(biayaItem.jml),
+        businessDate: todayStr
       }, tidbKey);
+      if (!created || created.ok !== true || !created.data || !created.data.expenseId) {
+        throw new Error("Server TiDB belum mengonfirmasi pencatatan pengeluaran.");
+      }
+      await syncOperationalDataFromTiDB();
     } catch (err) {
       showAlert(err.message || 'Gagal mencatat biaya ke TiDB.', 'Gagal');
       return;
     }
   }
 
-  store.state.biaya.push(biayaItem);
+  if (!isTiDBCatalogPreview()) store.state.biaya.push(biayaItem);
   store.logActivity('Tambah', 'Biaya', `${ket} (${rp(total)})`);
   store.saveLocal();
   $('b-ket').value = '';
@@ -3323,6 +3329,10 @@ async function actionAddBiaya() {
 }
 
 function editBiaya(id) {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Perubahan pengeluaran TiDB harus melalui alur koreksi yang diaudit. Edit lokal dinonaktifkan.', 'Perlindungan Data');
+    return;
+  }
   const b = store.get('biaya', id);
   if (!b) return;
   showFormModal('Edit Biaya', [
@@ -3341,6 +3351,10 @@ function editBiaya(id) {
 }
 
 function delBiaya(id) {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Pengeluaran TiDB tidak dapat dihapus. Gunakan koreksi yang memiliki jejak audit.', 'Perlindungan Data');
+    return;
+  }
   showConfirm('Hapus data pengeluaran biaya ini?', () => {
     const b = store.get('biaya', id);
     if (b) {
@@ -4571,9 +4585,38 @@ function viewApproval() {
   `;
 }
 
-function actionApproveBiaya(id, isApproved) {
+async function actionApproveBiaya(id, isApproved) {
   const b = store.get('biaya', id);
   if (!b) return;
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    if (!isApproved) {
+      showAlert('Penolakan pengeluaran belum tersedia sebagai perintah backend yang diaudit. Status tidak diubah.', 'Belum Tersedia');
+      return;
+    }
+    if (!/^\\d+$/.test(String(b.expenseId || ''))) {
+      showAlert('ID pengeluaran resmi dari TiDB tidak tersedia. Persetujuan dihentikan.', 'Data Tidak Valid');
+      return;
+    }
+    showFormModal('Persetujuan Pengeluaran', [
+      ['reason', 'Catatan persetujuan Pimpinan *', 'text', 'Pengeluaran telah diperiksa']
+    ], async values => {
+      const reason = String(values.reason || '').trim();
+      if (!reason) { showAlert('Catatan persetujuan wajib diisi.'); return; }
+      try {
+        const result = await window.assalamTiDBApi.approveExpense({
+          expenseId: String(b.expenseId), reason
+        }, window.assalamTiDBApi.newIdempotencyKey());
+        if (!result || result.ok !== true) throw new Error('Server TiDB belum mengonfirmasi persetujuan.');
+        await syncOperationalDataFromTiDB();
+        store.logActivity('Approval', 'Biaya', 'Pengeluaran ' + b.ket + ' disetujui melalui TiDB');
+        store.saveLocal();
+        showAlert('Pengeluaran berhasil disetujui dan dikonfirmasi dari TiDB.', 'Sukses');
+      } catch (err) {
+        showAlert(err.message || 'Persetujuan pengeluaran gagal.', 'Gagal');
+      }
+    });
+    return;
+  }
   b.status = isApproved ? 'approved' : 'ditolak';
   b._t = Date.now();
   store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
