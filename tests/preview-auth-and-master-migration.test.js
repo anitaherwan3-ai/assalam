@@ -71,6 +71,13 @@ test("Preview login and initial owner activation use TiDB, not Firebase",()=>{
  assert.equal(html.split("\n").filter(line=>line.includes("document.write")&&line.includes("<\\\\/script>")).length,0,"dynamic script tags must close correctly");
 });
 
+test("Preview UI exposes owner activation only when the protected owner has no Better Auth identity",()=>{
+ const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
+ assert.match(app,/getPreviewOwnerStatus\(\)/);
+ assert.match(app,/protectedOwnerCount===1&&status\.protectedOwnerActive===true/);
+ assert.match(app,/status\.authUserCount===0/);
+ assert.match(app,/preview-owner-bootstrap/);
+});
 test("owner bootstrap adopts the existing protected clinic identity without duplicating roles",()=>{
  const owner=fs.readFileSync(require.resolve("../lib/preview-owner-bootstrap"),"utf8");
  assert.match(owner,/SELECT user_id,display_name,active FROM users WHERE protected_owner=1 FOR UPDATE/);
