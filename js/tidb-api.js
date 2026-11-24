@@ -34,7 +34,8 @@
       "/api/inventory",
       "/api/finance"
     ]);
-    if (!allowedPaths.has(path)) {
+    const endpointPath = String(path || "").split("?")[0];
+    if (!allowedPaths.has(endpointPath)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
     }
     const method = String(options.method || "GET").toUpperCase();
