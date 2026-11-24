@@ -1248,11 +1248,20 @@ async function actionAddPasien() {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        const assignedLane = (shift && shift.laneCode) || (currentUser && currentUser.u && String(currentUser.u).includes('2') ? 'B' : 'A');
+        if (!shift || !shift.shiftId || !shift.laneCode) {
+          showAlert('Pendaftaran antrean memerlukan shift TiDB yang aktif beserta penetapan jalurnya. Silakan buka atau muat ulang shift terlebih dahulu.', 'Shift TiDB Diperlukan');
+          return;
+        }
+        const assignedLane = String(shift.laneCode).trim().toUpperCase();
+        const authoritativeShiftId = String(shift.shiftId);
+        if (!/^\\d+$/.test(authoritativeShiftId) || !['A', 'B'].includes(assignedLane)) {
+          showAlert('Data shift atau jalur antrean dari TiDB tidak valid. Pendaftaran dihentikan agar nomor antrean tidak salah.', 'Data Shift Tidak Valid');
+          return;
+        }
         const res = await window.assalamTiDBApi.registerEncounter({
           patient: { fullName: patient.nama, phone: patient.hp, nik: null },
           serviceCode: patient.layanan || "UMUM",
-          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          shiftId: authoritativeShiftId,
           queuePrefix: assignedLane
         }, tidbKey);
         const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
