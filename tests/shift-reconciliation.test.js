@@ -5,17 +5,26 @@ const assert = require("node:assert/strict");
 const { createClinicDomainCommands } = require("../lib/clinic-domain-commands");
 
 function makeCommands(shift) {
-  const state = { closed: null, verified: null };
+  const state = { closed: null, verified: null, verifications: [] };
   const repository = {
     async lockShiftForClose() { return { ...shift, status: "open", expectedCash: "100000" }; },
     async closeShift(_c, input) { state.closed = input; return "recon-1"; },
     async lockShiftForVerification() { return { ...shift, status: "pending_verification" }; },
-    async verifyShift(_c, input) { state.verified = input; }
+    async recordShiftVerification(_c, input) {
+      if (state.verifications.some(x => x.verifierUserId === input.verifierUserId)) {
+        throw Object.assign(new Error("duplicate verifier"), { code: "SHIFT_ALREADY_VERIFIED_BY_ACTOR" });
+      }
+      state.verifications.push(input);
+      const verificationCount=state.verifications.length;
+      const verified=verificationCount>=input.requiredApprovals;
+      if(verified)state.verified=input;
+      return {verificationCount,requiredApprovals:input.requiredApprovals,verified};
+    }
   };
   const commands = createClinicDomainCommands({
     repository,
     withTransaction: async work => work({}),
-    claimIdempotency: async () => ({ replayed: false, idempotencyId: "idem-1" }),
+    claimIdempotency: async (_c,x) => ({ replayed: false, idempotencyId: x.idempotencyKey }),
     completeIdempotency: async () => {},
     writeAuditEvent: async () => "audit-1"
   });
@@ -43,22 +52,36 @@ test("shift variance without a reason is blocked", async () => {
   }), { code: "SHIFT_VARIANCE_REASON_REQUIRED" });
 });
 
-test("cashier shift verification requires Admin; Admin shift requires Pimpinan", async () => {
-  const cashierShift = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "evening" });
+test("cashier shift requires two distinct Admin approvals; Admin shift requires one Pimpinan", async () => {
+  const cashierShift = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
   await assert.rejects(cashierShift.commands.verifyShift({
     actor: { userId: "owner-1", role: "pimpinan" }, shiftId: "1", reason: "test",
     idempotencyKey: "shift-verify-1", requestId: "shift-verify-req-1"
   }), { code: "SHIFT_VERIFIER_ROLE_INVALID" });
-  await cashierShift.commands.verifyShift({
-    actor: { userId: "admin-1", role: "admin" }, shiftId: "1", reason: "Sesuai",
+  const first = await cashierShift.commands.verifyShift({
+    actor: { userId: "admin-1", role: "admin" }, shiftId: "1", reason: "Pemeriksaan pertama",
     idempotencyKey: "shift-verify-2", requestId: "shift-verify-req-2"
   });
-  assert.equal(cashierShift.state.verified.verifierUserId, "admin-1");
-
-  const adminShift = makeCommands({ shiftId: "2", cashierUserId: "admin-1", shiftCode: "admin" });
-  await adminShift.commands.verifyShift({
-    actor: { userId: "owner-1", role: "pimpinan" }, shiftId: "2", reason: "Sesuai",
+  assert.equal(first.body.data.status, "pending_verification");
+  assert.equal(first.body.data.verificationCount, 1);
+  assert.equal(first.body.data.requiredApprovals, 2);
+  await assert.rejects(cashierShift.commands.verifyShift({
+    actor: { userId: "admin-1", role: "admin" }, shiftId: "1", reason: "Ulang",
+    idempotencyKey: "shift-verify-duplicate", requestId: "shift-verify-duplicate-req"
+  }), { code: "SHIFT_ALREADY_VERIFIED_BY_ACTOR" });
+  const second = await cashierShift.commands.verifyShift({
+    actor: { userId: "admin-2", role: "admin" }, shiftId: "1", reason: "Pemeriksaan kedua",
     idempotencyKey: "shift-verify-3", requestId: "shift-verify-req-3"
   });
-  assert.equal(adminShift.state.verified.verifierUserId, "owner-1");
+  assert.equal(second.body.data.status, "verified");
+  assert.equal(second.body.data.verificationCount, 2);
+  assert.equal(cashierShift.state.verified.verifierUserId, "admin-2");
+
+  const adminShift = makeCommands({ shiftId: "2", cashierUserId: "admin-1", shiftCode: "admin" });
+  const final = await adminShift.commands.verifyShift({
+    actor: { userId: "owner-1", role: "pimpinan" }, shiftId: "2", reason: "Sesuai",
+    idempotencyKey: "shift-verify-4", requestId: "shift-verify-req-4"
+  });
+  assert.equal(final.body.data.status, "verified");
+  assert.equal(final.body.data.requiredApprovals, 1);
 });

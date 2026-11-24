@@ -1120,24 +1120,32 @@ async function actionAddPasien() {
 
     let allocation;
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-      const res = await window.assalamTiDBApi.registerEncounter({
-        patient: { name: patient.nama, phone: patient.hp, nik: null },
-        serviceCode: patient.layanan || "UMUM",
-        shiftId: patient.sh || "shift-default",
-        queuePrefix: "A"
-      }, tidbKey).catch(e => {
-        console.warn("[TiDB Queue] registerEncounter:", e.code || e.message);
-        return null;
-      });
-      if (res && res.queueNumber) {
-        allocation = { id: res.encounterId || ("q_" + Date.now()), no: res.queueNumber, number: parseInt(res.queueNumber.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1) };
+      try {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        const res = await window.assalamTiDBApi.registerEncounter({
+          patient: { fullName: patient.nama, phone: patient.hp, nik: null },
+          serviceCode: patient.layanan || "UMUM",
+          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          queuePrefix: "A"
+        }, tidbKey);
+        const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
+        const qNum = data.queueNumber || res.queueNumber;
+        if (qNum) {
+          allocation = {
+            id: data.encounterId || res.encounterId || ("enc_" + Date.now()),
+            no: qNum,
+            number: parseInt(qNum.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1)
+          };
+        } else {
+          throw new Error("Nomor antrean tidak ditemukan pada respons server TiDB.");
+        }
+      } catch (e) {
+        showAlert(e.message || 'Pendaftaran antrean ke TiDB gagal. Silakan coba lagi.', 'Gagal');
+        return;
       }
-    }
-    if (!allocation && window.firebaseBackend && window.firebaseBackend.isOnline) {
+    } else if (window.firebaseBackend && window.firebaseBackend.isOnline) {
       allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
-    }
-    if (!allocation) {
+    } else {
       const seqVal = (Number((store.state.seq || {})[todayStr]) || 0) + 1;
       allocation = { id: "q_" + Date.now(), no: "A" + String(seqVal).padStart(3, "0"), number: seqVal };
     }
@@ -1878,21 +1886,48 @@ async function actionBayarTrx(totalCart) {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.checkout({
-          encounterId: pasien.id || ("enc_" + Date.now()),
-          lines: (newTrx.items || []).map((it, idx) => ({
-            lineIndex: idx + 1,
-            itemType: (it.t || it.jenis) === "Paket" ? "package" : (it.oid ? "medicine" : "service"),
-            itemId: it.oid || it.id || String(idx + 1),
+        const checkoutItems = (newTrx.items || []).map((it, idx) => {
+          const isPaket = (it.t || it.jenis) === "Paket";
+          const isObat = !!it.oid;
+          if (isPaket) {
+            return {
+              packageId: it.pkgId || it.id || String(idx + 1),
+              quantity: String(it.qty || 1),
+              price: String(it.harga || it.price || 0),
+              discount: "0"
+            };
+          }
+          if (isObat) {
+            return {
+              medicineId: it.oid || it.id || String(idx + 1),
+              quantity: String(it.qty || 1),
+              price: String(it.harga || it.price || 0),
+              discount: "0"
+            };
+          }
+          return {
+            tariffId: it.tid || it.id || String(idx + 1),
             quantity: String(it.qty || 1),
             price: String(it.harga || it.price || 0),
             discount: "0"
-          })),
+          };
+        });
+
+        const checkoutPayload = {
+          encounterId: pasien.id || ("enc_" + Date.now()),
+          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          items: checkoutItems,
           payment: {
             method: metode === "Tunai" ? "cash" : metode === "QRIS" ? "qris" : metode === "Transfer" ? "bank_transfer" : metode === "Debit/Kredit" ? "card" : "cash",
             amountPaid: String(bayarTunai)
           }
-        }, tidbKey).catch(e => console.warn("[TiDB Sales] checkout:", e.code || e.message));
+        };
+
+        const checkoutRes = await window.assalamTiDBApi.checkout(checkoutPayload, tidbKey);
+        if (checkoutRes && (checkoutRes.data || checkoutRes.invoiceId)) {
+          const invId = (checkoutRes.data && (checkoutRes.data.invoiceId || checkoutRes.data.publicId)) || checkoutRes.invoiceId;
+          if (invId) newTrx.id = String(invId);
+        }
       } else if (window.firebaseBackend && window.firebaseBackend.isOnline) {
         await window.firebaseBackend.commitCashierTransaction(newTrx, pasien.id, Array.from(stockMap.values()));
       }
@@ -3324,18 +3359,40 @@ async function actionVerifShift(id) {
   try {
     const s = store.get('shift', id);
     if (!s) return;
-    s.verif = true;
-    s.oleh = currentUser ? currentUser.nama : 'Admin';
-    s._t = Date.now();
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-      await window.assalamTiDBApi.verifyShift({
-        shiftId: s.id || String(id)
-      }, tidbKey).catch(e => console.warn("[TiDB Shift] verifyShift:", e.code || e.message));
+      const res = await window.assalamTiDBApi.verifyShift({
+        shiftId: s.id || String(id),
+        reason: "Verifikasi Admin shift"
+      }, tidbKey);
+      const data = (res && res.data) || res || {};
+      if (data.status === "verified") {
+        s.verif = true;
+        s.oleh = currentUser ? currentUser.nama : 'Admin';
+        s.verifCount = data.verificationCount || 2;
+        s._t = Date.now();
+        store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)}) - Terverifikasi Penuh`);
+        store.saveLocal();
+        showAlert('Setoran kasir berhasil diverifikasi penuh (2 dari 2 Admin telah menyetujui).', 'Sukses');
+      } else {
+        s.verif = false;
+        s.verifCount = data.verificationCount || 1;
+        s._t = Date.now();
+        store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)}) - Verifikasi Ke-1`);
+        store.saveLocal();
+        showAlert(`Verifikasi Admin ke-${data.verificationCount || 1} berhasil dicatat. Menunggu verifikasi dari Admin kedua yang berbeda untuk menyelesaikan rekonsiliasi.`, 'Menunggu Admin Kedua');
+      }
+    } else {
+      s.verif = true;
+      s.oleh = currentUser ? currentUser.nama : 'Admin';
+      s._t = Date.now();
+      store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
+      store.saveLocal();
+      showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
     }
-    store.logActivity('Verifikasi', 'Setoran Shift', `Kasir ${s.nama} (${rp(s.fisik)})`);
-    store.saveLocal();
-    showAlert('Setoran kasir berhasil diverifikasi.', 'Sukses');
+    renderApp();
+  } catch (err) {
+    showAlert(err.message || 'Verifikasi shift gagal.', 'Gagal');
   } finally {
     window._shiftActionInProgress = false;
   }

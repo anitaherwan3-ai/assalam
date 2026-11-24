@@ -5,8 +5,12 @@
 const { execFileSync } = require("node:child_process");
 
 function migrationBuildEnabled() {
-  return process.env.VERCEL_ENV === "preview" &&
-    process.env.VERCEL_GIT_COMMIT_REF === "migration/tidb-foundation" &&
+  const branch = process.env.VERCEL_GIT_COMMIT_REF;
+  const foundationBranch = branch === "migration/tidb-foundation";
+  const operationalBranch = (branch === "migration/tidb-operational-cutover" || branch === "main") &&
+    (process.env.TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions" || process.env.TIDB_MIGRATIONS_ENABLED === "true");
+  return (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production" || process.env.TIDB_MIGRATION_EXECUTION_CONTEXT === "github-actions" || !process.env.VERCEL_ENV) &&
+    (foundationBranch || operationalBranch) &&
     process.env.TIDB_DATABASE === "assalam_db" &&
     process.env.TIDB_MIGRATIONS_ENABLED === "true";
 }
@@ -37,7 +41,8 @@ async function main() {
     require("../lib/migrations/013_quarantine_disposition_approval"),
     require("../lib/migrations/014_better_auth_admin_fields"),
     require("../lib/migrations/015_widen_operational_status_columns"),
-    require("../lib/migrations/016_service_package_price_snapshots")
+    require("../lib/migrations/016_service_package_price_snapshots"),
+    require("../lib/migrations/017_two_admin_shift_verification")
   ];
   const { applyMigrations } = require("../lib/migration-runner");
   const { runFoundationSmokeTest } = require("../lib/migration-smoke-test");
@@ -49,12 +54,14 @@ async function main() {
     const result = await applyMigrations(connection, migrations);
     const smoke = await runFoundationSmokeTest(connection);
     const operationalSmoke = await runOperationalSmokeTest(connection);
+    const operationalSmoke = await runOperationalSmokeTest(connection);
     execFileSync("npm", ["run", "auth:schema-check"], { stdio: "inherit", env: process.env });
     console.log("[ASSALAM-MIGRATION] Preview operational schema and Better Auth schema verified", {
       applied: result.applied,
       alreadyApplied: result.alreadyApplied,
       current: result.current,
       foundationSmokeTest: smoke,
+      operationalSmokeTest: operationalSmoke,
       operationalSmokeTest: operationalSmoke
     });
   } catch (error) {
