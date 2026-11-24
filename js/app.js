@@ -7,6 +7,15 @@ function isTiDBCatalogPreview() {
   return !!(window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled());
 }
 
+function blockLocalOnlyActionInTiDBPreview(moduleName) {
+  if (!isTiDBCatalogPreview()) return false;
+  showAlert(
+    moduleName + ' belum memiliki perintah TiDB yang lengkap. Perubahan dihentikan agar tidak tersimpan hanya di perangkat ini.',
+    'Integrasi TiDB Belum Lengkap'
+  );
+  return true;
+}
+
 function getMasterTariffs() {
   return isTiDBCatalogPreview()
     ? window.assalamTiDBCatalog.getTariffs()
@@ -1363,6 +1372,7 @@ async function actionAddPasien() {
 }
 
 function editPasien(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Perubahan data pasien')) return;
   const p = store.get('pasien', id);
   if (!p || p.deletedAt || p.status === 'dihapus') return;
   showFormModal('Edit Data Pasien', [
@@ -1378,6 +1388,7 @@ function editPasien(id) {
 }
 
 function actionBatalBerobat(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Pembatalan kunjungan')) return;
   if (currentRole !== 'kasir') {
     showAlert('Hanya Kasir yang dapat mencatat pembatalan berobat.', 'Akses Ditolak');
     return;
@@ -1397,6 +1408,7 @@ function actionBatalBerobat(id) {
 }
 
 function actionPulihkanBatalBerobat(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Pemulihan kunjungan')) return;
   if (currentRole !== 'kasir') {
     showAlert('Hanya Kasir yang dapat mengaktifkan kembali antrean.', 'Akses Ditolak');
     return;
@@ -1415,6 +1427,7 @@ function actionPulihkanBatalBerobat(id) {
 }
 
 function delPasien(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Pengarsipan pasien')) return;
   if (currentRole !== 'pimpinan') {
     showAlert('Hanya Pimpinan yang dapat mengarsipkan pasien.', 'Akses Ditolak');
     return;
@@ -2332,6 +2345,7 @@ function viewPetty() {
 }
 
 function actionAddPetty() {
+  if (blockLocalOnlyActionInTiDBPreview('Kas kecil')) return;
   const ket = val('petty-ket').trim();
   const jml = numVal('petty-jml');
   if (!ket || jml <= 0) {
@@ -2356,6 +2370,7 @@ function actionAddPetty() {
 }
 
 function editPetty(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Kas kecil')) return;
   const p = store.get('petty', id);
   if (!p) return;
   showFormModal('Edit Kas Kecil', [
@@ -2371,6 +2386,7 @@ function editPetty(id) {
 }
 
 function delPetty(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Kas kecil')) return;
   showConfirm('Hapus catatan kas kecil ini?', () => {
     const p = store.get('petty', id);
     if (p) {
@@ -2499,6 +2515,7 @@ async function actionAddObat() {
 }
 
 function editObat(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Perubahan master obat dan stok')) return;
   const o = store.getObat(id);
   if (!o) return;
   showFormModal('Edit Obat', [
@@ -2522,6 +2539,7 @@ function editObat(id) {
 }
 
 function delObat(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Penghapusan master obat')) return;
   showConfirm('Hapus data master obat ini?', () => {
     const o = store.getObat(id);
     if (o) {
@@ -2811,6 +2829,7 @@ function cancelEditPaket() {
 }
 
 function delPaket(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Penghapusan paket pelayanan')) return;
   showConfirm('Hapus paket pelayanan ini?', () => {
     const p = store.get('paket', id);
     if (p) {
@@ -3119,6 +3138,7 @@ function openModalReturBeli(beliId) {
 }
 
 async function actionAddBeli() {
+  if (blockLocalOnlyActionInTiDBPreview('Pembelian obat')) return;
   const sup = val('beli-sup').trim();
   const oid = val('beli-oid');
   const qty = numVal('beli-qty');
@@ -3141,28 +3161,6 @@ async function actionAddBeli() {
     ed: ed,
     isLunas: val('beli-lunas') === 'tunai'
   };
-  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-    try {
-      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-      const tidbMedicines = window.assalamTiDBCatalog ? (window.assalamTiDBCatalog.getMedicines() || []) : [];
-      const localObat = (store.state.obat || []).find(o => o.id === purchasePayload.oid);
-      const tidbMed = localObat ? tidbMedicines.find(m => m.publicId === localObat.publicId || m.name === localObat.nama) : null;
-      const tidbMedicineId = (tidbMed && tidbMed.publicId) || purchasePayload.oid;
-      await window.assalamTiDBApi.receivePurchase({
-        supplierName: purchasePayload.supplier,
-        invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
-        medicineId: tidbMedicineId,
-        quantity: String(purchasePayload.qty),
-        totalBilled: String(purchasePayload.total),
-        batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
-        expiryDate: purchasePayload.ed
-      }, tidbKey);
-    } catch (e) {
-      showAlert(e.message || 'Pencatatan pembelian ke TiDB gagal. Transaksi dibatalkan.', 'Gagal');
-      return;
-    }
-  }
-
   const success = store.recordPurchase(purchasePayload);
 
   if (success) {
@@ -3464,6 +3462,7 @@ function viewOpname() {
 }
 
 function actionAddLoss() {
+  if (blockLocalOnlyActionInTiDBPreview('Pencatatan kerugian dan penyesuaian stok')) return;
   const bid = val('op-batch');
   const qty = numVal('op-qty');
   const batch = store.get('batch', bid);
@@ -3499,6 +3498,7 @@ function actionAddLoss() {
 }
 
 function delLoss(id) {
+  if (blockLocalOnlyActionInTiDBPreview('Pembatalan kerugian stok')) return;
   showConfirm('Batalkan catatan kerugian ini? Stok fisik dan batch akan dikembalikan.', () => {
     const l = store.get('loss', id);
     if (!l) return;
