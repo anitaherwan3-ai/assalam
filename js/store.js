@@ -382,7 +382,7 @@ class ClinicStore {
   // Pembatalan transaksi wajib melalui persetujuan Cloud; tidak ada rollback stok lokal.
 
   // Panggil Pasien ke Layar Display TV
-  async callPatient(patientId) {
+  callPatient(patientId) {
     const patient = (this.state.pasien || []).find(p => p.id === patientId);
     if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
@@ -394,6 +394,7 @@ class ClinicStore {
         if (typeof showAlert === 'function') showAlert('ID tiket atau jalur antrean TiDB tidak valid. Panggilan dihentikan.', 'Data Antrean Tidak Valid');
         return false;
       }
+      return (async () => {
       try {
         await window.assalamTiDBApi.callQueue({
           ticketId, laneCode, eventType: 'call'
@@ -415,6 +416,7 @@ class ClinicStore {
         if (typeof showAlert === 'function') showAlert(error.message || 'Panggilan antrean ke TiDB gagal.', 'Gagal Memanggil');
         return false;
       }
+      })();
     }
 
     const dateParts = new Intl.DateTimeFormat('en-CA', {
