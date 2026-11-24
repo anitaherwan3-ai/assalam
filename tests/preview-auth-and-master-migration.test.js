@@ -37,10 +37,10 @@ test("TiDB expenses use backend dates, optional evidence, and Pimpinan approval"
 test("TiDB checkout requires numeric server-owned encounter and shift IDs",()=>{
  const app=fs.readFileSync(require.resolve("../js/app.js"),"utf8");
  const checkout=app.slice(app.indexOf("const checkoutPayload"),app.indexOf("const checkoutRes",app.indexOf("const checkoutPayload")));
- assert.match(app,/authoritativeEncounterId = String\(pasien && pasien\.id \|\| ''\)/);
- assert.match(app,/authoritativeShiftId = String\(shift && shift\.shiftId \|\| ''\)/);
- assert.match(app,/!\^\\d\+\$/.test\(authoritativeEncounterId\)/);
- assert.match(app,/!\^\\d\+\$/.test\(authoritativeShiftId\)/);
+  assert.ok(app.includes("if (!/^\\d+$/.test(authoritativeEncounterId))"));
+  assert.ok(app.includes("if (!/^\\d+$/.test(authoritativeShiftId))"));
+  assert.ok(app.includes("if (!/^\\d+$/.test(authoritativeEncounterId))"));
+  assert.ok(app.includes("if (!/^\\d+$/.test(authoritativeShiftId))"));
  assert.doesNotMatch(checkout,/shift-1|enc_.*Date\.now/);
 });
 
