@@ -28,7 +28,11 @@
       "/api/auth/preview-import-dry-run",
       "/api/admin/users",
       "/api/catalog/tariffs",
-      "/api/catalog/suppliers"
+      "/api/catalog/suppliers",
+      "/api/queue",
+      "/api/sales",
+      "/api/inventory",
+      "/api/finance"
     ]);
     if (!allowedPaths.has(path)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
@@ -91,6 +95,19 @@
     listSuppliers: () => request("/api/catalog/suppliers"),
     createSupplier: (data, key) => request("/api/catalog/suppliers", { method: "POST", body: data, idempotencyKey: key }),
     updateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "PATCH", body: data, idempotencyKey: key }),
-    deactivateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "DELETE", body: data, idempotencyKey: key })
+    deactivateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "DELETE", body: data, idempotencyKey: key }),
+    listQueueTickets: () => request("/api/queue"),
+    registerEncounter: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "register" }, data), idempotencyKey: key }),
+    callQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "call" }, data), idempotencyKey: key }),
+    transferQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "transfer" }, data), idempotencyKey: key }),
+    checkout: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "checkout" }, data), idempotencyKey: key }),
+    requestSalesReturn: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "return_request" }, data), idempotencyKey: key }),
+    listMedicines: () => request("/api/inventory"),
+    createMedicine: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "create_medicine" }, data), idempotencyKey: key }),
+    receivePurchase: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "receive_purchase" }, data), idempotencyKey: key }),
+    recordPayment: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "record_payment" }, data), idempotencyKey: key }),
+    createExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "create_expense" }, data), idempotencyKey: key }),
+    closeShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "close_shift" }, data), idempotencyKey: key }),
+    verifyShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "verify_shift" }, data), idempotencyKey: key })
   });
 })();

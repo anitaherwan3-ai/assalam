@@ -908,8 +908,8 @@ async function actionAddPasien() {
   }
   const submitButton = $('btn-daftar-antrean');
   if (submitButton && submitButton.disabled) return;
-  if (!window.firebaseBackend || !window.firebaseBackend.isOnline) {
-    showAlert('Firebase belum terhubung. Pendaftaran antrean tidak dapat dilakukan secara offline agar nomor tidak ganda.', 'Koneksi Diperlukan');
+  if (!isTiDBCatalogPreview() && (!window.firebaseBackend || !window.firebaseBackend.isOnline)) {
+    showAlert('Koneksi belum terhubung. Pendaftaran antrean tidak dapat dilakukan secara offline agar nomor tidak ganda.', 'Koneksi Diperlukan');
     return;
   }
 
@@ -943,7 +943,29 @@ async function actionAddPasien() {
       _t: registeredAt
     };
 
-    const allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
+    let allocation;
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      const res = await window.assalamTiDBApi.registerEncounter({
+        patient: { name: patient.nama, phone: patient.hp, nik: null },
+        serviceCode: patient.layanan || "UMUM",
+        shiftId: patient.sh || "shift-default",
+        queuePrefix: "A"
+      }, tidbKey).catch(e => {
+        console.warn("[TiDB Queue] registerEncounter:", e.code || e.message);
+        return null;
+      });
+      if (res && res.queueNumber) {
+        allocation = { id: res.encounterId || ("q_" + Date.now()), no: res.queueNumber, number: parseInt(res.queueNumber.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1) };
+      }
+    }
+    if (!allocation && window.firebaseBackend && window.firebaseBackend.isOnline) {
+      allocation = await window.firebaseBackend.registerPatientWithQueueNumber(patient);
+    }
+    if (!allocation) {
+      const seqVal = (Number((store.state.seq || {})[todayStr]) || 0) + 1;
+      allocation = { id: "q_" + Date.now(), no: "A" + String(seqVal).padStart(3, "0"), number: seqVal };
+    }
     patient.id = allocation.id;
     patient.no = allocation.no;
     patient._t = Date.now();
@@ -1576,7 +1598,7 @@ async function actionBayarTrx(totalCart) {
   }
 
   // Transaksi Kasir harus tersambung agar stok lintas perangkat tetap konsisten.
-  if (currentUser && currentUser.role === 'kasir' &&
+  if (!isTiDBCatalogPreview() && currentUser && currentUser.role === 'kasir' &&
       (!window.firebaseBackend || !window.firebaseBackend.isOnline ||
        !window.firebaseBackend.currentProfile || window.firebaseBackend.currentProfile.role !== 'kasir')) {
     showAlert('Transaksi belum dapat disimpan karena koneksi Firebase belum siap. Pastikan status Cloud Tersambung, lalu coba lagi.', 'Koneksi Cloud');
@@ -1679,7 +1701,26 @@ async function actionBayarTrx(totalCart) {
       }
     });
     try {
-      await window.firebaseBackend.commitCashierTransaction(newTrx, pasien.id, Array.from(stockMap.values()));
+      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.checkout({
+          encounterId: pasien.id || ("enc_" + Date.now()),
+          lines: (newTrx.items || []).map((it, idx) => ({
+            lineIndex: idx + 1,
+            itemType: (it.t || it.jenis) === "Paket" ? "package" : (it.oid ? "medicine" : "service"),
+            itemId: it.oid || it.id || String(idx + 1),
+            quantity: String(it.qty || 1),
+            price: String(it.harga || it.price || 0),
+            discount: "0"
+          })),
+          payment: {
+            method: metode === "tunai" ? "cash" : "transfer",
+            amountPaid: String(bayarTunai)
+          }
+        }, tidbKey).catch(e => console.warn("[TiDB Sales] checkout:", e.code || e.message));
+      } else if (window.firebaseBackend && window.firebaseBackend.isOnline) {
+        await window.firebaseBackend.commitCashierTransaction(newTrx, pasien.id, Array.from(stockMap.values()));
+      }
     } catch (err) {
       // Kembalikan perubahan lokal jika transaksi atomik di server gagal.
       stockMap.forEach(entry => {
@@ -2846,7 +2887,7 @@ function actionAddBiaya() {
   const limitAppr = set.batasApproval || 1000000;
   const status = total >= limitAppr ? 'pending' : 'approved';
 
-  store.state.biaya.push({
+  const biayaItem = {
     id: uid(),
     tgl: todayStr,
     kat: val('b-kat'),
@@ -2855,7 +2896,16 @@ function actionAddBiaya() {
     status: status,
     kasir: currentUser ? currentUser.u : '-',
     _t: Date.now()
-  });
+  };
+  store.state.biaya.push(biayaItem);
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+    window.assalamTiDBApi.createExpense({
+      category: biayaItem.kat,
+      description: biayaItem.ket,
+      amount: String(biayaItem.jml)
+    }, tidbKey).catch(e => console.warn("[TiDB Expense] createExpense:", e.code || e.message));
+  }
 
   store.logActivity('Tambah', 'Biaya', `${ket} (${rp(total)})`);
   store.saveLocal();
