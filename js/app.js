@@ -757,7 +757,7 @@ async function actionBukaShift() {
   const codeEl = $('input-shift-code');
   const laneEl = $('input-shift-lane');
   const shiftCode = codeEl ? codeEl.value : (currentRole === 'admin' ? 'admin' : 'morning');
-  const laneCode = laneEl ? laneEl.value : (shiftCode === 'evening' ? 'B' : 'A');
+  const laneCode = currentRole === 'admin' ? null : (laneEl ? laneEl.value : (shiftCode === 'evening' ? 'B' : 'A'));
 
   let tidbShift = null;
   if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
