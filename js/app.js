@@ -189,11 +189,10 @@ async function syncOperationalDataFromTiDB() {
 
     if (!medRes || medRes.ok !== true || !Array.isArray(medRes.data)) {
       // Fail closed: never leave seeded/local medicine rows visible as if they
-      // were verified production stock when the TiDB inventory read failed.
+      // were verified stock when the TiDB inventory read failed.
       store.state.obat = [];
-      throw new Error("Data obat TiDB belum dapat diverifikasi; katalog lokal disembunyikan sementara.");
-    }
-    if (medRes && medRes.ok === true && Array.isArray(medRes.data)) {
+      console.warn("[TiDB Sync] Data obat belum terverifikasi; katalog lokal disembunyikan sementara.");
+    } else {
       // A successful TiDB response is authoritative, including an empty catalog.
       // Do not retain seeded/localStorage medicine rows when TiDB has no active items.
       store.state.obat = medRes.data.map(m => ({
@@ -255,6 +254,8 @@ async function syncOperationalDataFromTiDB() {
     }
 
     if (financeRes && financeRes.ok && financeRes.data && Array.isArray(financeRes.data.expenses)) {
+      // The TiDB endpoint is authoritative for the expense list returned here.
+      store.state.biaya = [];
       financeRes.data.expenses.forEach(e => {
         const idx = store.state.biaya.findIndex(b => b.id === e.publicId);
         if (idx >= 0) {
