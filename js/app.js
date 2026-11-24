@@ -174,6 +174,115 @@ function calculateFinancials() {
       refundPaidCash - pc
   };
 }
+async function syncOperationalDataFromTiDB() {
+  if (!isTiDBCatalogPreview() || !window.assalamTiDBApi) return;
+  try {
+    if (window.assalamTiDBCatalog) {
+      await window.assalamTiDBCatalog.ensureLoaded().catch(() => null);
+    }
+    const [medRes, queueRes, salesRes, financeRes] = await Promise.all([
+      window.assalamTiDBApi.listMedicines().catch(() => null),
+      window.assalamTiDBApi.listQueueTickets().catch(() => null),
+      window.assalamTiDBApi.listSales().catch(() => null),
+      window.assalamTiDBApi.listFinance().catch(() => null)
+    ]);
+
+    if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
+      medRes.data.forEach(m => {
+        const existing = (store.state.obat || []).find(o => o.id === m.publicId || o.nama === m.name);
+        if (existing) {
+          existing.stok = Number(m.physicalQuantity || existing.stok || 0);
+          existing.min = Number(m.minimumStock || existing.min || 0);
+          existing.jual = Number(m.sellingPrice || existing.jual || 0);
+          existing.satuan = m.unit || existing.satuan || 'tablet';
+        } else if (m.active) {
+          store.state.obat.push({
+            id: m.publicId || String(m.medicineId),
+            nama: m.name,
+            satuan: m.unit || 'tablet',
+            stok: Number(m.physicalQuantity || 0),
+            min: Number(m.minimumStock || 0),
+            jual: Number(m.sellingPrice || 0),
+            hpp: m.weightedHpp ? Number(m.weightedHpp) : 0,
+            _t: Date.now()
+          });
+        }
+      });
+    }
+
+    if (salesRes && salesRes.ok && salesRes.data) {
+      if (Array.isArray(salesRes.data.invoices) && salesRes.data.invoices.length > 0) {
+        salesRes.data.invoices.forEach(inv => {
+          const idx = store.state.trx.findIndex(x => x.id === inv.publicId || x.no === inv.publicId);
+          if (idx >= 0) {
+            store.state.trx[idx].status = inv.status === 'cancelled' ? 'dibatalkan' : 'selesai';
+            store.state.trx[idx].total = inv.total;
+          } else {
+            store.state.trx.push({
+              id: inv.publicId || String(inv.invoiceId),
+              no: inv.publicId || ('INV-' + inv.invoiceId),
+              tgl: inv.tgl,
+              jam: '00:00',
+              pid: String(inv.patientId || ''),
+              nama: inv.patientName || 'Pasien',
+              hp: inv.phone || '',
+              kasir: inv.cashierName || inv.cashierUserId,
+              sh: '',
+              items: [],
+              total: Number(inv.total),
+              metode: 'Tunai',
+              bayar: Number(inv.total),
+              kembalian: 0,
+              status: inv.status === 'cancelled' ? 'dibatalkan' : 'selesai',
+              _t: Date.now()
+            });
+          }
+        });
+      }
+      if (Array.isArray(salesRes.data.cancels) && salesRes.data.cancels.length > 0) {
+        salesRes.data.cancels.forEach(c => {
+          const idx = store.state.batalTrx.findIndex(x => x.id === c.publicId || x.trxId === String(c.invoiceId));
+          if (idx < 0) {
+            store.state.batalTrx.push({
+              id: c.publicId || String(c.requestId),
+              trxId: String(c.invoiceId),
+              tgl: todayStr,
+              alasan: c.reason,
+              status: c.status === 'approved' ? 'disetujui' : (c.status === 'rejected' ? 'ditolak' : 'menunggu'),
+              _t: Date.now()
+            });
+          }
+        });
+      }
+    }
+
+    if (financeRes && financeRes.ok && financeRes.data && Array.isArray(financeRes.data.expenses)) {
+      financeRes.data.expenses.forEach(e => {
+        const idx = store.state.biaya.findIndex(b => b.id === e.publicId);
+        if (idx >= 0) {
+          store.state.biaya[idx].status = e.status;
+          store.state.biaya[idx].jml = e.jml;
+        } else {
+          store.state.biaya.push({
+            id: e.publicId || String(e.expenseId),
+            tgl: e.tgl,
+            kat: e.kat,
+            ket: e.ket,
+            jml: e.jml,
+            status: e.status || 'approved',
+            kasir: e.creatorName || '-',
+            _t: Date.now()
+          });
+        }
+      });
+    }
+
+    renderApp();
+  } catch (err) {
+    console.warn("[TiDB Sync]:", err.message || err);
+  }
+}
+
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
@@ -184,7 +293,7 @@ function initApp() {
       const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
       currentUser = {id:actor.userId,u:actor.userId,nama:actor.displayName,email:actor.email||'',role:actor.role,active:true};
       window.currentUser = currentUser; currentRole = actor.role; activeTab = (ROLE_TABS[currentRole]||[])[0]||'';
-      $('login-modal').style.display = 'none'; renderApp();
+      $('login-modal').style.display = 'none'; renderApp(); syncOperationalDataFromTiDB();
     });
   }
   store.subscribe(() => {
@@ -303,6 +412,7 @@ async function signInTiDBPreview(email,password) {
   window.currentUser=currentUser;currentRole=actor.role;activeTab=(ROLE_TABS[currentRole]||[])[0]||"";cartItems=[];
   $("login-error").textContent="";$("login-password").value="";$("login-modal").style.display="none";
   if(window.assalamTiDBCatalog){try{await window.assalamTiDBCatalog.ensureLoaded(true);}catch(e){console.warn("[TiDB Preview] Katalog belum dimuat:",e.code||e.message);}}
+  syncOperationalDataFromTiDB();
   if(isTiDBCatalogPreview() && window.assalamTiDBApi) {
     try {
       const [medRes, queueRes] = await Promise.all([
@@ -2081,7 +2191,7 @@ function viewMaster() {
           <input id="m-o-nama" placeholder="Contoh: Paracetamol 500mg">
         </label>
         <label style="width:100px;">Satuan
-          <input id="m-o-satuan" value="strip">
+          <input id="m-o-satuan" value="tablet" placeholder="tablet, kapsul, botol, pcs">
         </label>
         <label>Harga Beli (HPP)
           <input id="m-o-hpp" type="number" placeholder="3000">
@@ -2129,7 +2239,7 @@ async function actionAddObat() {
       const key = window.assalamTiDBApi.newIdempotencyKey();
       await window.assalamTiDBApi.createMedicine({
         name: nama,
-        unit: val('m-o-satuan').trim() || 'strip',
+        unit: val('m-o-satuan').trim() || 'tablet',
         purchasePrice: String(numVal('m-o-hpp')),
         sellingPrice: String(numVal('m-o-jual')),
         minimumStock: String(numVal('m-o-min') || 5)
@@ -2146,7 +2256,7 @@ async function actionAddObat() {
   store.state.obat.push({
     id: uid(),
     nama: nama,
-    satuan: val('m-o-satuan').trim() || 'strip',
+    satuan: val('m-o-satuan').trim() || 'tablet',
     hpp: numVal('m-o-hpp'),
     jual: numVal('m-o-jual'),
     stok: 0,
@@ -2974,7 +3084,7 @@ function viewBiaya() {
   `;
 }
 
-function actionAddBiaya() {
+async function actionAddBiaya() {
   const ket = val('b-ket').trim();
   const sat = numVal('b-satuan');
   const qty = numVal('b-qty') || 1;
@@ -2998,20 +3108,28 @@ function actionAddBiaya() {
     kasir: currentUser ? currentUser.u : '-',
     _t: Date.now()
   };
-  store.state.biaya.push(biayaItem);
+
   if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-    const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-    window.assalamTiDBApi.createExpense({
-      category: biayaItem.kat,
-      description: biayaItem.ket,
-      amount: String(biayaItem.jml)
-    }, tidbKey).catch(e => console.warn("[TiDB Expense] createExpense:", e.code || e.message));
+    try {
+      const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.createExpense({
+        category: biayaItem.kat,
+        description: biayaItem.ket,
+        amount: String(biayaItem.jml)
+      }, tidbKey);
+    } catch (err) {
+      showAlert(err.message || 'Gagal mencatat biaya ke TiDB.', 'Gagal');
+      return;
+    }
   }
 
+  store.state.biaya.push(biayaItem);
   store.logActivity('Tambah', 'Biaya', `${ket} (${rp(total)})`);
   store.saveLocal();
   $('b-ket').value = '';
   $('b-satuan').value = '';
+  renderApp();
+  showAlert('Biaya operasional berhasil dicatat.', 'Sukses');
 }
 
 function editBiaya(id) {
@@ -3640,7 +3758,7 @@ function openModalLabelObat(trxId) {
         id: it.oid || it.id,
         nama: it.nama,
         qty: it.qty,
-        satuan: (obat && obat.satuan) ? obat.satuan : 'tablet/strip',
+        satuan: (obat && obat.satuan) ? obat.satuan : 'tablet',
         jenis: 'putih',
         signa: '3 x 1 Tablet Sehari',
         waktu: 'Sesudah Makan',
@@ -3656,7 +3774,7 @@ function openModalLabelObat(trxId) {
             id: oid,
             nama: pkgIt.nama || (obat ? obat.nama : 'Obat Paket'),
             qty: (pkgIt.qty || 1) * it.qty,
-            satuan: (obat && obat.satuan) ? obat.satuan : 'strip',
+            satuan: (obat && obat.satuan) ? obat.satuan : 'tablet',
             jenis: 'putih',
             signa: '3 x 1 Tablet Sehari',
             waktu: 'Sesudah Makan',

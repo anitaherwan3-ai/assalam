@@ -12,8 +12,45 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, private");
   try {
     const actor = await requireBetterAuthActor(req);
+    if (req.method === "GET") {
+      const { getPool } = require("../lib/tidb");
+      const [expenses] = await getPool().execute(
+        "SELECT e.expense_id AS expenseId, e.public_id AS publicId, DATE_FORMAT(e.business_date, '%Y-%m-%d') AS tgl, " +
+        "e.category AS kat, e.description AS ket, e.amount AS jml, e.status, " +
+        "e.created_by_user_id AS createdByUserId, u.display_name AS creatorName " +
+        "FROM expenses e JOIN users u ON u.user_id = e.created_by_user_id " +
+        "ORDER BY e.expense_id DESC LIMIT 200"
+      );
+      const [shifts] = await getPool().execute(
+        "SELECT s.shift_id AS shiftId, s.cashier_user_id AS cashierUserId, u.display_name AS cashierName, " +
+        "DATE_FORMAT(s.business_date, '%Y-%m-%d') AS tgl, s.lane_code AS laneCode, s.status, " +
+        "r.expected_cash AS expectedCash, r.counted_cash AS countedCash, r.variance_amount AS varianceAmount, " +
+        "r.variance_reason AS varianceReason, r.status AS verifStatus " +
+        "FROM cashier_shifts s " +
+        "JOIN users u ON u.user_id = s.cashier_user_id " +
+        "LEFT JOIN shift_reconciliations r ON r.shift_id = s.shift_id " +
+        "ORDER BY s.shift_id DESC LIMIT 100"
+      );
+      return res.status(200).json({
+        ok: true,
+        data: {
+          expenses: expenses.map(row => ({
+            ...row,
+            expenseId: String(row.expenseId),
+            jml: Number(row.jml)
+          })),
+          shifts: shifts.map(row => ({
+            ...row,
+            shiftId: String(row.shiftId),
+            expectedCash: row.expectedCash === null ? null : String(row.expectedCash),
+            countedCash: row.countedCash === null ? null : String(row.countedCash),
+            varianceAmount: row.varianceAmount === null ? null : String(row.varianceAmount)
+          }))
+        }
+      });
+    }
     if (req.method !== "POST") {
-      res.setHeader("Allow", "POST");
+      res.setHeader("Allow", "GET, POST");
       return res.status(405).json({ ok: false, code: "METHOD_NOT_ALLOWED" });
     }
     const body = req.body && typeof req.body === "object" ? req.body : {};

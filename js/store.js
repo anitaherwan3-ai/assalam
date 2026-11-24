@@ -27,8 +27,8 @@ const INITIAL_USERS = [
 ];
 
 const INITIAL_OBAT = [
-  { id: 'o1', nama: 'Paracetamol 500mg', satuan: 'strip', hpp: 3000, jual: 5000, stok: 50, min: 10 },
-  { id: 'o2', nama: 'Amoxicillin 500mg', satuan: 'strip', hpp: 9000, jual: 15000, stok: 30, min: 10 },
+  { id: 'o1', nama: 'Paracetamol 500mg', satuan: 'tablet', hpp: 3000, jual: 5000, stok: 50, min: 10 },
+  { id: 'o2', nama: 'Amoxicillin 500mg', satuan: 'kapsul', hpp: 9000, jual: 15000, stok: 30, min: 10 },
   { id: 'o3', nama: 'Vitamin C 500mg', satuan: 'botol', hpp: 12000, jual: 20000, stok: 20, min: 5 }
 ];
 
@@ -160,6 +160,7 @@ class ClinicStore {
     });
 
     if (this.state.obat.length === 0) this.state.obat = [...INITIAL_OBAT];
+    this.state.obat.forEach(o => { if (o && o.satuan === 'strip') o.satuan = 'tablet'; });
     if (this.state.batch.length === 0) this.state.batch = [...INITIAL_BATCH];
     if (this.state.tarif.length === 0) this.state.tarif = [...INITIAL_TARIF];
     if (this.state.users.length === 0) this.state.users = [...INITIAL_USERS];

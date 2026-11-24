@@ -125,6 +125,7 @@
     registerEncounter: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "register" }, data), idempotencyKey: key }),
     callQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "call" }, data), idempotencyKey: key }),
     transferQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "transfer" }, data), idempotencyKey: key }),
+    listSales: () => request("/api/sales"),
     checkout: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "checkout" }, data), idempotencyKey: key }),
     requestSalesReturn: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "return_request" }, data), idempotencyKey: key }),
     reviewSalesReturn: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "return_admin_review" }, data), idempotencyKey: key }),
@@ -135,6 +136,7 @@
     createMedicine: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "create_medicine" }, data), idempotencyKey: key }),
     receivePurchase: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "receive_purchase" }, data), idempotencyKey: key }),
     recordPayment: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "record_payment" }, data), idempotencyKey: key }),
+    listFinance: () => request("/api/finance"),
     createExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "create_expense" }, data), idempotencyKey: key }),
     closeShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "close_shift" }, data), idempotencyKey: key }),
     verifyShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "verify_shift" }, data), idempotencyKey: key })
