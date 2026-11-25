@@ -484,8 +484,6 @@ class ClinicStore {
     const part = type => (dateParts.find(item => item.type === type) || {}).value || '';
     const today = `${part('year')}-${part('month')}-${part('day')}`;
     const now = Date.now();
-    const patient = (this.state.pasien || []).find(p => p.id === patientId);
-    if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
     // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
     (this.state.pasien || []).forEach(p => {
