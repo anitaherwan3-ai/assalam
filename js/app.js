@@ -1247,12 +1247,16 @@ async function actionAddPasien() {
     let allocation;
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
+        if (!shift || (!shift.id && !shift.publicId && !shift.shiftId)) {
+          throw new Error('Shift kasir belum aktif. Silakan buka shift resmi terlebih dahulu sebelum mendaftarkan antrean.');
+        }
+        const shiftId = String(shift.publicId || shift.id || shift.shiftId);
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
         const assignedLane = (shift && shift.laneCode) || (currentUser && currentUser.u && String(currentUser.u).includes('2') ? 'B' : 'A');
         const res = await window.assalamTiDBApi.registerEncounter({
           patient: { fullName: patient.nama, phone: patient.hp, nik: null },
           serviceCode: patient.layanan || "UMUM",
-          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          shiftId: shiftId,
           queuePrefix: assignedLane
         }, tidbKey);
         const data = (res && res.data) || (res && res.body && res.body.data) || res || {};
@@ -2015,6 +2019,17 @@ async function actionBayarTrx(totalCart) {
     });
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+        if (!shift || (!shift.id && !shift.publicId && !shift.shiftId)) {
+          showAlert('Transaksi ditolak: Shift kasir belum aktif atau tidak valid. Silakan buka shift resmi terlebih dahulu.', 'Shift Diperlukan');
+          return;
+        }
+        if (!pasien.id && !pasien.encounterId) {
+          showAlert('Transaksi ditolak: ID kunjungan antrean pasien tidak ditemukan.', 'Encounter Diperlukan');
+          return;
+        }
+        const shiftId = String(shift.publicId || shift.id || shift.shiftId);
+        const encounterId = String(pasien.encounterId || pasien.id);
+
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
         const medMap = new Map();
         const tariffList = [];
@@ -2058,8 +2073,8 @@ async function actionBayarTrx(totalCart) {
         tariffList.forEach(t => checkoutItems.push(t));
 
         const checkoutPayload = {
-          encounterId: pasien.id || ("enc_" + Date.now()),
-          shiftId: shift ? (shift.id || shift.publicId || String(shift.shiftId || "shift-1")) : "shift-1",
+          encounterId: encounterId,
+          shiftId: shiftId,
           items: checkoutItems,
           payment: {
             method: metode === "Tunai" ? "cash" : metode === "QRIS" ? "qris" : metode === "Transfer" ? "bank_transfer" : metode === "Debit/Kredit" ? "card" : "cash",

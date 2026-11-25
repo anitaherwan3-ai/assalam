@@ -249,8 +249,12 @@ test("checkout with non-cash payment writes to invoice_payments but does not alt
   });
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.data.payment.method, "qris");
+  assert.equal(res.body.data.payment.reviewStatus, "pending");
+  assert.equal(res.body.data.payment.settlementStatus, "pending");
+  assert.equal(res.body.data.payment.incomeRecognized, false);
   assert.equal(state.payments.length, 1);
   assert.equal(state.payments[0].paymentMethod, "qris");
+  assert.equal(state.payments[0].paymentStatus, "pending_settlement");
   assert.equal(state.cashEntries.length, 0);
 });
 

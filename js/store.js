@@ -150,6 +150,13 @@ class ClinicStore {
       console.warn('Gagal memuat local data:', e);
     }
 
+    const isTiDBActive = !!(
+      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
+      (typeof window !== 'undefined' && window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
+      (typeof window !== 'undefined' && window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP)
+    );
+
+    this.isCacheOnly = isTiDBActive;
     this.state = localData || {};
     
     // Inisialisasi default collections jika belum ada
@@ -159,12 +166,16 @@ class ClinicStore {
       }
     });
 
-    if (this.state.obat.length === 0) this.state.obat = [...INITIAL_OBAT];
+    // Pada mode non-TiDB (legacy), isi sampel data jika belum ada.
+    // Pada mode TiDB, hindari data tiruan; TiDB adalah satu-satunya sumber kebenaran (SSOT).
+    if (!isTiDBActive) {
+      if (this.state.obat.length === 0) this.state.obat = [...INITIAL_OBAT];
+      if (this.state.batch.length === 0) this.state.batch = [...INITIAL_BATCH];
+      if (this.state.tarif.length === 0) this.state.tarif = [...INITIAL_TARIF];
+      if (this.state.users.length === 0) this.state.users = [...INITIAL_USERS];
+      if (!this.state.paket || this.state.paket.length === 0) this.state.paket = [...INITIAL_PAKET];
+    }
     this.state.obat.forEach(o => { if (o && o.satuan === 'strip') o.satuan = 'tablet'; });
-    if (this.state.batch.length === 0) this.state.batch = [...INITIAL_BATCH];
-    if (this.state.tarif.length === 0) this.state.tarif = [...INITIAL_TARIF];
-    if (this.state.users.length === 0) this.state.users = [...INITIAL_USERS];
-    if (!this.state.paket || this.state.paket.length === 0) this.state.paket = [...INITIAL_PAKET];
 
     // Pastikan nomor WhatsApp terisi pada user pimpinan jika sebelumnya belum ada
     (this.state.users || []).forEach(u => {
@@ -213,17 +224,25 @@ class ClinicStore {
   }
 
   _flushSave(triggerSync = true) {
+    const isTiDBActive = !!(
+      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
+      (typeof window !== 'undefined' && window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
+      (typeof window !== 'undefined' && window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP)
+    );
+
     try {
+      if (isTiDBActive) {
+        // Pada mode TiDB, localStorage hanya bertindak sebagai cache lokal sementara (bukan SSOT)
+        this.state._cacheMeta = {
+          source: 'tidb_cache',
+          cachedAt: Date.now()
+        };
+      }
       localStorage.setItem('klinik_data', JSON.stringify(this.state));
     } catch (e) {
       console.error('LocalStorage write error:', e);
     }
 
-    const isTiDBActive = !!(
-      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
-      (window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
-      window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP
-    );
     if (triggerSync && window.firebaseBackend && !isTiDBActive) {
       window.firebaseBackend.pushData(this.state);
     }

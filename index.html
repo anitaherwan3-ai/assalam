@@ -247,7 +247,10 @@
   <script src="js/modules/whatsapp.js"></script>
   <script src="js/store.js"></script>
   <script>
-    if (location.hostname === 'klinikassalaam.vercel.app') {
+    // Firebase dinonaktifkan dari pemuatan default pada domain produksi.
+    // Menghindari ketergantungan ganda dan mengarahkan seluruh jalur data ke TiDB.
+    // Hanya dimuat sementara jika parameter URL ?legacy_firebase=1 diberikan secara eksplisit.
+    if (new URLSearchParams(location.search).get('legacy_firebase') === '1') {
       document.write('<script src="js/firebase-config.js"><\/script>');
       document.write('<script src="js/firebase-backend.js?v=refund4"><\/script>');
     }
