@@ -60,7 +60,7 @@ module.exports = async function handler(req, res) {
           lineType: row.lineType, itemName: row.itemName, unit: row.unit,
           quantity: String(row.quantity), unitPrice: String(row.unitPrice),
           grossAmount: String(row.grossAmount), discount: String(row.discount),
-          netCharge: String(row.netCharge),
+          netCharge: String(row.netCharge), hpp: row.hpp === null ? null : String(row.hpp),
           medicinePublicId: row.medicinePublicId || null,
           tariffPublicId: row.tariffPublicId || null
         });
