@@ -15,6 +15,7 @@ function createHarness(overrides = {}) {
     receipts: [], payableUpserts: [], supplierReturnRequests: [], supplierReturnStatus: null,
     suppliers: [{ supplierId: 1, supplierName: "Kimia Farma" }],
     supplierInvoices: [], supplierInvoiceLines: [],
+    supplierPayments: [], supplierPaymentAllocations: [],
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
   };
   let queue = Promise.resolve();
@@ -34,6 +35,7 @@ function createHarness(overrides = {}) {
       purchaseLine: state.purchaseLine, receipts: state.receipts, payableUpserts: state.payableUpserts,
       supplierReturnRequests: state.supplierReturnRequests, supplierReturnStatus: state.supplierReturnStatus,
       suppliers: state.suppliers, supplierInvoices: state.supplierInvoices, supplierInvoiceLines: state.supplierInvoiceLines,
+      supplierPayments: state.supplierPayments, supplierPaymentAllocations: state.supplierPaymentAllocations,
       currentCall: state.currentCall,
       nextSequence: state.nextSequence, claims: state.claims, completed: state.completed
     });
@@ -126,6 +128,25 @@ function createHarness(overrides = {}) {
       const record = { supplierInvoiceLineId: id, ...data };
       state.supplierInvoiceLines.push(record);
       return id;
+    },
+    async getSupplierPaymentPolicy() { return { approved: true, partialPayments: true }; },
+    async lockSupplierPayable(_c, invoiceId) {
+      const inv = state.supplierInvoices.find(i => String(i.supplierInvoiceId) === String(invoiceId));
+      if (!inv) return null;
+      const totalPaid = state.supplierPaymentAllocations
+        .filter(a => String(a.payableId) === String(invoiceId))
+        .reduce((sum, a) => sum + BigInt(a.amount), 0n);
+      const gross = BigInt(inv.grossAmount || 0);
+      const outstanding = gross > totalPaid ? gross - totalPaid : 0n;
+      return { payableId: String(inv.supplierInvoiceId), supplierId: String(inv.supplierId), grossAmount: gross.toString(), outstandingAmount: outstanding.toString() };
+    },
+    async appendSupplierPayment(_c, data) {
+      const id = "pay-" + (state.supplierPayments.length + 1);
+      state.supplierPayments.push({ paymentId: id, ...data });
+      return id;
+    },
+    async applySupplierPaymentAllocation(_c, data) {
+      state.supplierPaymentAllocations.push({ ...data });
     },
     async previewSupplierReturnSource() {
       return {
@@ -714,4 +735,135 @@ test("failure in supplier invoice line creation rolls back invoice header cleanl
   assert.equal(state.supplierInvoices.length, 0);
   assert.equal(state.supplierInvoiceLines.length, 0);
   assert.equal(state.audits.length, 0);
+});
+
+test("createSupplierInvoice preserves lineTotal from subtotal without rounding loss and returns matching payableId and invoiceId", async () => {
+  const { state, commands } = createHarness();
+  // 3 unit dengan total 100.000 (unitCost dibulatkan 33.333, tetapi subtotal 100.000 tidak boleh turun jadi 99.999)
+  const res = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-ROUNDING",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "100000",
+    lines: [
+      { medicineId: "med-1", orderedQty: "3", unitCost: "33333", subtotal: "100000" }
+    ],
+    idempotencyKey: "key-inv-round",
+    requestId: "req-inv-round"
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.data.grossAmount, "100000");
+  assert.equal(res.body.data.totalAmount, "100000");
+  assert.equal(res.body.data.lines[0].lineTotal, "100000");
+  assert.equal(res.body.data.lines[0].subtotal, "100000");
+  assert.equal(res.body.data.payableId, res.body.data.invoiceId);
+  assert.equal(res.body.data.supplierInvoiceId, res.body.data.invoiceId);
+});
+
+test("recordSupplierPayment accepts structured payment payload and allocates against supplier payable", async () => {
+  const { state, commands } = createHarness();
+  const invoiceRes = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-PAY-1",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "50000",
+    lines: [{ medicineId: "med-1", orderedQty: "5", unitCost: "10000", subtotal: "50000" }],
+    idempotencyKey: "key-inv-pay-1",
+    requestId: "req-inv-pay-1"
+  });
+
+  const payableId = invoiceRes.body.data.payableId;
+  const payRes = await commands.recordSupplierPayment({
+    actor: { userId: "admin-1", role: "admin" },
+    payableId: payableId,
+    payment: {
+      sourceType: "supplier_payable",
+      sourceId: payableId,
+      amount: "50000",
+      paymentMethod: "cash",
+      paymentStatus: "settled",
+      businessDate: "2026-11-25",
+      eventAtUtc: "2026-11-25T09:00:00Z",
+      evidenceFileId: "evidence-kwitansi-001"
+    },
+    idempotencyKey: "key-pay-struc",
+    requestId: "req-pay-struc"
+  });
+
+  assert.equal(payRes.body.ok, true);
+  assert.equal(payRes.body.data.amount, "50000");
+  assert.equal(payRes.body.data.outstandingAfter, "0");
+  assert.equal(state.supplierPayments.length, 1);
+  assert.equal(state.supplierPaymentAllocations.length, 1);
+});
+
+test("recordSupplierPayment normalizes flat payload to payment object", async () => {
+  const { state, commands } = createHarness();
+  const invoiceRes = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-PAY-2",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "30000",
+    lines: [{ medicineId: "med-1", orderedQty: "3", unitCost: "10000", subtotal: "30000" }],
+    idempotencyKey: "key-inv-pay-2",
+    requestId: "req-inv-pay-2"
+  });
+
+  const payableId = invoiceRes.body.data.payableId;
+  // Pengiriman format datar
+  const payRes = await commands.recordSupplierPayment({
+    actor: { userId: "admin-1", role: "admin" },
+    payableId: payableId,
+    amount: "30000",
+    paymentMethod: "bank_transfer",
+    businessDate: "2026-11-25",
+    evidenceFileId: "bukti-transfer-002",
+    idempotencyKey: "key-pay-flat",
+    requestId: "req-pay-flat"
+  });
+
+  assert.equal(payRes.body.ok, true);
+  assert.equal(payRes.body.data.amount, "30000");
+  assert.equal(payRes.body.data.outstandingAfter, "0");
+  assert.equal(state.supplierPayments.length, 1);
+});
+
+test("recordSupplierPayment rejects payment without evidenceFileId", async () => {
+  const { commands } = createHarness();
+  const invoiceRes = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-PAY-NO-EVID",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "20000",
+    lines: [{ medicineId: "med-1", orderedQty: "2", unitCost: "10000", subtotal: "20000" }],
+    idempotencyKey: "key-inv-no-evid",
+    requestId: "req-inv-no-evid"
+  });
+
+  const payableId = invoiceRes.body.data.payableId;
+  await assert.rejects(commands.recordSupplierPayment({
+    actor: { userId: "admin-1", role: "admin" },
+    payment: {
+      sourceType: "supplier_payable",
+      sourceId: payableId,
+      amount: "20000",
+      paymentMethod: "cash",
+      paymentStatus: "settled",
+      businessDate: "2026-11-25",
+      eventAtUtc: "2026-11-25T09:00:00Z"
+      // evidenceFileId sengaja dihilangkan
+    },
+    idempotencyKey: "key-pay-no-evid",
+    requestId: "req-pay-no-evid"
+  }), { code: "SUPPLIER_PAYMENT_EVIDENCE_REQUIRED" });
 });

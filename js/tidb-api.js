@@ -98,7 +98,14 @@
     return payload;
   }
 
-  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(window.location && (String(window.location.hostname || "").includes("assalam-mysql-preview") || String(window.location.hostname || "").includes("klinik-assalaam")));
+  const hostname = String(window.location && window.location.hostname || "").toLowerCase();
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = !!(
+    hostname.includes("assalam-mysql-preview") ||
+    hostname.includes("klinik-assalaam") ||
+    hostname.includes("klinikassalaam") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  );
 
   window.assalamTiDBApi = Object.freeze({
     request,

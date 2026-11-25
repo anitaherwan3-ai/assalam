@@ -3150,7 +3150,8 @@ async function actionAddBeli() {
             medicineId: tidbMedicineId,
             orderedQty: String(purchasePayload.qty),
             unitCost: unitCost,
-            subtotal: String(purchasePayload.total)
+            subtotal: String(purchasePayload.total),
+            lineTotal: String(purchasePayload.total)
           }
         ]
       }, tidbKey);
@@ -3165,6 +3166,7 @@ async function actionAddBeli() {
       await window.assalamTiDBApi.receivePurchase({
         purchaseLineId: purchaseLineId,
         receivedQty: String(purchasePayload.qty),
+        purchaseValue: String(purchasePayload.total),
         receiptReference: purchasePayload.faktur || ("RCV-" + Date.now()),
         batch: {
           batchNo: purchasePayload.batchNo || ("B-" + Date.now()),
@@ -3176,21 +3178,40 @@ async function actionAddBeli() {
         }
       }, receiveKey);
 
-      // 3. Jika lunas, catat pelunasan utang supplier
+      // 3. Jika lunas, catat pelunasan utang supplier secara transparan (jangan tampilkan lunas bila gagal)
       if (purchasePayload.isLunas) {
+        const payableId = String(
+          (invoiceRes.data && (invoiceRes.data.payableId || invoiceRes.data.invoiceId || invoiceRes.data.supplierInvoiceId)) || ""
+        );
+        const evidenceId = "evid-fak-" + (purchasePayload.faktur || Date.now());
         const payKey = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.recordSupplierPayment({
-          payableId: (invoiceRes.data && invoiceRes.data.payableId) || invoiceRes.data.supplierInvoiceId,
-          amount: String(purchasePayload.total),
-          paymentMethod: 'cash',
-          paymentReference: 'LUNAS-' + (purchasePayload.faktur || Date.now())
-        }, payKey).catch(err => {
-          console.warn('[Supplier Payment Notice]:', err.message || err);
-        });
+        try {
+          if (!payableId) throw new Error("ID referensi utang faktur tidak ditemukan dari respon TiDB.");
+          await window.assalamTiDBApi.recordSupplierPayment({
+            payableId: payableId,
+            payment: {
+              sourceType: "supplier_payable",
+              sourceId: payableId,
+              amount: String(purchasePayload.total),
+              paymentMethod: "cash",
+              paymentStatus: "settled",
+              businessDate: todayStr,
+              eventAtUtc: new Date().toISOString(),
+              settlementReference: "LUNAS-" + (purchasePayload.faktur || Date.now()),
+              evidenceFileId: evidenceId
+            }
+          }, payKey);
+          await syncOperationalDataFromTiDB();
+          showAlert('Pembelian obat berhasil dicatat ke TiDB dan faktur telah dilunasi.', 'Sukses');
+        } catch (payErr) {
+          await syncOperationalDataFromTiDB();
+          showAlert('Penerimaan obat berhasil dicatat ke TiDB, tetapi pelunasan pembayaran GAGAL: ' + (payErr.message || 'Kebijakan pembayaran supplier tertunda') + '. Faktur tetap tercatat sebagai UTANG (belum lunas).', 'Perhatian');
+        }
+      } else {
+        await syncOperationalDataFromTiDB();
+        showAlert('Pembelian obat berhasil dicatat ke TiDB sebagai UTANG TEMPO.', 'Sukses');
       }
 
-      await syncOperationalDataFromTiDB();
-      showAlert('Pembelian obat berhasil dicatat ke TiDB dan HPP telah diperbarui secara otomatis.', 'Sukses');
       $('beli-sup').value = '';
       $('beli-fak').value = '';
       $('beli-total').value = '';

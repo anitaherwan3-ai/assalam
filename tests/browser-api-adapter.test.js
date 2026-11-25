@@ -48,9 +48,13 @@ test("browser TiDB adapter uses Better Auth cookies and only its exact API paths
   );
 });
 
-test("browser TiDB adapter does not enable preview catalog on the production host", () => {
-  const window = { crypto: { randomUUID: () => "id" }, location: { hostname: "klinikassalaam.vercel.app" } };
+test("browser TiDB adapter enables TiDB catalog on production and preview hosts", () => {
+  const windowProd = { crypto: { randomUUID: () => "id" }, location: { hostname: "klinikassalaam.vercel.app" } };
   const source = fs.readFileSync(require.resolve("../js/tidb-api.js"), "utf8");
-  vm.runInNewContext(source, { window, fetch: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
-  assert.equal(window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP, false);
+  vm.runInNewContext(source, { window: windowProd, fetch: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
+  assert.equal(windowProd.ASSALAM_TIDB_PREVIEW_BOOTSTRAP, true);
+
+  const windowExternal = { crypto: { randomUUID: () => "id" }, location: { hostname: "unauthorized-domain.com" } };
+  vm.runInNewContext(source, { window: windowExternal, fetch: async () => ({ ok: true, status: 200, json: async () => ({}) }) });
+  assert.equal(windowExternal.ASSALAM_TIDB_PREVIEW_BOOTSTRAP, false);
 });
