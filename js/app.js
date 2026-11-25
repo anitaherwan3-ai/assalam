@@ -1464,7 +1464,7 @@ function actionBatalBerobat(id) {
   showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', async () => {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
-        await window.assalamTiDBApi.cancelEncounter({ encounterId: String(p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+        await window.assalamTiDBApi.cancelEncounter({ encounterId: String(p.encounterId || p.id) }, window.assalamTiDBApi.newIdempotencyKey());
       } catch (error) {
         showAlert(error.message || 'Pembatalan belum tersimpan di server TiDB.', 'Gagal Membatalkan');
         return;
@@ -1491,7 +1491,7 @@ function actionPulihkanBatalBerobat(id) {
   showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', async () => {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
-        await window.assalamTiDBApi.restoreEncounter({ encounterId: String(p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+        await window.assalamTiDBApi.restoreEncounter({ encounterId: String(p.encounterId || p.id) }, window.assalamTiDBApi.newIdempotencyKey());
       } catch (error) {
         showAlert(error.message || 'Pemulihan belum tersimpan di server TiDB.', 'Gagal Memulihkan');
         return;
