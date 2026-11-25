@@ -976,7 +976,8 @@ function actionTutupShift() {
 
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        const targetShiftId = shift.shiftId || shift.id || String(shift.publicId || "1");
+        if (!shift.shiftId) throw new Error('ID internal shift TiDB tidak tersedia. Muat ulang data shift sebelum menutup shift.');
+        const targetShiftId = String(shift.shiftId);
         await window.assalamTiDBApi.closeShift({
           shiftId: targetShiftId,
           countedCash: String(fisik),
@@ -1392,9 +1393,11 @@ async function actionAddPasien() {
         if (!shift || (!shift.id && !shift.publicId && !shift.shiftId)) {
           throw new Error('Shift kasir belum aktif. Silakan buka shift resmi terlebih dahulu sebelum mendaftarkan antrean.');
         }
-        const shiftId = String(shift.shiftId || shift.id || shift.publicId);
+        if (!shift.shiftId) throw new Error('ID internal shift TiDB tidak tersedia. Muat ulang sesi shift sebelum mendaftarkan antrean.');
+        const shiftId = String(shift.shiftId);
+        const assignedLane = String(shift.laneCode || '').toUpperCase();
+        if (!['A', 'B'].includes(assignedLane)) throw new Error('Jalur antrean belum ditetapkan oleh Pimpinan untuk shift ini.');
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        const assignedLane = (shift && shift.laneCode) || (currentUser && currentUser.u && String(currentUser.u).includes('2') ? 'B' : 'A');
         const res = await window.assalamTiDBApi.registerEncounter({
           patient: { fullName: patient.nama, phone: patient.hp, nik: null },
           serviceCode: patient.layanan || "UMUM",
@@ -2240,7 +2243,11 @@ async function actionBayarTrx(totalCart) {
           showAlert('Transaksi ditolak: ID kunjungan antrean pasien tidak ditemukan.', 'Encounter Diperlukan');
           return;
         }
-        const shiftId = String(shift.publicId || shift.id || shift.shiftId);
+        if (!shift.shiftId) {
+          showAlert('ID internal shift TiDB tidak tersedia. Muat ulang data shift sebelum memproses transaksi.', 'Shift Tidak Valid');
+          return;
+        }
+        const shiftId = String(shift.shiftId);
         const encounterId = String(pasien.encounterId || pasien.id);
 
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
@@ -4040,8 +4047,9 @@ async function actionVerifShift(id) {
     if (!s) return;
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+      if (!s.shiftId) throw new Error('ID internal shift TiDB tidak tersedia. Muat ulang data shift sebelum verifikasi.');
       const res = await window.assalamTiDBApi.verifyShift({
-        shiftId: s.id || String(id),
+        shiftId: String(s.shiftId),
         reason: "Verifikasi Admin shift"
       }, tidbKey);
       const data = (res && res.data) || res || {};
