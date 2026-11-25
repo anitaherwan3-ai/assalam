@@ -51,6 +51,8 @@ module.exports = async function handler(req, res) {
 
     let result;
     if (body.action === "register") result = await commands.registerEncounter(value);
+    else if (body.action === "cancel_encounter") result = await commands.cancelEncounter(value);
+    else if (body.action === "restore_encounter") result = await commands.restoreEncounter(value);
     else if (body.action === "call") result = await commands.appendQueueCallEvent(value);
     else if (body.action === "transfer") result = await commands.transferQueue(value);
     else if (body.action === "assign_lane") result = await commands.assignQueueLane(value);
