@@ -40,7 +40,7 @@ Workflow `.github/workflows/tidb-foundation-tests.yml` diperluas agar branch ker
 - Ketiganya berhasil diparse tanpa syntax error.
 
 ## Belum diverifikasi
-- `npm test` / `npm run build` belum berhasil dijalankan di runner; GitHub Actions belum membuat run pada branch ini.
+- `npm run build` berhasil pada commit `eb79844548d5619df7926607eb92ceaf94cc51d1` dengan 226/226 tes lulus. Run terbaru untuk HEAD sesudah penyesuaian file tes masih perlu dikonfirmasi.
 - Tidak ada koneksi ke TiDB atau query live yang dilakukan.
 - Tidak ada migrasi/DDL atau perubahan data database.
 - Query read model belum diuji terhadap instance TiDB aktual.
@@ -62,4 +62,4 @@ Workflow `.github/workflows/tidb-foundation-tests.yml` diperluas agar branch ker
 - Jangan mengubah aturan HPP/biaya tambahan (ongkir, diskon, pajak) tanpa keputusan pemilik.
 
 ## Status
-**Tahap 2 sedang berjalan, belum selesai.** Perubahan yang ada hanya pada branch kerja; tidak ada perubahan main/produksi, Firebase, atau database live.
+**Tahap 2 sedang berjalan, belum selesai.** CI 226/226 lulus pada commit yang memuat perubahan backend dan test regresi. HEAD terakhir menunggu konfirmasi run ulang. Perubahan hanya pada branch kerja; tidak ada perubahan main/produksi, Firebase, atau database live.
