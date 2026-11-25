@@ -55,7 +55,7 @@ let dateFilter = {
 const ROLE_TABS = {
   kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil', 'Pengawasan Retur'],
   admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor', 'Pengawasan Retur'],
-  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Stok Opname', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Kedaluwarsa', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Stok Opname', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
@@ -226,7 +226,7 @@ async function syncOperationalDataFromTiDB() {
     if (window.assalamTiDBCatalog) {
       await window.assalamTiDBCatalog.ensureLoaded().catch(() => null);
     }
-    const [medRes, queueRes, salesRes, financeRes, invoicesRes, batchRes, supReturnRes, stocktakeRes] = await Promise.all([
+    const [medRes, queueRes, salesRes, financeRes, invoicesRes, batchRes, supReturnRes, stocktakeRes, quarantineRes] = await Promise.all([
       window.assalamTiDBApi.listMedicines().catch(() => null),
       window.assalamTiDBApi.listQueueTickets().catch(() => null),
       window.assalamTiDBApi.listSales().catch(() => null),
@@ -234,7 +234,8 @@ async function syncOperationalDataFromTiDB() {
       window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null,
       window.assalamTiDBApi.listBatches ? window.assalamTiDBApi.listBatches().catch(() => null) : null,
       window.assalamTiDBApi.listSupplierReturns ? window.assalamTiDBApi.listSupplierReturns().catch(() => null) : null,
-      window.assalamTiDBApi.listStocktakes ? window.assalamTiDBApi.listStocktakes().catch(() => null) : null
+      window.assalamTiDBApi.listStocktakes ? window.assalamTiDBApi.listStocktakes().catch(() => null) : null,
+      window.assalamTiDBApi.listQuarantine ? window.assalamTiDBApi.listQuarantine().catch(() => null) : null
     ]);
 
     if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
@@ -453,6 +454,20 @@ async function syncOperationalDataFromTiDB() {
         batchId: String(sr.batchId || ''), status: sr.status || 'requested',
         settlementStatus: sr.settlementStatus || 'pending', dispatchReference: sr.dispatchReference || '',
         purchaseLineId: sr.purchaseLineId ? String(sr.purchaseLineId) : '', _t: Date.now()
+      }));
+    }
+    if (quarantineRes && quarantineRes.ok && Array.isArray(quarantineRes.data)) {
+      store.state.quarantine = quarantineRes.data.map(q => ({
+        batchId: String(q.batchId), medicineName: q.medicineName || '',
+        batchNo: q.batchNo || '', expiryDate: q.expiryDate || '',
+        quantity: Number(q.quantity || 0), expiryVerified: !!q.expiryVerified,
+        originVerified: !!q.originVerified, eventId: q.eventId ? String(q.eventId) : '',
+        inspectionDecision: q.inspectionDecision || '',
+        reason: q.reason || '', inspectedByUserId: q.inspectedByUserId || '',
+        inspectedAt: q.inspectedAt || '', evidenceReference: q.evidenceReference || '',
+        releaseApprovedByUserId: q.releaseApprovedByUserId || '',
+        dispositionApprovedByUserId: q.dispositionApprovedByUserId || '',
+        workflowStatus: q.workflowStatus || 'needs_inspection', _t: Date.now()
       }));
     }
     if (stocktakeRes && stocktakeRes.ok && Array.isArray(stocktakeRes.data)) {
@@ -3503,35 +3518,128 @@ function viewKedaluwarsa() {
     const obat = store.getObat(b.oid);
     const diffDays = Math.round((new Date(b.ed) - new Date(todayStr)) / 864e5);
     let badge = '<span class="badge-ok">Aman</span>';
-    if (diffDays < 0) {
-      badge = '<span class="badge-bad">KEDALUWARSA</span>';
-    } else if (diffDays <= edLimitDays) {
-      badge = `<span class="badge-warn">${diffDays} hari lagi</span>`;
+    if (diffDays < 0) badge = '<span class="badge-bad">KEDALUWARSA</span>';
+    else if (diffDays <= edLimitDays) badge = `<span class="badge-warn">${diffDays} hari lagi</span>`;
+    const quarantine = (store.state.quarantine || []).find(q => String(q.batchId) === String(b.id));
+    const statusLabels = {
+      needs_inspection: 'Menunggu pemeriksaan Admin',
+      on_hold: 'Ditahan / perlu tindak lanjut',
+      release_pending_approval: 'Menunggu persetujuan Pimpinan untuk dilepas',
+      release_approved_waiting_admin: 'Disetujui, menunggu pelepasan Admin',
+      disposition_pending_approval: 'Menunggu persetujuan pemusnahan',
+      disposition_approved_waiting_admin: 'Disetujui, menunggu pemusnahan Admin'
+    };
+    let actions = '-';
+    if (isTiDBCatalogPreview() && b.disposition === 'quarantined' && quarantine) {
+      if (currentRole === 'admin') {
+        if (quarantine.workflowStatus === 'release_approved_waiting_admin') {
+          actions = `<button class="s btn-primary" onclick="actionCompleteQuarantine('${b.id}','release')">Lepaskan ke stok</button>`;
+        } else if (quarantine.workflowStatus === 'disposition_approved_waiting_admin') {
+          actions = `<button class="s btn-danger" onclick="actionCompleteQuarantine('${b.id}','dispose')">Selesaikan pemusnahan</button>`;
+        } else if (['needs_inspection','on_hold'].includes(quarantine.workflowStatus)) {
+          actions = `
+            <button class="s" onclick="actionInspectQuarantine('${b.id}','release')">Rekomendasikan lepas</button>
+            <button class="s" onclick="actionInspectQuarantine('${b.id}','hold')">Tahan</button>
+            <button class="s btn-danger" onclick="actionInspectQuarantine('${b.id}','dispose')">Usulkan musnah</button>`;
+        }
+      } else if (currentRole === 'pimpinan') {
+        if (quarantine.workflowStatus === 'release_pending_approval') {
+          actions = `<button class="s btn-primary" onclick="actionApproveQuarantine('${b.id}','release')">Setujui pelepasan</button>`;
+        } else if (quarantine.workflowStatus === 'disposition_pending_approval') {
+          actions = `<button class="s btn-danger" onclick="actionApproveQuarantine('${b.id}','dispose')">Setujui pemusnahan</button>`;
+        }
+      }
     }
-
     return [
-      esc(obat ? obat.nama : '-'),
-      esc(b.no || '-'),
-      esc(b.ed),
-      b.sisa,
+      esc(obat ? obat.nama : '-'), esc(b.no || '-'), esc(b.ed), b.sisa,
       b.disposition === 'quarantined' ? '<span class="badge-warn">Karantina</span>' :
-        (b.disposition === 'disposed' ? '<span class="badge-bad">Dibuang</span>' : '<span class="badge-ok">Layak Jual</span>'),
-      badge
+        (b.disposition === 'disposed' || b.disposition === 'expired' || b.disposition === 'rejected' ? '<span class="badge-bad">Tidak layak jual</span>' : '<span class="badge-ok">Layak Jual</span>'),
+      badge,
+      b.disposition === 'quarantined' ? (quarantine
+        ? `<span>${esc(statusLabels[quarantine.workflowStatus] || 'Status karantina belum tersinkron')}</span><br><small>${esc(quarantine.reason || '')}</small>${quarantine.evidenceReference ? `<br><small>Ref. bukti: ${esc(quarantine.evidenceReference)}</small>` : ''}`
+        : 'Status karantina belum tersinkron') : '-',
+      actions
     ];
   });
 
   return `
     <div class="card">
-      <h2>Pengawasan Batch Obat & Tanggal Kedaluwarsa (FEFO)</h2>
+      <h2>Pengawasan Batch, Kedaluwarsa & Karantina</h2>
       <p style="color:var(--mu);font-size:13px;">
-        Sistem otomatis memprioritaskan penjualan obat dari batch dengan tanggal kedaluwarsa terdekat (<b>First Expired First Out</b>). Peringatan aktif ${edLimitDays} hari sebelum ED.
+        Batch karantina tidak dapat dijual. Admin memeriksa dan mengusulkan keputusan; Pimpinan menyetujui; Admin mencatat pelaksanaan pelepasan atau pemusnahan. Semua tahap dicatat di TiDB.
       </p>
       <div style="margin-bottom:14px;">
-        ${isTiDBCatalogPreview() ? '<span style="color:var(--mu);font-size:12px;">Pembuangan batch dilakukan melalui workflow inventory TiDB, bukan perubahan lokal.</span>' : '<button class="p btn-danger" onclick="actionBuangAllExpired()">🗑️ Buang Semua Batch yang Kedaluwarsa</button>'}
+        ${isTiDBCatalogPreview() ? '<span style="color:var(--mu);font-size:12px;">Mutasi batch hanya dilakukan melalui workflow TiDB yang memerlukan pemeriksaan dan persetujuan.</span>' : '<button class="p btn-danger" onclick="actionBuangAllExpired()">🗑️ Buang Semua Batch yang Kedaluwarsa</button>'}
       </div>
-      ${renderTable(['Nama Obat', 'Nomor Batch', 'Tanggal ED', 'Sisa Stok Fisik', 'Disposisi', 'Status ED'], rows, { key: 'batch_ed' })}
+      ${renderTable(['Nama Obat', 'Nomor Batch', 'Tanggal ED', 'Sisa Fisik', 'Disposisi', 'Status ED', 'Status Proses Karantina', 'Tindakan'], rows, { key: 'batch_ed' })}
     </div>
   `;
+}
+
+async function actionInspectQuarantine(batchId, decision) {
+  if (currentRole !== 'admin' || !isTiDBCatalogPreview() || !window.assalamTiDBApi) {
+    showAlert('Pemeriksaan karantina hanya dapat dilakukan Admin melalui TiDB.'); return;
+  }
+  const titles = { release: 'Rekomendasi Pelepasan Karantina', hold: 'Tahan Batch Karantina', dispose: 'Usulan Pemusnahan Batch' };
+  showFormModal(titles[decision] || 'Pemeriksaan Karantina', [
+    ['reason', 'Catatan pemeriksaan fisik *', 'text', 'Hasil pemeriksaan fisik batch'],
+    ['evidenceFileId', 'Nomor referensi bukti fisik (wajib untuk pemusnahan; bukan upload lampiran)', 'text', '']
+  ], async result => {
+    const reason = String(result.reason || '').trim();
+    const evidenceFileId = String(result.evidenceFileId || '').trim();
+    if (!reason) { showAlert('Catatan pemeriksaan wajib diisi.'); return; }
+    if (decision === 'dispose' && !evidenceFileId) { showAlert('Nomor referensi bukti kondisi wajib diisi.'); return; }
+    try {
+      await window.assalamTiDBApi.inspectQuarantine({
+        batchId: String(batchId), decision, reason, evidenceFileId: evidenceFileId || null
+      }, window.assalamTiDBApi.newIdempotencyKey());
+      await syncOperationalDataFromTiDB();
+      showAlert('Hasil pemeriksaan tersimpan di TiDB dan menunggu proses berikutnya.', 'Pemeriksaan Tersimpan');
+    } catch (err) { showAlert(err.message || 'Pemeriksaan gagal. Status stok tidak berubah.', 'Gagal'); }
+    renderApp();
+  });
+}
+
+async function actionApproveQuarantine(batchId, decision) {
+  if (currentRole !== 'pimpinan' || !isTiDBCatalogPreview() || !window.assalamTiDBApi) {
+    showAlert('Hanya Pimpinan yang dapat menyetujui keputusan karantina.'); return;
+  }
+  const release = decision === 'release';
+  showFormModal(release ? 'Persetujuan Pelepasan Batch' : 'Persetujuan Pemusnahan Batch', [
+    ['reason', 'Catatan persetujuan Pimpinan *', 'text', release ? 'Asal dan kedaluwarsa telah diverifikasi' : 'Pemusnahan disetujui berdasarkan hasil pemeriksaan']
+  ], async result => {
+    const reason = String(result.reason || '').trim();
+    if (!reason) { showAlert('Catatan persetujuan wajib diisi.'); return; }
+    try {
+      const payload = { batchId: String(batchId), reason };
+      const action = release ? window.assalamTiDBApi.approveQuarantineRelease : window.assalamTiDBApi.approveQuarantineDisposition;
+      await action(payload, window.assalamTiDBApi.newIdempotencyKey());
+      await syncOperationalDataFromTiDB();
+      showAlert(release ? 'Pelepasan disetujui. Admin dapat mencatat pelaksanaan setelah persetujuan.' : 'Pemusnahan disetujui. Admin dapat mencatat pelaksanaan setelah persetujuan.', 'Persetujuan Tersimpan');
+    } catch (err) { showAlert(err.message || 'Persetujuan gagal. Status stok tidak berubah.', 'Gagal'); }
+    renderApp();
+  });
+}
+
+async function actionCompleteQuarantine(batchId, decision) {
+  if (currentRole !== 'admin' || !isTiDBCatalogPreview() || !window.assalamTiDBApi) {
+    showAlert('Pelaksanaan keputusan karantina hanya dapat dilakukan Admin melalui TiDB.'); return;
+  }
+  const release = decision === 'release';
+  showFormModal(release ? 'Pelaksanaan Pelepasan Batch' : 'Pelaksanaan Pemusnahan Batch', [
+    ['reason', 'Catatan pelaksanaan *', 'text', release ? 'Pelepasan setelah persetujuan Pimpinan' : 'Pemusnahan setelah persetujuan Pimpinan']
+  ], async result => {
+    const reason = String(result.reason || '').trim();
+    if (!reason) { showAlert('Catatan pelaksanaan wajib diisi.'); return; }
+    try {
+      const payload = { batchId: String(batchId), reason };
+      const action = release ? window.assalamTiDBApi.releaseQuarantine : window.assalamTiDBApi.disposeQuarantine;
+      await action(payload, window.assalamTiDBApi.newIdempotencyKey());
+      await syncOperationalDataFromTiDB();
+      showAlert(release ? 'Batch berhasil dilepas ke stok layak jual.' : 'Pemusnahan batch berhasil dicatat sebagai kerugian.', 'Proses Selesai');
+    } catch (err) { showAlert(err.message || 'Pelaksanaan gagal. Status stok tidak berubah.', 'Gagal'); }
+    renderApp();
+  });
 }
 
 function actionBuangAllExpired() {

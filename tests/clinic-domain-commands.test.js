@@ -221,6 +221,61 @@ function createHarness(overrides = {}) {
   return { state, repo, commands: createClinicDomainCommands(deps) };
 }
 
+test("quarantine approval enforces Admin and Pimpinan dual control", async () => {
+  let approvedEventId = null;
+  const { commands } = createHarness({
+    async lockLatestQuarantineInspection() {
+      return { eventId: "event-1", inspectionDecision: "release", inspectedByUserId: "admin-1" };
+    },
+    async approveQuarantineRelease(_connection, input) { approvedEventId = input.eventId; }
+  });
+  await assert.rejects(commands.approveQuarantineRelease({
+    actor: { userId: "admin-1", role: "pimpinan" }, batchId: "batch-1",
+    reason: "Sudah diperiksa", idempotencyKey: "quarantine-approve-same", requestId: "quarantine-approve-same"
+  }), { code: "QUARANTINE_DUAL_CONTROL_REQUIRED" });
+  const result = await commands.approveQuarantineRelease({
+    actor: { userId: "lead-1", role: "pimpinan" }, batchId: "batch-1",
+    reason: "Sudah diperiksa", idempotencyKey: "quarantine-approve-other", requestId: "quarantine-approve-other"
+  });
+  assert.equal(result.body.data.status, "release_approved_waiting_admin");
+  assert.equal(approvedEventId, "event-1");
+});
+
+test("quarantine release execution records a reason after Pimpinan approval", async () => {
+  let released = false, savedReason = "";
+  const { commands } = createHarness({
+    async lockLatestQuarantineInspection() {
+      return {
+        eventId: "event-1", inspectionDecision: "release",
+        inspectedByUserId: "admin-1", releaseApprovedByUserId: "lead-1"
+      };
+    },
+    async releaseQuarantineBatch(_connection, input) {
+      released = true; savedReason = input.reason;
+      return { sellableQuantity: "5" };
+    }
+  });
+  await assert.rejects(commands.releaseQuarantineBatch({
+    actor: { userId: "admin-1", role: "admin" }, batchId: "batch-1",
+    idempotencyKey: "quarantine-release-no-reason", requestId: "quarantine-release-no-reason"
+  }), { code: "QUARANTINE_RELEASE_COMPLETION_REASON_REQUIRED" });
+  const result = await commands.releaseQuarantineBatch({
+    actor: { userId: "admin-1", role: "admin" }, batchId: "batch-1",
+    reason: "Dilepas setelah approval Pimpinan", idempotencyKey: "quarantine-release-approved", requestId: "quarantine-release-approved"
+  });
+  assert.equal(result.body.data.status, "sellable");
+  assert.equal(savedReason, "Dilepas setelah approval Pimpinan");
+  assert.equal(released, true);
+});
+
+test("quarantine disposal cannot be proposed without a physical evidence reference", async () => {
+  const { commands } = createHarness();
+  await assert.rejects(commands.inspectQuarantineBatch({
+    actor: { userId: "admin-1", role: "admin" }, batchId: "batch-1",
+    decision: "dispose", reason: "Rusak", idempotencyKey: "quarantine-dispose-no-proof", requestId: "quarantine-dispose-no-proof"
+  }), { code: "QUARANTINE_DISPOSAL_EVIDENCE_REQUIRED" });
+});
+
 const cashier = { userId: "cashier-1", role: "kasir" };
 const lead = { userId: "lead-1", role: "pimpinan" };
 
