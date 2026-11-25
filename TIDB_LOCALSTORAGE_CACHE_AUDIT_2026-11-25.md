@@ -64,7 +64,25 @@ Cache-only persistence prevents operational data from being stored in browser lo
 7. Run the non-deploying CI test workflow and review results; do not trigger Vercel deployments for routine audit changes.
 8. Only after all gates pass, prepare a separate production cutover review. Production activation/merge/deploy requires explicit confirmation.
 
+## Follow-up implementation on the same working branch
+After the initial audit, the branch received these additional source changes:
+- `api/sales.js` GET now returns persisted invoice lines (including item snapshots, medicine/tariff public IDs and sale-time HPP) and invoice payment rows (method, amount, review status, settlement status and income-recognition timestamp) for the latest 200 invoices.
+- `js/app.js` now hydrates sales history from those server fields rather than fabricating empty item lists and defaulting every invoice to cash. Unrecognized non-cash income is excluded from active financial totals until the full invoice amount is recognized. This is conservative for partial approvals and still needs a precise partial-recognition accounting treatment before launch.
+- `js/app.js` no longer performs local batch deduction or local stock rollback in TiDB Preview checkout mode. The server checkout transaction is the sole stock authority; local batch prevalidation is bypassed in TiDB mode because batches are not yet hydrated into the browser. After checkout, the app refreshes server-owned operational state.
+- `js/store.js` now routes the patient-call action through `POST /api/queue` in TiDB Preview, and only changes local call state/broadcasts after the server confirms the call event.
+- Receipt lookup retains the internal TiDB invoice ID, and item display uses net line price from the server read model.
+
+## Remaining high-priority blockers after this pass
+- No batch-list/read endpoint is wired to the browser; the UI currently relies on server-side FEFO checkout rather than a local batch cache. Stock cards/lot detail and expiry workflows still need a full TiDB read model.
+- Sales returns and their line-level details are not yet fully hydrated into the UI; return approval/refund paths need a read-after-write reconciliation.
+- Patient master maintenance (edit/archive/restore/cancel-berobat), petty cash, medicine edit/deactivate, package CRUD, purchase-order creation, loss/expired disposal, and expense edit/delete still have browser-only mutation paths or no corresponding TiDB command.
+- Purchase/supplier invoice read models and payment allocations remain incomplete for the UI.
+- Cancellation request/decision code still performs direct SQL updates in `api/sales.js` outside the domain-command transaction/audit pattern and needs to be moved into an audited idempotent command.
+- The TiDB queue-call route is now called by the app, but transfer/handoff UI wiring still needs verification and the queue read model needs stronger patient/encounter fields.
+- The audit log displayed by the app is not yet a complete server-backed audit event read model.
+- Partial payment recognition must be represented as recognized amount, not as a binary fully-recognized invoice, before finance reporting is production-safe.
+
 ## Verification status
-- Source inspection only. No automated tests were run in this audit.
+- Source inspection only. Automated tests and JavaScript syntax checks have not been run in this environment.
 - No live TiDB data was changed or queried.
 - No PR was opened; no merge or deployment was performed.
