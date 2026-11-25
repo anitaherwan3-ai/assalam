@@ -174,6 +174,52 @@ function calculateFinancials() {
       refundPaidCash - pc
   };
 }
+function applyTiDBQueueSnapshot(queueRows) {
+  if (!Array.isArray(queueRows)) return;
+  const rows = queueRows.map(row => {
+    const registeredAt = row.registeredAtUtc ? new Date(row.registeredAtUtc).getTime() : Date.now();
+    const encounterStatus = String(row.encounterStatus || '');
+    const ticketStatus = String(row.status || '');
+    const cancelled = encounterStatus === 'cancelled' || ticketStatus === 'cancelled';
+    const completed = encounterStatus === 'completed' || ticketStatus === 'completed' || ticketStatus === 'done';
+    return {
+      id: String(row.encounterId),
+      encounterId: String(row.encounterId),
+      ticketId: String(row.ticketId),
+      patientId: String(row.patientId || ''),
+      no: String(row.queueNumber || ''),
+      tgl: String(row.businessDate || todayStr).slice(0, 10),
+      jam: Number.isFinite(registeredAt) ? new Date(registeredAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+      nama: String(row.patientName || ''),
+      hp: String(row.phone || ''),
+      layanan: String(row.serviceName || 'Poli Umum'),
+      kasir: String(row.cashierName || row.cashierUserId || ''),
+      cashierUserId: String(row.cashierUserId || ''),
+      sh: String(row.shiftId || ''),
+      shiftId: String(row.shiftId || ''),
+      laneCode: String(row.laneCode || ''),
+      status: cancelled ? 'batal_berobat' : (completed ? 'selesai' : 'aktif'),
+      done: completed,
+      calling: !cancelled && ticketStatus === 'called',
+      batalBerobatPada: null,
+      source: 'tidb',
+      registeredAt: Number.isFinite(registeredAt) ? registeredAt : Date.now(),
+      _t: Date.now()
+    };
+  });
+  const visibleIds = new Set(rows.map(row => row.id));
+  store.state.pasien = (store.state.pasien || []).filter(patient =>
+    patient.source !== 'tidb' || visibleIds.has(String(patient.id))
+  );
+  rows.forEach(row => {
+    const index = store.state.pasien.findIndex(patient =>
+      String(patient.id) === row.id || (patient.ticketId && String(patient.ticketId) === row.ticketId)
+    );
+    if (index >= 0) store.state.pasien[index] = { ...store.state.pasien[index], ...row };
+    else store.state.pasien.push(row);
+  });
+}
+
 async function syncOperationalDataFromTiDB() {
   if (!isTiDBCatalogPreview() || !window.assalamTiDBApi) return;
   try {
@@ -187,6 +233,10 @@ async function syncOperationalDataFromTiDB() {
       window.assalamTiDBApi.listFinance().catch(() => null),
       window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null
     ]);
+
+    if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
+      applyTiDBQueueSnapshot(queueRes.data);
+    }
 
     if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
       medRes.data.forEach(m => {
@@ -1294,6 +1344,8 @@ async function actionAddPasien() {
             number: parseInt(qNum.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1)
           };
           patient.ticketId = allocation.ticketId;
+          patient.encounterId = allocation.id;
+          patient.source = 'tidb';
           patient.laneCode = assignedLane;
         } else {
           throw new Error("Nomor antrean tidak ditemukan pada respons server TiDB.");
