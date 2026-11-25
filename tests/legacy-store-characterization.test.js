@@ -348,6 +348,8 @@ test("legacy queue call clears same-day local active calls before marking the se
     { id: "p-selected", tgl: today, no: "A-004", calling: false, done: false, status: "aktif" }
   ];
 
+  // This characterization covers the legacy synchronous path, not TiDB preview.
+  window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = false;
   assert.equal(store.callPatient("p-selected"), true);
   assert.equal(store.get("pasien", "p-old-a").calling, false);
   assert.equal(store.get("pasien", "p-old-b").calling, false);
