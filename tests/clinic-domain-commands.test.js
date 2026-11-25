@@ -396,7 +396,7 @@ test("supplier payment and refund payout fail closed until their owner policies 
   });
   const payment = {
     sourceType: "supplier_payable", sourceId: "payable-1", amount: "10000",
-    paymentMethod: "transfer", paymentStatus: "settled",
+    paymentMethod: "bank_transfer", paymentStatus: "settled",
     businessDate: "2026-11-17", eventAtUtc: "2026-11-17T00:00:00Z",
     settlementReference: "BANK-REF-1"
   };
@@ -790,7 +790,8 @@ test("recordSupplierPayment accepts structured payment payload and allocates aga
       paymentStatus: "settled",
       businessDate: "2026-11-25",
       eventAtUtc: "2026-11-25T09:00:00Z",
-      evidenceFileId: "evidence-kwitansi-001"
+      settlementReference: "KW-FISIK-001",
+      evidenceFileId: "KW-FISIK-001"
     },
     idempotencyKey: "key-pay-struc",
     requestId: "req-pay-struc"
@@ -824,7 +825,10 @@ test("recordSupplierPayment normalizes flat payload to payment object", async ()
     payableId: payableId,
     amount: "30000",
     paymentMethod: "bank_transfer",
+    paymentStatus: "settled",
     businessDate: "2026-11-25",
+    eventAtUtc: "2026-11-25T09:30:00Z",
+    settlementReference: "bukti-transfer-002",
     evidenceFileId: "bukti-transfer-002",
     idempotencyKey: "key-pay-flat",
     requestId: "req-pay-flat"
