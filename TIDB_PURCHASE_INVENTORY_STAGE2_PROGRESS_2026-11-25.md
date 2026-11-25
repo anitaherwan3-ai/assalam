@@ -63,3 +63,37 @@ Workflow `.github/workflows/tidb-foundation-tests.yml` diperluas agar branch ker
 
 ## Status
 **Tahap 2 sedang berjalan, belum selesai.** CI 226/226 lulus pada commit yang memuat perubahan backend dan test regresi. HEAD terakhir menunggu konfirmasi run ulang. Perubahan hanya pada branch kerja; tidak ada perubahan main/produksi, Firebase, atau database live.
+
+
+## Audit lanjutan 25-11-2026 — jalur UI Simpan Pembelian
+
+Pemeriksaan ulang langsung pada `js/app.js`, `js/tidb-api.js`, `api/inventory.js`, `lib/clinic-domain-commands.js`, dan repository menemukan bahwa jalur pembelian dari form belum dapat berhasil secara konsisten:
+
+1. Form `actionAddBeli()` mengirim `supplierName`, `invoiceNumber`, `medicineId`, `quantity`, `totalBilled`, `batchNumber`, dan `expiryDate` ke `receivePurchase()`.
+2. Adapter meneruskan body tersebut sebagai action `receive_purchase`.
+3. API meneruskan action ke `commands.receivePurchase()`, yang justru mewajibkan `purchaseLineId` dan `receivedQty`; command lalu mencari baris faktur yang sudah ada.
+4. Tidak ditemukan action/command untuk membuat `supplier_invoices` dan `supplier_invoice_lines` pada endpoint inventory.
+5. Sesudah panggilan TiDB, UI tetap memanggil `store.recordPurchase(purchasePayload)`. Jadi jika panggilan TiDB suatu saat lolos, UI masih menulis transaksi pembelian ke state lokal; ini bertentangan dengan aturan cache-only.
+
+**Kesimpulan:** tombol Simpan Pembelian belum merupakan transaksi TiDB end-to-end. Temuan ini adalah blocker nyata, bukan sekadar kekurangan tampilan.
+
+### Kontrak perbaikan yang aman
+
+- Tambahkan alur pembuatan faktur terlebih dahulu: resolve supplier dan obat ke ID internal di server, validasi nomor faktur unik per supplier, tanggal, kuantitas, harga, dan total; buat header serta baris faktur dengan audit dan idempotency dalam transaksi.
+- Setelah faktur tersimpan, penerimaan harus memakai ID baris faktur yang dikembalikan server. Jangan mengirim nama supplier atau ID lokal browser sebagai FK.
+- Sampai ada command transaksi gabungan, kegagalan penerimaan setelah faktur tercatat harus ditampilkan sebagai faktur belum diterima dan dapat dipulihkan; jangan menulis transaksi lokal sebagai pengganti.
+- Pada mode TiDB, jangan panggil `store.recordPurchase()`. Setelah sukses, refresh read model dari API TiDB dan render data server.
+- Pertahankan kebijakan penerimaan `single_receipt` yang saat ini aktif. Jangan mengaktifkan penerimaan bertahap tanpa keputusan pemilik.
+- Form saat ini hanya mengirim satu obat per penyimpanan. Dukungan banyak baris dalam satu faktur belum boleh diasumsikan.
+- Jangan mengarang harga satuan ketika total tidak habis dibagi kuantitas. Validasi total dan unit cost harus memakai aturan integer yang eksplisit.
+- Jangan otomatis membuat supplier dari teks bebas; gunakan master supplier aktif atau arahkan Admin membuat supplier melalui master supplier.
+
+### Tes wajib sebelum UI diaktifkan
+
+- Supplier/obat public ID dipetakan server-side ke internal FK yang valid.
+- Nomor faktur duplikat untuk supplier yang sama ditolak.
+- Qty, total, harga satuan, tanggal dan ED tidak valid ditolak tanpa perubahan parsial.
+- Idempotency retry tidak membuat faktur/receipt/batch/movement ganda.
+- Kegagalan receipt tidak menimbulkan stok atau batch parsial.
+- Pembelian TiDB tidak menulis `klinik_data` atau state operasional localStorage.
+- Setelah berhasil, tampilan pembelian, stok, batch, dan utang berasal dari GET TiDB.
