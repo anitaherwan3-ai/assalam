@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - migration/tidb-foundation
+      - fix/tidb-localstorage-cache-only-2026-11-25
       - main
   pull_request:
     branches:
       - migration/tidb-foundation
+      - fix/tidb-localstorage-cache-only-2026-11-25
       - main
 
 jobs:
