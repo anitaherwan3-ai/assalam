@@ -94,7 +94,7 @@ function isTrxCancelled(trx) {
 
 // Transaksi batal tetap tampil di riwayat, tetapi tidak dihitung sebagai pemasukan.
 function getActiveFilteredTrx() {
-  return getFilteredTrx().filter(t => !isTrxCancelled(t));
+  return getFilteredTrx().filter(t => !isTrxCancelled(t) && t.incomeRecognized !== false);
 }
 
 // ==========================================
@@ -211,32 +211,55 @@ async function syncOperationalDataFromTiDB() {
     }
 
     if (salesRes && salesRes.ok && salesRes.data) {
-      if (Array.isArray(salesRes.data.invoices) && salesRes.data.invoices.length > 0) {
-        salesRes.data.invoices.forEach(inv => {
-          const idx = store.state.trx.findIndex(x => x.id === inv.publicId || x.no === inv.publicId);
-          if (idx >= 0) {
-            store.state.trx[idx].status = inv.status === 'cancelled' ? 'dibatalkan' : 'selesai';
-            store.state.trx[idx].total = inv.total;
-          } else {
-            store.state.trx.push({
-              id: inv.publicId || String(inv.invoiceId),
-              no: inv.publicId || ('INV-' + inv.invoiceId),
-              tgl: inv.tgl,
-              jam: '00:00',
-              pid: String(inv.patientId || ''),
-              nama: inv.patientName || 'Pasien',
-              hp: inv.phone || '',
-              kasir: inv.cashierName || inv.cashierUserId,
-              sh: '',
-              items: [],
-              total: Number(inv.total),
-              metode: 'Tunai',
-              bayar: Number(inv.total),
-              kembalian: 0,
-              status: inv.status === 'cancelled' ? 'dibatalkan' : 'selesai',
-              _t: Date.now()
-            });
-          }
+      if (Array.isArray(salesRes.data.invoices)) {
+        const methodLabels = {
+          cash: 'Tunai', qris: 'QRIS', bank_transfer: 'Transfer', card: 'Debit/Kredit'
+        };
+        store.state.trx = salesRes.data.invoices.map(inv => {
+          const payments = Array.isArray(inv.payments) ? inv.payments : [];
+          const recognizedAmount = payments
+            .filter(p => p.incomeRecognized && p.settlementStatus !== 'reversed')
+            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+          const recordedAmount = payments
+            .filter(p => p.settlementStatus !== 'reversed')
+            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+          const methods = [...new Set(payments.map(p => methodLabels[p.method] || p.method).filter(Boolean))];
+          const items = (Array.isArray(inv.items) ? inv.items : []).map(line => ({
+            id: line.lineId,
+            t: line.lineType === 'medicine' ? 'Obat' : 'Layanan',
+            oid: line.medicinePublicId || undefined,
+            tid: line.tariffPublicId || undefined,
+            nama: line.itemName || 'Item',
+            satuan: line.unit || '',
+            qty: Number(line.quantity || 0),
+            harga: Number(line.unitPrice || 0),
+            total: Number(line.netCharge || 0),
+            hpp: line.hpp === null || line.hpp === undefined ? 0 : Number(line.hpp),
+            diskon: Number(line.discount || 0)
+          }));
+          const incomeRecognized = recognizedAmount >= Number(inv.total || 0);
+          const isCancelled = inv.status === 'cancelled';
+          return {
+            id: inv.publicId || String(inv.invoiceId),
+            no: inv.publicId || ('INV-' + inv.invoiceId),
+            tgl: inv.tgl,
+            jam: '00:00',
+            pid: String(inv.patientId || ''),
+            nama: inv.patientName || 'Pasien',
+            hp: inv.phone || '',
+            kasir: inv.cashierName || inv.cashierUserId,
+            sh: '',
+            items,
+            total: Number(inv.total || 0),
+            metode: methods.length > 1 ? 'Campuran' : (methods[0] || 'Belum tercatat'),
+            bayar: recordedAmount,
+            kembalian: 0,
+            payments,
+            paymentStatus: inv.status,
+            incomeRecognized,
+            status: isCancelled ? 'dibatalkan' : incomeRecognized ? 'selesai' : 'menunggu_review',
+            _t: Date.now()
+          };
         });
       }
       if (Array.isArray(salesRes.data.cancels) && salesRes.data.cancels.length > 0) {
