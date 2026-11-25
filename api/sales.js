@@ -29,10 +29,10 @@ module.exports = async function handler(req, res) {
         "l.line_type AS lineType, l.item_name_snapshot AS itemName, l.unit_snapshot AS unit, l.quantity, " +
         "l.gross_unit_price AS unitPrice, l.gross_amount AS grossAmount, l.line_discount AS discount, l.net_charge AS netCharge, l.hpp_snapshot AS hpp, " +
         "m.public_id AS medicinePublicId, t.public_id AS tariffPublicId " +
-        "FROM sales_invoice_lines l JOIN sales_invoices i ON i.sales_invoice_id = l.sales_invoice_id " +
+        "FROM sales_invoice_lines l JOIN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) recent " +
+        "ON recent.sales_invoice_id = l.sales_invoice_id " +
         "LEFT JOIN medicines m ON m.medicine_id = l.medicine_id " +
         "LEFT JOIN tariffs t ON t.tariff_id = l.tariff_id " +
-        "WHERE i.sales_invoice_id IN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) " +
         "ORDER BY l.sales_invoice_id DESC, l.line_number"
       );
       const [payments] = await getPool().execute(
@@ -40,8 +40,8 @@ module.exports = async function handler(req, res) {
         "p.amount, p.review_status AS reviewStatus, p.settlement_status AS settlementStatus, " +
         "p.income_recognized_at_utc AS incomeRecognizedAt, p.paid_at_utc AS paidAt, " +
         "p.settlement_reference AS reference " +
-        "FROM invoice_payments p JOIN sales_invoices i ON i.sales_invoice_id = p.sales_invoice_id " +
-        "WHERE i.sales_invoice_id IN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) " +
+        "FROM invoice_payments p JOIN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) recent " +
+        "ON recent.sales_invoice_id = p.sales_invoice_id " +
         "ORDER BY p.sales_invoice_id DESC, p.invoice_payment_id";
       const [returns] = await getPool().execute(
         "SELECT r.sales_return_id AS returnId, r.public_id AS publicId, r.sales_invoice_id AS invoiceId, " +
