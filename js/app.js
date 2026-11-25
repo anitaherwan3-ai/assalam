@@ -3188,21 +3188,18 @@ function viewPembelian() {
       b.lunas 
         ? `<span class="badge-ok">Lunas (${b.tglBayar})</span>` 
         : `<button class="s p" onclick="openModalLunasiBeli('${b.id}')">Lunasi Sekarang</button>`,
-      `
-        <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>
-
-      `
+${isTiDBCatalogPreview()
+        ? '<span style="color:var(--mu);font-size:11px;">Retur supplier TiDB menunggu UI workflow</span>'
+        : `
+          <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>
+        `}
     ];
   });
 
   const returRows = returList.map(r => [
-    esc(r.tgl),
-    esc(r.supplier),
-    esc(r.faktur || '-'),
-    esc(r.namaObat),
-    r.qty,
-    rp(r.nilai),
-    esc(r.alasan)
+    esc(r.tgl), esc(r.supplier), esc(r.faktur || '-'), esc(r.namaObat),
+    r.qty, rp(r.nilai), esc(r.alasan),
+    esc(r.status || '-'), esc(r.settlementStatus || '-'), esc(r.dispatchReference || '-')
   ]);
 
   return `
@@ -3264,7 +3261,7 @@ function viewPembelian() {
 
     <div class="card">
       <h2>Riwayat Retur Pembelian ke Supplier (PBF)</h2>
-      ${renderTable(['Tanggal', 'Supplier', 'No. Faktur', 'Nama Obat', 'Qty Retur', 'Nilai Pengurang', 'Alasan'], returRows, { key: 'retur_beli_tbl' })}
+      ${renderTable(['Tanggal', 'Supplier', 'No. Faktur', 'Nama Obat', 'Qty Retur', 'Nilai Pengurang', 'Alasan', 'Status Retur', 'Status Piutang', 'Referensi Kirim'], returRows, { key: 'retur_beli_tbl' })}
     </div>
   `;
 }
@@ -3333,6 +3330,10 @@ function openModalLunasiBeli(beliId) {
 }
 
 function openModalReturBeli(beliId) {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Pembuatan retur supplier melalui UI TiDB belum diaktifkan. Retur lokal diblokir agar stok dan utang database tidak berubah secara tidak sinkron.', 'Workflow TiDB Belum Tersedia');
+    return;
+  }
   const b = store.get('beli', beliId);
   if (!b) return;
 
@@ -3515,6 +3516,8 @@ function viewKedaluwarsa() {
       esc(b.no || '-'),
       esc(b.ed),
       b.sisa,
+      b.disposition === 'quarantined' ? '<span class="badge-warn">Karantina</span>' :
+        (b.disposition === 'disposed' ? '<span class="badge-bad">Dibuang</span>' : '<span class="badge-ok">Layak Jual</span>'),
       badge
     ];
   });
@@ -3526,14 +3529,18 @@ function viewKedaluwarsa() {
         Sistem otomatis memprioritaskan penjualan obat dari batch dengan tanggal kedaluwarsa terdekat (<b>First Expired First Out</b>). Peringatan aktif ${edLimitDays} hari sebelum ED.
       </p>
       <div style="margin-bottom:14px;">
-        <button class="p btn-danger" onclick="actionBuangAllExpired()">🗑️ Buang Semua Batch yang Kedaluwarsa</button>
+        ${isTiDBCatalogPreview() ? '<span style="color:var(--mu);font-size:12px;">Pembuangan batch dilakukan melalui workflow inventory TiDB, bukan perubahan lokal.</span>' : '<button class="p btn-danger" onclick="actionBuangAllExpired()">🗑️ Buang Semua Batch yang Kedaluwarsa</button>'}
       </div>
-      ${renderTable(['Nama Obat', 'Nomor Batch', 'Tanggal ED', 'Sisa Stok Fisik', 'Status'], rows, { key: 'batch_ed' })}
+      ${renderTable(['Nama Obat', 'Nomor Batch', 'Tanggal ED', 'Sisa Stok Fisik', 'Disposisi', 'Status ED'], rows, { key: 'batch_ed' })}
     </div>
   `;
 }
 
 function actionBuangAllExpired() {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Pembuangan batch lokal dinonaktifkan pada mode TiDB. Gunakan workflow inventory TiDB agar mutasi stok tercatat di database.');
+    return;
+  }
   const expiredList = (store.state.batch || []).filter(b => b.sisa > 0 && b.ed < todayStr);
   if (expiredList.length === 0) {
     showAlert('Tidak ada batch obat yang kedaluwarsa saat ini.', 'Informasi');
