@@ -105,3 +105,54 @@ test("batch with unverified origin is quarantined even when expiry date is prese
   assert.equal(params[5], 0, "origin remains unverified");
   assert.equal(params[9], "quarantined", "unverified origin must never enter sellable stock");
 });
+
+
+test("supplier payable resolves public invoice IDs before aggregating payment and credit balances", async () => {
+  const aggregateKeys = [];
+  const connection = {
+    async execute(sql, params) {
+      if (sql.includes("FROM supplier_invoices WHERE")) return [[{
+        payableId: 42, supplierId: 7, grossAmount: "100000"
+      }]];
+      if (sql.includes("FROM supplier_payment_allocations WHERE")) {
+        aggregateKeys.push(params[0]);
+        return [[{ paidAmount: "25000" }]];
+      }
+      if (sql.includes("FROM supplier_credit_notes WHERE")) {
+        aggregateKeys.push(params[0]);
+        return [[{ creditAmount: "5000" }]];
+      }
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  const payable = await createTidbInventoryRepository().lockSupplierPayable(connection, "invoice-public-42");
+  assert.deepEqual(aggregateKeys, ["42", "42"]);
+  assert.equal(payable.payableId, "42");
+  assert.equal(payable.invoiceId, "42");
+  assert.equal(payable.outstandingAmount, "70000");
+});
+
+test("supplier payment allocation stores canonical invoice FK when caller supplies public ID", async () => {
+  const calls = [];
+  const connection = {
+    async execute(sql, params) {
+      calls.push({ sql, params });
+      if (sql.includes("FROM supplier_invoices WHERE")) return [[{
+        payableId: 42, supplierId: 7, grossAmount: "100000"
+      }]];
+      if (sql.includes("FROM supplier_payment_allocations WHERE")) return [[{ paidAmount: "25000" }]];
+      if (sql.includes("FROM supplier_credit_notes WHERE")) return [[{ creditAmount: "5000" }]];
+      if (sql.startsWith("INSERT INTO supplier_payment_allocations")) return [{ affectedRows: 1 }];
+      if (sql.startsWith("UPDATE supplier_invoices")) return [{ affectedRows: 1 }];
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  await createTidbInventoryRepository().applySupplierPaymentAllocation(connection, {
+    paymentId: "91", payableId: "invoice-public-42", amount: "20000"
+  });
+  const allocation = calls.find(call => call.sql.startsWith("INSERT INTO supplier_payment_allocations"));
+  const update = calls.find(call => call.sql.startsWith("UPDATE supplier_invoices"));
+  assert.equal(allocation.params[1], "42");
+  assert.equal(update.params[1], "42");
+  assert.equal(update.params[0], "partial");
+});
