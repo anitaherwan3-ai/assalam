@@ -141,33 +141,54 @@ class ClinicStore {
     this.loadLocal();
   }
 
-  loadLocal() {
-    let localData = null;
-    try {
-      const raw = localStorage.getItem('klinik_data');
-      if (raw) localData = JSON.parse(raw);
-    } catch (e) {
-      console.warn('Gagal memuat local data:', e);
-    }
-
-    const isTiDBActive = !!(
-      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
-      (typeof window !== 'undefined' && window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
-      (typeof window !== 'undefined' && window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP)
+  _isTiDBActive() {
+    return !!(
+      (typeof window !== 'undefined' && window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP === true) ||
+      (typeof window !== 'undefined' && window.assalamTiDBCatalog &&
+        typeof window.assalamTiDBCatalog.enabled === 'function' && window.assalamTiDBCatalog.enabled()) ||
+      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview())
     );
+  }
+
+  loadLocal() {
+    const isTiDBActive = this._isTiDBActive();
+    let localData = null;
+
+    try {
+      if (isTiDBActive) {
+        // Dalam mode TiDB, baca preferensi tampilan saja. Data operasional lama
+        // di klinik_data tidak pernah dipakai untuk mengisi state aplikasi.
+        let preferences = null;
+        const savedPreferences = localStorage.getItem('klinik_ui_preferences');
+        if (savedPreferences) {
+          preferences = JSON.parse(savedPreferences);
+        } else {
+          // Kompatibilitas satu kali: ambil hanya pengaturan UI dari format lama.
+          const legacyRaw = localStorage.getItem('klinik_data');
+          if (legacyRaw) {
+            const legacyData = JSON.parse(legacyRaw);
+            preferences = legacyData && legacyData.set ? legacyData.set : null;
+          }
+        }
+        localData = { set: preferences || {} };
+      } else {
+        const raw = localStorage.getItem('klinik_data');
+        if (raw) localData = JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('Gagal memuat preferensi lokal:', e);
+    }
 
     this.isCacheOnly = isTiDBActive;
     this.state = localData || {};
-    
-    // Inisialisasi default collections jika belum ada
+
+    // Inisialisasi koleksi dalam memori. Dalam mode TiDB, koleksi ini
+    // hanya cache runtime yang harus dihidrasi dari endpoint TiDB.
     this.COLLECTIONS.forEach(col => {
-      if (!Array.isArray(this.state[col])) {
-        this.state[col] = [];
-      }
+      if (!Array.isArray(this.state[col])) this.state[col] = [];
     });
 
-    // Pada mode non-TiDB (legacy), isi sampel data jika belum ada.
-    // Pada mode TiDB, hindari data tiruan; TiDB adalah satu-satunya sumber kebenaran (SSOT).
+    // Data contoh hanya boleh digunakan pada mode legacy lokal.
     if (!isTiDBActive) {
       if (this.state.obat.length === 0) this.state.obat = [...INITIAL_OBAT];
       if (this.state.batch.length === 0) this.state.batch = [...INITIAL_BATCH];
@@ -175,23 +196,24 @@ class ClinicStore {
       if (this.state.users.length === 0) this.state.users = [...INITIAL_USERS];
       if (!this.state.paket || this.state.paket.length === 0) this.state.paket = [...INITIAL_PAKET];
     }
-    this.state.obat.forEach(o => { if (o && o.satuan === 'strip') o.satuan = 'tablet'; });
 
-    // Pastikan nomor WhatsApp terisi pada user pimpinan jika sebelumnya belum ada
-    (this.state.users || []).forEach(u => {
-      if (!u.hp) {
-        if (u.role === 'pimpinan') u.hp = '081299998888';
-        else if (u.role === 'kasir') u.hp = '081234567891';
-        else if (u.role === 'admin') u.hp = '081234567892';
-      }
-    });
+    if (!isTiDBActive) {
+      this.state.obat.forEach(o => { if (o && o.satuan === 'strip') o.satuan = 'tablet'; });
+      (this.state.users || []).forEach(u => {
+        if (!u.hp) {
+          if (u.role === 'pimpinan') u.hp = '081299998888';
+          else if (u.role === 'kasir') u.hp = '081234567891';
+          else if (u.role === 'admin') u.hp = '081234567892';
+        }
+      });
+    }
 
     this.state.set = Object.assign({}, DEFAULT_SETTINGS, this.state.set || {});
     // Identitas nama klinik bersifat tetap dan tidak dapat ditimpa data lokal lama.
     this.state.set.nama = 'Klinik Assalaam Palembang';
     if (!this.state.set.waOwner) this.state.set.waOwner = '081299998888';
-    this.state.seq = this.state.seq || {};
-    this.state.firebaseConfig = this.state.firebaseConfig || null;
+    this.state.seq = isTiDBActive ? {} : (this.state.seq || {});
+    this.state.firebaseConfig = null;
 
     this.saveLocal(false);
   }
@@ -224,21 +246,16 @@ class ClinicStore {
   }
 
   _flushSave(triggerSync = true) {
-    const isTiDBActive = !!(
-      (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) ||
-      (typeof window !== 'undefined' && window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled()) ||
-      (typeof window !== 'undefined' && window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP)
-    );
+    const isTiDBActive = this._isTiDBActive();
 
     try {
       if (isTiDBActive) {
-        // Pada mode TiDB, localStorage hanya bertindak sebagai cache lokal sementara (bukan SSOT)
-        this.state._cacheMeta = {
-          source: 'tidb_cache',
-          cachedAt: Date.now()
-        };
+        // Simpan preferensi UI saja. Koleksi operasional tidak ditulis ke browser:
+        // seluruh perubahan bisnis wajib melalui API dan transaksi TiDB.
+        localStorage.setItem('klinik_ui_preferences', JSON.stringify(this.state.set || {}));
+      } else {
+        localStorage.setItem('klinik_data', JSON.stringify(this.state));
       }
-      localStorage.setItem('klinik_data', JSON.stringify(this.state));
     } catch (e) {
       console.error('LocalStorage write error:', e);
     }
