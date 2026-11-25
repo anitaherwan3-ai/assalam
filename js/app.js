@@ -53,9 +53,9 @@ let dateFilter = {
 };
 // Navigasi Tabs per Role
 const ROLE_TABS = {
-  kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil'],
-  admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor'],
-  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
+  kasir: ['Shift', 'Pasien', 'Transaksi', 'Riwayat Transaksi', 'Kas Kecil', 'Pengawasan Retur'],
+  admin: ['Obat & Tarif', 'Paket Pelayanan', 'Pembelian', 'Kedaluwarsa', 'Biaya', 'Stok Opname', 'Kartu Stok', 'Riwayat Transaksi', 'Verifikasi', 'Display TV', 'Ekspor', 'Pengawasan Retur'],
+  pimpinan: ['Dashboard', 'Data Pasien', 'Stok Obat', 'Kartu Stok', 'Laba Rugi', 'Arus Kas', 'Utang', 'Approval', 'Pengawasan Retur', 'Stok Opname', 'Paket Pelayanan', 'Display TV', 'Ekspor', 'Log Aktivitas', 'Pengguna', 'Pengaturan']
 };
 
 const TAB_ICONS = {
@@ -226,14 +226,15 @@ async function syncOperationalDataFromTiDB() {
     if (window.assalamTiDBCatalog) {
       await window.assalamTiDBCatalog.ensureLoaded().catch(() => null);
     }
-    const [medRes, queueRes, salesRes, financeRes, invoicesRes, batchRes, supReturnRes] = await Promise.all([
+    const [medRes, queueRes, salesRes, financeRes, invoicesRes, batchRes, supReturnRes, stocktakeRes] = await Promise.all([
       window.assalamTiDBApi.listMedicines().catch(() => null),
       window.assalamTiDBApi.listQueueTickets().catch(() => null),
       window.assalamTiDBApi.listSales().catch(() => null),
       window.assalamTiDBApi.listFinance().catch(() => null),
       window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null,
       window.assalamTiDBApi.listBatches ? window.assalamTiDBApi.listBatches().catch(() => null) : null,
-      window.assalamTiDBApi.listSupplierReturns ? window.assalamTiDBApi.listSupplierReturns().catch(() => null) : null
+      window.assalamTiDBApi.listSupplierReturns ? window.assalamTiDBApi.listSupplierReturns().catch(() => null) : null,
+      window.assalamTiDBApi.listStocktakes ? window.assalamTiDBApi.listStocktakes().catch(() => null) : null
     ]);
 
     if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
@@ -307,39 +308,25 @@ async function syncOperationalDataFromTiDB() {
           }
         });
       }
-      if (Array.isArray(salesRes.data.returns) && salesRes.data.returns.length > 0) {
-        salesRes.data.returns.forEach(r => {
-          const idx = store.state.returJual.findIndex(x => x.id === r.publicId || String(x.returnId || x.id) === String(r.returnId));
+      if (Array.isArray(salesRes.data.returns)) {
+        store.state.returJual = salesRes.data.returns.map(r => {
           const appStatus = r.status === 'requested' ? 'menunggu' :
             (r.status === 'admin_reviewed' ? 'menunggu_pimpinan' :
-            (r.status === 'pimpinan_approved' ? 'disetujui' :
-            (r.status === 'rejected' ? 'ditolak' : r.status)));
-
+            (r.status === 'pimpinan_approved' ? 'disetujui' : (r.status === 'rejected' ? 'ditolak' : r.status)));
+          const refundPending = r.refundStatus === 'approved_pending_payout';
+          const refundPaid = r.refundStatus === 'transferred' || r.refundStatus === 'paid';
           const refundObj = r.refundStatus ? {
-            status: r.refundStatus === 'paid' ? 'dibayar' : 'menunggu',
-            nominal: Number(r.refundAmount || 0),
-            metode: 'Tunai'
-          } : (r.status === 'pimpinan_approved' ? { status: 'menunggu', nominal: Number(r.refundAmount || 0) } : null);
-
-          const item = {
-            id: r.publicId || String(r.returnId),
-            returnId: String(r.returnId),
-            publicId: r.publicId || String(r.returnId),
-            trxId: String(r.invoiceId),
-            noNota: 'INV-' + r.invoiceId,
-            tgl: r.requestedAt ? r.requestedAt.slice(0, 10) : todayStr,
-            alasan: r.reason || '',
-            status: appStatus,
-            nominal: Number(r.refundAmount || 0),
-            pengembalian: refundObj,
-            _t: Date.now()
+            obligationId: String(r.refundObligationId || ''), outstanding: Number(r.refundOutstanding || 0),
+            status: refundPaid ? 'dibayar' : (refundPending ? 'menunggu' : String(r.refundStatus)),
+            nominal: Number(r.refundAmount || 0), metode: ''
+          } : null;
+          return {
+            id: r.publicId || String(r.returnId), returnId: String(r.returnId), publicId: r.publicId || String(r.returnId),
+            trxId: String(r.invoiceId), noNota: 'INV-' + r.invoiceId,
+            tgl: r.requestedAt ? String(r.requestedAt).slice(0, 10) : todayStr,
+            alasan: r.reason || '', status: appStatus, nominal: Number(r.refundAmount || 0),
+            pengembalian: refundObj, _t: Date.now()
           };
-
-          if (idx >= 0) {
-            Object.assign(store.state.returJual[idx], item);
-          } else {
-            store.state.returJual.push(item);
-          }
         });
       }
     }
@@ -446,48 +433,41 @@ async function syncOperationalDataFromTiDB() {
       });
     }
 
-    if (batchRes && batchRes.ok && Array.isArray(batchRes.data) && batchRes.data.length > 0) {
-      batchRes.data.forEach(b => {
-        const idx = (store.state.batch || []).findIndex(x => x.id === b.id || x.no === b.batchNo);
+    if (batchRes && batchRes.ok && Array.isArray(batchRes.data)) {
+      store.state.batch = batchRes.data.map(b => {
         const obat = (store.state.obat || []).find(o => o.id === b.publicId || o.nama === b.medicineName);
-        const item = {
-          id: String(b.id),
-          oid: obat ? obat.id : String(b.medicineId),
-          no: b.batchNo || '-',
-          ed: b.ed,
-          qty: Number(b.qty || 0),
-          sisa: Number(b.sisa || 0),
-          hpp: Number(b.hpp || 0),
-          disposition: b.disposition || 'sellable',
-          _t: Date.now()
-        };
-        if (idx >= 0) {
-          Object.assign(store.state.batch[idx], item);
-        } else {
-          store.state.batch.push(item);
-        }
+        return { id: String(b.id), oid: obat ? obat.id : String(b.publicId || b.medicineId),
+          no: b.batchNo || '-', ed: b.ed || '', qty: Number(b.qty || 0), sisa: Number(b.sisa || 0),
+          hpp: Number(b.hpp || 0), disposition: b.disposition || 'sellable',
+          expiryVerified: !!b.expiryVerified, originVerified: !!b.originVerified,
+          purchaseLineId: b.purchaseLineId ? String(b.purchaseLineId) : '', _t: Date.now() };
       });
     }
 
-    if (supReturnRes && supReturnRes.ok && Array.isArray(supReturnRes.data) && supReturnRes.data.length > 0) {
-      supReturnRes.data.forEach(sr => {
-        const idx = (store.state.returBeli || []).findIndex(x => x.id === sr.id || String(x.returnId || x.id) === String(sr.returnId));
-        const item = {
-          id: String(sr.id),
-          returnId: String(sr.returnId),
-          tgl: sr.tgl || todayStr,
-          obat: sr.medicineName || '-',
-          qty: Number(sr.qtyRetur || 0),
-          alasan: sr.alasan || '-',
-          status: sr.status,
-          _t: Date.now()
-        };
-        if (idx >= 0) {
-          Object.assign(store.state.returBeli[idx], item);
-        } else {
-          store.state.returBeli.push(item);
-        }
-      });
+    if (supReturnRes && supReturnRes.ok && Array.isArray(supReturnRes.data)) {
+      store.state.returBeli = supReturnRes.data.map(sr => ({
+        id: String(sr.id), returnId: String(sr.returnId), tgl: sr.tgl || '',
+        obat: sr.medicineName || '-', namaObat: sr.medicineName || '-', qty: Number(sr.qtyRetur || 0),
+        alasan: sr.alasan || '-', supplier: sr.supplierName || '-', faktur: sr.invoiceNumber || '-',
+        nilai: Number(sr.returnValue || 0), invoiceId: String(sr.invoiceId || ''),
+        batchId: String(sr.batchId || ''), status: sr.status || 'requested',
+        settlementStatus: sr.settlementStatus || 'pending', dispatchReference: sr.dispatchReference || '',
+        purchaseLineId: sr.purchaseLineId ? String(sr.purchaseLineId) : '', _t: Date.now()
+      }));
+    }
+    if (stocktakeRes && stocktakeRes.ok && Array.isArray(stocktakeRes.data)) {
+      store.state.stocktake = stocktakeRes.data.map(st => ({
+        id: String(st.id || st.stocktakeId), stocktakeId: String(st.stocktakeId || st.id),
+        tgl: st.tgl || st.stocktakeDate || '', status: st.status || 'counting',
+        countedByUserId: st.countedByUserId || '', approvedByUserId: st.approvedByUserId || '',
+        lineCount: Number(st.lineCount || (st.lines || []).length || 0),
+        lines: Array.isArray(st.lines) ? st.lines.map(line => ({
+          lineId: String(line.lineId || ''), batchId: String(line.batchId || ''), medicineId: String(line.medicineId || ''),
+          medicineName: line.medicineName || '', batchNo: line.batchNo || '',
+          systemQuantity: Number(line.systemQuantity || 0), countedQuantity: Number(line.countedQuantity || 0),
+          varianceQuantity: Number(line.varianceQuantity || 0), reason: line.reason || ''
+        })) : [], _t: Date.now()
+      }));
     }
 
     renderApp();
@@ -3751,56 +3731,96 @@ function delBiaya(id) {
 // MODULE: STOK OPNAME & KERUGIAN (ADMIN)
 // -------------------------------------------------------------
 function viewOpname() {
-  const activeBatches = (store.state.batch || []).filter(b => b.sisa > 0);
+  const activeBatches = (store.state.batch || []).filter(b => Number(b.sisa || 0) > 0);
+  const stocktakes = (store.state.stocktake || []).slice().sort((x, y) => String(y.tgl).localeCompare(String(x.tgl)));
+  const isAdmin = currentRole === 'admin', isOwner = currentRole === 'pimpinan';
   const lossList = inFilterRange(store.state.loss).slice().reverse();
-
-  const rows = lossList.map(l => {
+  const lossRows = lossList.map(l => {
     const obat = store.getObat(l.oid);
-    return [
-      esc(l.tgl),
-      esc(obat ? obat.nama : '-'),
-      l.qty,
-      `<span class="badge-bad">${esc(l.ket)}</span>`,
-      rp(l.nilai),
-      `<button class="s btn-danger" onclick="delLoss('${l.id}')">Batalkan</button>`
-    ];
+    return [esc(l.tgl), esc(obat ? obat.nama : '-'), l.qty, esc(l.ket), rp(l.nilai),
+      isAdmin ? `<button class="s btn-danger" onclick="delLoss('${esc(l.id)}')">Batalkan</button>` : '-'];
   });
-
+  const batchRows = activeBatches.map(b => {
+    const obat = store.getObat(b.oid);
+    return `<tr><td>${esc(obat ? obat.nama : '-')}</td><td>${esc(b.no || '-')}</td><td>${esc(b.ed || '-')}</td>
+      <td>${Number(b.sisa || 0)}</td><td><input id="stocktake-count-${esc(b.id)}" type="number" min="0" step="1" value="${Number(b.sisa || 0)}" style="width:100px"></td>
+      <td><input id="stocktake-reason-${esc(b.id)}" type="text" placeholder="Wajib jika ada selisih" style="min-width:170px"></td></tr>`;
+  }).join('');
+  const stocktakeRows = stocktakes.map(st => [
+    esc(st.tgl || '-'), st.lineCount || (st.lines || []).length,
+    st.status === 'approved' ? '<span class="badge-ok">Disetujui</span>' : '<span class="badge-warn">Menunggu Pimpinan</span>',
+    (st.lines || []).filter(line => Number(line.varianceQuantity || 0) !== 0).length,
+    isOwner && st.status === 'counting' ? `<button class="p" onclick="actionApproveStocktake('${esc(st.stocktakeId || st.id)}')">Setujui Opname</button>` :
+      (st.status === 'approved' ? 'Selesai' : 'Menunggu approval')
+  ]);
   return `
+    ${isAdmin ? `
     <div class="card">
-      <h2>Catat Obat Rusak, Hilang, atau Selisih Stok Opname</h2>
-      <div class="row">
-        <label style="flex:1;min-width:240px;">Pilih Batch / Obat *
-          <select id="op-batch">
-            ${activeBatches.map(b => {
-              const o = store.getObat(b.oid);
-              return `<option value="${b.id}">${esc(o ? o.nama : '-')} | Batch ${esc(b.no)} | ED ${b.ed} | Sisa ${b.sisa}</option>`;
-            }).join('')}
-          </select>
-        </label>
-        <label style="width:90px;">Jumlah *
-          <input id="op-qty" type="number" min="1" value="1">
-        </label>
-        <label>Alasan Kerugian
-          <select id="op-ket">
-            <option>Obat Rusak / Pecah</option>
-            <option>Selisih Stok Opname</option>
-            <option>Kedaluwarsa (Expired)</option>
-            <option>Lainnya</option>
-          </select>
-        </label>
-        <button class="p btn-danger" onclick="actionAddLoss()">Catat Kerugian</button>
-      </div>
-    </div>
-
+      <h2>Stock Opname Fisik — Admin</h2>
+      <p style="color:var(--mu);font-size:13px;">Hitung seluruh batch yang masih memiliki saldo. Tanggal opname wajib tanggal 1. Setiap selisih harus disertai alasan; perubahan stok baru diterapkan setelah Pimpinan menyetujui.</p>
+      <label>Tanggal Stock Opname *<input id="stocktake-date" type="date" value="${todayStr.slice(0,7)}-01"></label>
+      <div style="overflow-x:auto;margin-top:12px;"><table style="width:100%;border-collapse:collapse;">
+        <thead><tr><th>Obat</th><th>Batch</th><th>ED</th><th>Stok Sistem</th><th>Hitung Fisik</th><th>Alasan Selisih</th></tr></thead>
+        <tbody>${batchRows || '<tr><td colspan="6">Tidak ada batch aktif untuk dihitung.</td></tr>'}</tbody>
+      </table></div>
+      <button class="p" style="margin-top:12px;" onclick="actionCreateStocktake()">Kirim Hasil Opname ke TiDB</button>
+    </div>` : ''}
     <div class="card">
-      <h2>Riwayat Kerugian Obat</h2>
-      ${renderTable(['Tanggal', 'Obat', 'Qty', 'Penyebab', 'Nilai Kerugian', 'Aksi'], rows, { key: 'loss_tbl' })}
+      <h2>Riwayat Stock Opname TiDB</h2>
+      <p style="color:var(--mu);font-size:13px;">Data dibaca dari stocktakes dan stocktake_lines. Persetujuan Pimpinan menerapkan selisih stok secara transaksional.</p>
+      ${renderTable(['Tanggal','Jumlah Batch','Status','Jumlah Selisih','Tindakan'], stocktakeRows, { key: 'stocktake_tidb' })}
+      ${stocktakes.length ? stocktakes.map(st => `<details style="margin-top:10px;"><summary>Rincian opname ${esc(st.tgl)} — ${esc(st.status)}</summary>
+        ${renderTable(['Obat','Batch','Sistem','Fisik','Selisih','Alasan'], (st.lines || []).map(line => [
+          esc(line.medicineName || '-'), esc(line.batchNo || '-'), line.systemQuantity, line.countedQuantity, line.varianceQuantity, esc(line.reason || '-')
+        ]), { key: 'stocktake_lines_' + String(st.stocktakeId || st.id) })}</details>`).join('') : '<p>Belum ada riwayat stock opname.</p>'}
     </div>
+    ${isAdmin && !isTiDBCatalogPreview() ? `<div class="card"><h2>Catat Obat Rusak, Hilang, atau Selisih Stok</h2>
+      <div class="row"><label style="flex:1;min-width:240px;">Pilih Batch / Obat *<select id="op-batch">${activeBatches.map(b => { const o = store.getObat(b.oid); return `<option value="${esc(b.id)}">${esc(o ? o.nama : '-')} | Batch ${esc(b.no)} | ED ${esc(b.ed)} | Sisa ${b.sisa}</option>`; }).join('')}</select></label>
+      <label style="width:90px;">Jumlah *<input id="op-qty" type="number" min="1" value="1"></label>
+      <label>Alasan Kerugian<select id="op-ket"><option>Obat Rusak / Pecah</option><option>Selisih Stok Opname</option><option>Kedaluwarsa (Expired)</option><option>Lainnya</option></select></label>
+      <button class="p btn-danger" onclick="actionAddLoss()">Catat Kerugian</button></div>
+      ${renderTable(['Tanggal','Obat','Qty','Penyebab','Nilai Kerugian','Aksi'], lossRows, { key: 'loss_tbl' })}</div>` : ''}
   `;
 }
 
+async function actionCreateStocktake() {
+  if (currentRole !== 'admin' || !isTiDBCatalogPreview() || !window.assalamTiDBApi) { showAlert('Pembuatan stock opname hanya tersedia untuk Admin melalui TiDB.'); return; }
+  const stocktakeDate = val('stocktake-date');
+  if (!/^\d{4}-\d{2}-01$/.test(stocktakeDate)) { showAlert('Tanggal stock opname harus tanggal 1 pada bulan yang dihitung.'); return; }
+  const batches = (store.state.batch || []).filter(b => Number(b.sisa || 0) > 0);
+  if (!batches.length) { showAlert('Tidak ada batch aktif untuk dihitung.'); return; }
+  const lines = [];
+  for (const batch of batches) {
+    const countedRaw = val('stocktake-count-' + batch.id);
+    if (countedRaw === '' || !/^\d+$/.test(String(countedRaw))) { showAlert('Jumlah fisik batch ' + batch.no + ' harus angka bulat nol atau lebih.'); return; }
+    const countedQuantity = Number(countedRaw), reason = val('stocktake-reason-' + batch.id).trim();
+    if (countedQuantity !== Number(batch.sisa || 0) && !reason) { showAlert('Alasan wajib diisi untuk selisih batch ' + batch.no + '.'); return; }
+    lines.push({ batchId: String(batch.id), countedQuantity: String(countedQuantity), reason });
+  }
+  try {
+    await window.assalamTiDBApi.createStocktake({ stocktakeDate, lines }, window.assalamTiDBApi.newIdempotencyKey());
+    await syncOperationalDataFromTiDB();
+    showAlert('Hasil stock opname tersimpan di TiDB dan menunggu persetujuan Pimpinan. Stok belum berubah.', 'Opname Terkirim');
+  } catch (err) { showAlert(err.message || 'Stock opname gagal disimpan. Stok tidak berubah.', 'Gagal'); }
+}
+
+async function actionApproveStocktake(stocktakeId) {
+  if (currentRole !== 'pimpinan' || !isTiDBCatalogPreview() || !window.assalamTiDBApi) { showAlert('Hanya Pimpinan yang dapat menyetujui stock opname TiDB.'); return; }
+  showFormModal('Persetujuan Stock Opname', [['reason', 'Catatan persetujuan Pimpinan *', 'text', 'Hasil hitung fisik telah diperiksa']], async res => {
+    try {
+      await window.assalamTiDBApi.approveStocktake({ stocktakeId: String(stocktakeId), reason: String(res.reason || '').trim() }, window.assalamTiDBApi.newIdempotencyKey());
+      await syncOperationalDataFromTiDB();
+      showAlert('Stock opname disetujui. Selisih stok diterapkan di TiDB dan dicatat dalam audit.', 'Stock Opname Disetujui');
+    } catch (err) { showAlert(err.message || 'Persetujuan stock opname gagal. Tidak ada perubahan stok.', 'Gagal'); }
+    renderApp();
+  });
+}
+
 function actionAddLoss() {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Pencatatan kerugian stok lokal dinonaktifkan pada mode TiDB. Gunakan workflow inventory TiDB yang telah disetujui.');
+    return;
+  }
   const bid = val('op-batch');
   const qty = numVal('op-qty');
   const batch = store.get('batch', bid);
@@ -3836,6 +3856,10 @@ function actionAddLoss() {
 }
 
 function delLoss(id) {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Penghapusan kerugian lokal dinonaktifkan pada mode TiDB agar saldo stok database tidak berbeda.');
+    return;
+  }
   showConfirm('Batalkan catatan kerugian ini? Stok fisik dan batch akan dikembalikan.', () => {
     const l = store.get('loss', id);
     if (!l) return;
@@ -4181,56 +4205,52 @@ function actionRejectReturJual(id) {
   });
 }
 
-function actionPayReturJual(id) {
-  if (currentRole !== 'pimpinan') {
-    showAlert('Hanya Pimpinan yang dapat mencatat pengembalian uang.', 'Akses Ditolak');
-    return;
-  }
-  showFormModal('Catat Pengembalian Uang Retur', [
-    ['metode', 'Metode pengembalian', 'select', 'Tunai', [
-      { value: 'Tunai', label: 'Tunai' },
-      { value: 'Transfer', label: 'Transfer' }
-    ]],
-    ['referensi', 'Nomor referensi/bukti transfer (wajib untuk transfer)', 'text', '']
+async function actionApproveRefund(id) {
+  if (currentRole !== 'pimpinan') { showAlert('Hanya Pimpinan yang dapat menyetujui kewajiban refund.', 'Akses Ditolak'); return; }
+  const retur = (store.state.returJual || []).find(r => r.id === id || String(r.returnId) === String(id));
+  if (!retur || retur.status !== 'disetujui') { showAlert('Retur harus disetujui Pimpinan sebelum kewajiban refund dibuat.'); return; }
+  if (retur.pengembalian && retur.pengembalian.obligationId) { showAlert('Kewajiban refund sudah disetujui. Pembayaran menunggu Kasir/Admin.'); return; }
+  showFormModal('Persetujuan Kewajiban Refund', [
+    ['alasan', 'Catatan persetujuan Pimpinan *', 'text', 'Menyetujui kewajiban pengembalian dana']
   ], async res => {
     try {
-      if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-        // 1. Approval kewajiban refund oleh Pimpinan
-        const apprKey = window.assalamTiDBApi.newIdempotencyKey();
-        let refundRes = await window.assalamTiDBApi.approveRefund({
-          salesReturnId: id,
-          returnId: id,
-          reason: 'Persetujuan kewajiban refund oleh Pimpinan'
-        }, apprKey).catch(err => {
-          if (err && (err.code === 'REFUND_APPROVED_ALREADY' || err.code === 'REFUND_RETURN_NOT_APPROVED')) return null;
-          throw err;
-        });
+      const key = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.approveRefund({ salesReturnId: retur.returnId || id, returnId: retur.returnId || id, reason: String(res.alasan || '').trim() }, key);
+      await syncOperationalDataFromTiDB();
+      showAlert('Kewajiban refund disetujui. Belum ada kas keluar; pembayaran menunggu Kasir/Admin.', 'Approval Refund Berhasil');
+    } catch (err) { showAlert(err.message || 'Persetujuan kewajiban refund gagal.', 'Gagal'); }
+    renderApp();
+  });
+}
 
-        // 2. Pembayaran kas / transfer kewajiban refund
-        const retur = (store.state.returJual || []).find(r => r.id === id || r.returnId === id);
-        const nominal = (retur && retur.nominal) || (refundRes && refundRes.data && refundRes.data.amount) || 0;
-        const obligationId = (refundRes && refundRes.data && refundRes.data.refundObligationId) || id;
-        const payKey = window.assalamTiDBApi.newIdempotencyKey();
-
-        await window.assalamTiDBApi.payRefund({
-          payout: {
-            sourceType: "refund_obligation",
-            sourceId: String(obligationId),
-            amount: String(nominal),
-            paymentStatus: "settled",
-            businessDate: todayStr,
-            eventAtUtc: new Date().toISOString(),
-            settlementReference: res.referensi || (res.metode === 'Tunai' ? ('KAS-REF-' + Date.now()) : ('TRF-REF-' + Date.now()))
-          }
-        }, payKey);
-        await syncOperationalDataFromTiDB();
-      } else {
-        await window.firebaseBackend.payReturJual(id, res.metode, res.referensi);
-      }
-      showAlert('Pengembalian uang tercatat satu kali. Saldo kas tunai dan status kewajiban refund telah diperbarui di TiDB.', 'Pengembalian Tercatat');
-    } catch (err) {
-      showAlert(err.message || 'Pengembalian uang gagal dicatat.', 'Gagal');
-    }
+function actionPayReturJual(id) {
+  if (!['admin', 'kasir'].includes(currentRole)) { showAlert('Pembayaran refund hanya dapat diproses Kasir/Admin setelah persetujuan Pimpinan.', 'Akses Ditolak'); return; }
+  const retur = (store.state.returJual || []).find(r => r.id === id || String(r.returnId) === String(id));
+  const refund = retur && retur.pengembalian;
+  if (!retur || retur.status !== 'disetujui' || !refund || !refund.obligationId || refund.status !== 'menunggu') {
+    showAlert('Kewajiban refund belum disetujui Pimpinan atau sudah dibayar. Tidak ada kas keluar yang dicatat.'); return;
+  }
+  const outstanding = Number(refund.outstanding || refund.nominal || retur.nominal || 0);
+  if (!(outstanding > 0)) { showAlert('Sisa kewajiban refund tidak valid. Periksa data TiDB.'); return; }
+  showFormModal('Pembayaran Refund Retur', [
+    ['metode', 'Metode pembayaran *', 'select', 'Tunai', [{value:'Tunai',label:'Tunai'},{value:'Transfer',label:'Transfer'}]],
+    ['referensi', 'Nomor bukti pembayaran/kuitansi *', 'text', ''],
+    ['tgl', 'Tanggal pembayaran *', 'date', todayStr]
+  ], async res => {
+    const reference = String(res.referensi || '').trim();
+    if (reference.length < 3 || !res.tgl) { showAlert('Tanggal dan nomor bukti pembayaran nyata wajib diisi.'); return; }
+    try {
+      const currentShift = typeof getCurrentShift === 'function' ? getCurrentShift() : null;
+      const key = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.payRefund({ payout: {
+        sourceType: 'refund_obligation', sourceId: String(refund.obligationId), amount: String(outstanding),
+        paymentStatus: 'settled', paymentMethod: res.metode === 'Tunai' ? 'cash' : 'bank_transfer',
+        businessDate: res.tgl, eventAtUtc: new Date().toISOString(), settlementReference: reference,
+        shiftId: currentShift && currentShift.shiftId ? String(currentShift.shiftId) : null
+      } }, key);
+      await syncOperationalDataFromTiDB();
+      showAlert('Pembayaran refund berhasil dicatat. Kas keluar dibukukan hanya setelah pembayaran diproses.', 'Pembayaran Refund Berhasil');
+    } catch (err) { showAlert(err.message || 'Pembayaran refund gagal. Kewajiban tetap menunggu.', 'Gagal'); }
     renderApp();
   });
 }
@@ -4927,7 +4947,9 @@ async function actionMigrateReturKuota() {
 }
 
 function viewPengawasanRetur() {
-  if (currentRole !== 'pimpinan') return '<div class="card">Akses hanya untuk Pimpinan.</div>';
+  if (!['pimpinan', 'admin', 'kasir'].includes(currentRole)) return '<div class="card">Akses tidak tersedia.</div>';
+  const isOwner = currentRole === 'pimpinan';
+  const canPay = currentRole === 'admin' || currentRole === 'kasir';
   const list = (store.state.returJual || []).slice().sort((a, b) =>
     Number(b.diverifikasiPada || b.diverifikasiAdminPada || b._t || 0) - Number(a.diverifikasiPada || a.diverifikasiAdminPada || a._t || 0)
   );
@@ -4942,45 +4964,40 @@ function viewPengawasanRetur() {
       status === 'menunggu_pimpinan' ? '<span class="badge-warn">Menunggu Keputusan Pimpinan</span>' :
       status === 'disetujui' ? '<span class="badge-ok">Disetujui Pimpinan</span>' : '<span class="badge-bad">Ditolak</span>';
     const statusUang = status !== 'disetujui' ? '-' : (!refund
-      ? '<span class="badge-warn">Retur Lama - Perlu Rekonsiliasi</span>'
-      : (refund.status === 'dibayar' ? '<span class="badge-ok">Sudah Dikembalikan</span>' :
-        '<span class="badge-warn">Menunggu Pimpinan</span>'));
+      ? '<span class="badge-warn">Menunggu Approval Refund</span>'
+      : (refund.status === 'dibayar' ? '<span class="badge-ok">Sudah Dibayar</span>' :
+        (refund.obligationId ? '<span class="badge-warn">Disetujui — Menunggu Pembayaran</span>' : '<span class="badge-warn">Perlu Rekonsiliasi</span>')));
     const detail = refund && refund.status === 'dibayar'
-      ? esc(refund.metode || '-') + (refund.referensi ? ' / ' + esc(refund.referensi) : '') +
-        ' / ' + esc(refund.dibayarOleh || '-') +
-        (refund.dibayarPada ? ' / ' + new Date(refund.dibayarPada).toLocaleString('id-ID') : '')
+      ? 'Bukti: ' + esc(refund.referensi || '-') + ' / ' + esc(refund.dibayarOleh || '-')
       : (status === 'ditolak' ? esc(r.alasanPenolakan || '-') :
         status === 'menunggu' ? 'Menunggu pemeriksaan Admin' :
-        status === 'menunggu_pimpinan' ? 'Diverifikasi Admin: ' + esc(r.diverifikasiAdminOleh || '-') +
-          (r.diverifikasiAdminPada ? ' / ' + new Date(r.diverifikasiAdminPada).toLocaleString('id-ID') : '') :
-        (refund ? '-' : 'Periksa arsip lama'));
-    const finalApprovalActions = status === 'menunggu_pimpinan'
+        status === 'menunggu_pimpinan' ? 'Diverifikasi Admin' :
+        (refund && refund.obligationId ? 'Sisa kewajiban: ' + rp(refund.outstanding || 0) : 'Belum ada kewajiban refund'));
+    const finalApprovalActions = isOwner && status === 'menunggu_pimpinan'
       ? '<button class="p" onclick="actionFinalizeReturJual(\'' + esc(r.id) + '\')">Setujui Akhir</button> ' +
         '<button class="s btn-danger" onclick="actionRejectReturJual(\'' + esc(r.id) + '\')">Tolak</button>'
       : '';
-    const payAction = status === 'disetujui' && refund && refund.status === 'menunggu'
-      ? '<button class="p" onclick="actionPayReturJual(\'' + esc(r.id) + '\')">Catat Uang Kembali</button>'
+    const approveRefundAction = isOwner && status === 'disetujui' && !refund
+      ? '<button class="p" onclick="actionApproveRefund(\'' + esc(r.id) + '\')">Setujui Kewajiban Refund</button>'
       : '';
-    const action = '<button class="s" onclick="printReturJual(\'' + esc(r.id) + '\')">Nota Retur</button> ' + finalApprovalActions + payAction;
-    return [esc(r.tgl || '-'), esc(r.noNota || '-'), esc(r.namaPasien || '-'),
-      esc(r.namaItem || '-'), Number(r.qty || 0), rp(r.total), esc(r.kasir || '-'),
-      statusRetur, statusUang, detail, action];
+    const payAction = canPay && status === 'disetujui' && refund && refund.status === 'menunggu' && refund.obligationId
+      ? '<button class="p" onclick="actionPayReturJual(\'' + esc(r.id) + '\')">Proses Pembayaran</button>'
+      : '';
+    const action = '<button class="s" onclick="printReturJual(\'' + esc(r.id) + '\')">Nota Retur</button> ' + finalApprovalActions + approveRefundAction + payAction;
+    return [esc(r.tgl || '-'), esc(r.noNota || '-'), esc(r.namaPasien || '-'), esc(r.namaItem || '-'),
+      Number(r.qty || 0), rp(r.total), esc(r.kasir || '-'), statusRetur, statusUang, detail, action];
   });
   return `
     <div class="card">
-      <h2>Persetujuan Akhir &amp; Pengawasan Retur</h2>
-      <p style="color:var(--mu);font-size:13px;">Pimpinan memutuskan akhir setiap retur setelah verifikasi Admin. Stok/batch obat dipulihkan hanya saat Pimpinan menyetujui. Retur jasa/tindakan tidak mengubah stok. Pengembalian uang tunai atau transfer dicatat terpisah dan hanya satu kali.</p>
-      <div style="margin:10px 0 14px;">
-        <button class="s p" onclick="actionMigrateReturKuota()">Siapkan / Periksa Kuota Retur Nota Lama</button>
-        <p style="color:var(--mu);font-size:12px;">Jalankan sekali setelah pembaruan. Dokumen kuota terpisah; nota, stok, dan riwayat lama tidak ditimpa.</p>
-      </div>
+      <h2>Pengawasan Retur &amp; Pembayaran Refund</h2>
+      <p style="color:var(--mu);font-size:13px;">Pimpinan menyetujui retur dan kewajiban refund. Kasir/Admin memproses pembayaran setelah approval. Persetujuan tidak mencatat kas keluar.</p>
       <div class="grid">
         <div class="kpi"><span>Menunggu Persetujuan Akhir</span><b>${pendingFinalApproval}</b></div>
-        <div class="kpi"><span>Menunggu Pengembalian Uang</span><b>${pendingPayment}</b></div>
-        <div class="kpi"><span>Sudah Dikembalikan</span><b>${paid}</b></div>
-        <div class="kpi"><span>Retur Lama Perlu Rekonsiliasi</span><b>${legacy}</b></div>
+        <div class="kpi"><span>Menunggu Pembayaran</span><b>${pendingPayment}</b></div>
+        <div class="kpi"><span>Sudah Dibayar</span><b>${paid}</b></div>
+        <div class="kpi"><span>Perlu Rekonsiliasi</span><b>${legacy}</b></div>
       </div>
-      ${renderTable(['Tanggal','No. Nota','Pasien','Item','Qty','Nilai Retur','Kasir','Status Retur','Status Uang','Bukti/Metode/Petugas','Tindakan'], rows, { key: 'pimpinan_pengawasan_retur' })}
+      ${renderTable(['Tanggal','No. Nota','Pasien','Item','Qty','Nilai Retur','Kasir','Status Retur','Status Refund','Bukti/Status','Tindakan'], rows, { key: 'pengawasan_retur_tidb' })}
     </div>
   `;
 }

@@ -148,6 +148,8 @@
     listBatches: () => request("/api/inventory?batches=1"),
     listSupplierReturns: () => request("/api/inventory?supplier_returns=1"),
     listStocktakes: () => request("/api/inventory?stocktakes=1"),
+    createStocktake: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "stocktake_create" }, data), idempotencyKey: key }),
+    approveStocktake: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "stocktake_approve" }, data), idempotencyKey: key }),
     listSupplierInvoices: () => request("/api/inventory?invoices=1"),
     createSupplierInvoice: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "create_supplier_invoice" }, data), idempotencyKey: key }),
     receivePurchase: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "receive_purchase" }, data), idempotencyKey: key }),
