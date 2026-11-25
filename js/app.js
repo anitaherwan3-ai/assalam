@@ -5278,15 +5278,37 @@ async function loadTiDBUsers(){
  window.ASSALAM_TIDB_USERS_LOADING=true;target.innerHTML='<p class="muted">Memuat akun...</p>';
  try{
   const response=await window.assalamTiDBApi.listUsers(),users=Array.isArray(response.data)?response.data:[];window.ASSALAM_TIDB_USER_CACHE=users;
-  if(!users.length){target.innerHTML='<p class="muted">Belum ada akun TiDB.</p>';return;}
+  const assignmentResponse=await window.assalamTiDBApi.listAllQueueAssignments().catch(error=>({error}));
+  const assignments=Array.isArray(assignmentResponse.data)?assignmentResponse.data:[];
+  window.ASSALAM_TIDB_LANE_ASSIGNMENTS=assignments;
+  const activeCashiers=users.filter(u=>u.role==='kasir'&&u.active&&!u.banned);
+  const assignmentOptions=activeCashiers.map(u=>'<option value="'+esc(u.userId)+'">'+esc(u.name||u.email||u.userId)+'</option>').join('');
+  const assignmentTable=assignments.length?'<div style="overflow:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Kasir</th><th>Shift</th><th>Jalur</th></tr></thead><tbody>'+assignments.map(a=>'<tr><td>'+esc(a.userName||a.userId)+'</td><td>'+(a.prefix==='A'?'Pagi':'Sore')+'</td><td>'+esc(a.prefix)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">Belum ada penetapan jalur aktif.</p>';
+  const assignmentPanel='<div class="card" style="margin:12px 0"><h3>Penetapan Shift &amp; Jalur Antrean</h3><p class="muted">Hanya Pimpinan yang menetapkan. Jalur A otomatis menjadi Shift Pagi; Jalur B otomatis menjadi Shift Sore. Penetapan tidak dapat diubah ketika kasir sedang memiliki shift aktif.</p>'+(assignmentResponse.error?'<p class="bad">Gagal memuat penetapan: '+esc(assignmentResponse.error.message||'layanan tidak tersedia')+'</p>':(activeCashiers.length?'<div class="row" style="align-items:end"><label>Kasir<select id="tidb-lane-user">'+assignmentOptions+'</select></label><label>Penetapan<select id="tidb-lane-code"><option value="A">Jalur A — Shift Pagi</option><option value="B">Jalur B — Shift Sore</option></select></label><button class="p" onclick="actionAssignQueueLane()">Simpan Penetapan</button></div>':'<p class="muted">Belum ada akun Kasir aktif untuk ditetapkan.</p>'))+assignmentTable+'</div>';
+  if(!users.length){target.innerHTML=assignmentPanel+'<p class="muted">Belum ada akun TiDB.</p>';return;}
   const rows=users.map(u=>{const locked=!!u.protectedOwner||['praktekrose@gmail.com','nursalim42@gmail.com','assalamkasir1@gmail.com','assalamkasir2@gmail.com','assalamadmin1@gmail.com'].includes(String(u.email||'').toLowerCase());
    const status=u.active&&!u.banned?'<span class="badge-ok">Aktif</span>':'<span class="badge-warn">Nonaktif</span>';
    const actions=`<button class="s" onclick="editTiDBUser('${esc(u.userId)}')">Kelola</button>`+(locked||!u.active?'':` <button class="s btn-danger" onclick="disableTiDBUser('${esc(u.userId)}')">Nonaktifkan</button>`);
    return `<tr><td>${esc(u.name||'-')}</td><td>${esc(u.email||'-')}</td><td>${esc(u.role||'-')}</td><td>${status}</td><td>${locked?'<span class="muted">Akun inti</span> ':''}${actions}</td></tr>`;
   }).join('');
-  target.innerHTML=`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Total akun: ${users.length}. Akun nonaktif tetap tersimpan untuk audit.</p>`;
+  target.innerHTML=assignmentPanel+`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows}</tbody></table></div><p class="muted">Total akun: ${users.length}. Akun nonaktif tetap tersimpan untuk audit.</p>`;
  }catch(e){target.innerHTML=`<p class="bad">${esc(e.message||'Gagal memuat akun.')}</p>`;}finally{window.ASSALAM_TIDB_USERS_LOADING=false;}
 }
+async function actionAssignQueueLane(){
+ if(currentRole!=='pimpinan'){showAlert('Hanya Pimpinan yang dapat menetapkan shift dan jalur antrean.','Akses Ditolak');return;}
+ const userId=String(val('tidb-lane-user')||'').trim(),laneCode=String(val('tidb-lane-code')||'').trim().toUpperCase();
+ if(!userId||!['A','B'].includes(laneCode)){showAlert('Pilih akun Kasir dan jalur antrean yang valid.');return;}
+ const cashier=(window.ASSALAM_TIDB_USER_CACHE||[]).find(u=>u.userId===userId);
+ if(!cashier||cashier.role!=='kasir'||!cashier.active||cashier.banned){showAlert('Akun tujuan bukan Kasir aktif.');return;}
+ showConfirm('Tetapkan '+(cashier.name||cashier.email)+' ke Jalur '+laneCode+' / Shift '+(laneCode==='A'?'Pagi':'Sore')+'?',async()=>{
+  try{
+   await window.assalamTiDBApi.assignLane({userId,laneCode},window.assalamTiDBApi.newIdempotencyKey());
+   await loadTiDBUsers();
+   showAlert('Penetapan shift berhasil disimpan di TiDB.','Penetapan Disimpan');
+  }catch(error){showAlert(error.message||'Penetapan shift gagal disimpan.','Gagal Menetapkan Shift');}
+ },'Tetapkan Shift Kasir');
+}
+
 function actionAddUser(){
  if(!isTiDBCatalogPreview()){showAlert('Pembuatan akun lokal dinonaktifkan.');return;}
  showFormModal('Tambah Akun Klinik',[
