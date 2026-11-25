@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - migration/tidb-foundation
+      - main
   pull_request:
     branches:
       - migration/tidb-foundation
+      - main
 
 jobs:
   node-tests:
