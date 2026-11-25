@@ -2016,32 +2016,46 @@ async function actionBayarTrx(totalCart) {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
-        const checkoutItems = (newTrx.items || []).map((it, idx) => {
+        const medMap = new Map();
+        const tariffList = [];
+        (newTrx.items || []).forEach((it, idx) => {
           const isPaket = (it.t || it.jenis) === "Paket";
           const isObat = !!it.oid;
-          if (isPaket) {
-            return {
-              packageId: it.pkgId || it.id || String(idx + 1),
+          if (isPaket && Array.isArray(it.items) && it.items.length > 0) {
+            it.items.forEach(part => {
+              const partQty = (Number(part.qty) || 1) * Number(it.qty || 1);
+              if (part.type === "obat" || part.oid) {
+                const medId = String(part.oid || part.id);
+                medMap.set(medId, (medMap.get(medId) || 0) + partQty);
+              } else {
+                tariffList.push({
+                  tariffId: String(part.tid || part.id || (idx + 1)),
+                  quantity: String(partQty),
+                  discount: "0"
+                });
+              }
+            });
+          } else if (isObat) {
+            const medId = String(it.oid || it.id);
+            const qty = Number(it.qty || 1);
+            medMap.set(medId, (medMap.get(medId) || 0) + qty);
+          } else {
+            tariffList.push({
+              tariffId: String(it.tid || it.id || (idx + 1)),
               quantity: String(it.qty || 1),
-              price: String(it.harga || it.price || 0),
               discount: "0"
-            };
+            });
           }
-          if (isObat) {
-            return {
-              medicineId: it.oid || it.id || String(idx + 1),
-              quantity: String(it.qty || 1),
-              price: String(it.harga || it.price || 0),
-              discount: "0"
-            };
-          }
-          return {
-            tariffId: it.tid || it.id || String(idx + 1),
-            quantity: String(it.qty || 1),
-            price: String(it.harga || it.price || 0),
-            discount: "0"
-          };
         });
+        const checkoutItems = [];
+        medMap.forEach((qty, medId) => {
+          checkoutItems.push({
+            medicineId: medId,
+            quantity: String(qty),
+            discount: "0"
+          });
+        });
+        tariffList.forEach(t => checkoutItems.push(t));
 
         const checkoutPayload = {
           encounterId: pasien.id || ("enc_" + Date.now()),
@@ -2072,7 +2086,7 @@ async function actionBayarTrx(totalCart) {
         });
       });
       store.saveLocal(false);
-      showAlert(err.message || 'Transaksi gagal disimpan ke Firebase. Stok lokal telah dikembalikan.', 'Transaksi Gagal');
+      showAlert(err.message || 'Transaksi gagal disimpan ke server. Stok lokal telah dikembalikan.', 'Transaksi Gagal');
       return;
     }
   }
@@ -2085,7 +2099,7 @@ async function actionBayarTrx(totalCart) {
   store.logActivity('Transaksi', 'Kasir', `Nota ${noNota} - Pasien ${pasien.nama} (${rp(totalCart)})`);
   store.saveLocal();
   renderApp();
-  printReceipt(trxId);
+  printReceipt(newTrx.id);
 }
 
 // Cetak Nota Struk Pasien (Modal Khusus Nota)

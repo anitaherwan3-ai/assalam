@@ -10,6 +10,7 @@ function createHarness(overrides = {}) {
     batches: [{ batchId: "batch-1", expiryDate: "2027-01-01", receivedAtUtc: "2026-10-01T00:00:00Z", remainingQty: "5", disposition: "sellable", version: "1" }],
     movements: [], audits: [], patients: [], encounters: [], tickets: [],
     invoiceDrafts: [], invoices: [], invoiceLines: [], batchAllocations: [], returnQuotas: [], encounterCompleted: null,
+    payments: [], cashEntries: [],
     purchaseLine: { purchaseId: "purchase-1", purchaseLineId: "line-1", medicineId: "med-1", supplierId: "sup-1", quantityScale: 0, orderedQty: "5", receivedQty: "0", purchasedQty: "5", returnedQty: "0", originalBatchAllocations: [{ batchId: "batch-1" }] },
     receipts: [], payableUpserts: [], supplierReturnRequests: [], supplierReturnStatus: null,
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
@@ -27,6 +28,7 @@ function createHarness(overrides = {}) {
       tickets: state.tickets, invoiceDrafts: state.invoiceDrafts, invoices: state.invoices,
       invoiceLines: state.invoiceLines, batchAllocations: state.batchAllocations,
       returnQuotas: state.returnQuotas, encounterCompleted: state.encounterCompleted,
+      payments: state.payments, cashEntries: state.cashEntries,
       purchaseLine: state.purchaseLine, receipts: state.receipts, payableUpserts: state.payableUpserts,
       supplierReturnRequests: state.supplierReturnRequests, supplierReturnStatus: state.supplierReturnStatus,
       currentCall: state.currentCall,
@@ -45,7 +47,15 @@ function createHarness(overrides = {}) {
   const repo = {
 
     async lockPaymentSource() { return { sourceId: "invoice-1", status: "posted" }; },
-    async appendPaymentEvent() { return "payment-1"; },
+    async appendPaymentEvent(_c, data) {
+      state.payments.push(data);
+      return "payment-" + state.payments.length;
+    },
+    async ensureCashAccount(_c, userId) { return "drawer-" + userId; },
+    async appendCashLedgerMovement(_c, data) {
+      state.cashEntries.push(data);
+      return state.cashEntries.length;
+    },
     async lockCheckoutContext(_c, encounterId, shiftId) {
       return {
         encounter: { encounterId: String(encounterId), patientId: "patient-" + encounterId, cashierUserId: "cashier-1", shiftId: String(shiftId), businessDate: "2026-11-17" },
@@ -206,6 +216,42 @@ test("checkout failure rolls back the invoice, batch and ledger writes together"
   assert.equal(state.invoiceDrafts.length, 0);
   assert.equal(state.invoices.length, 0);
   assert.equal(state.audits.length, 0);
+});
+
+test("checkout with cash payment writes to invoice_payments and cash_ledger_entries under shift", async () => {
+  const { state, commands } = createHarness();
+  const res = await commands.postCheckout({
+    actor: cashier, encounterId: "enc-cash-1", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "2" }],
+    payment: { method: "cash", amountPaid: "3000" },
+    idempotencyKey: "cash-key-1", requestId: "req-cash-1"
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.data.payment.method, "cash");
+  assert.equal(res.body.data.payment.amount, "3000");
+  assert.equal(state.payments.length, 1);
+  assert.equal(state.payments[0].paymentMethod, "cash");
+  assert.equal(state.payments[0].paymentStatus, "settled");
+  assert.equal(state.cashEntries.length, 1);
+  assert.equal(state.cashEntries[0].direction, "in");
+  assert.equal(state.cashEntries[0].amount, "3000");
+  assert.equal(state.cashEntries[0].shiftId, "shift-1");
+  assert.equal(state.cashEntries[0].sourceType, "sale");
+});
+
+test("checkout with non-cash payment writes to invoice_payments but does not alter cash drawer", async () => {
+  const { state, commands } = createHarness();
+  const res = await commands.postCheckout({
+    actor: cashier, encounterId: "enc-qris-1", shiftId: "shift-1",
+    items: [{ medicineId: "med-1", quantity: "1" }],
+    payment: { method: "qris", amountPaid: "1500" },
+    idempotencyKey: "qris-key-1", requestId: "req-qris-1"
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.data.payment.method, "qris");
+  assert.equal(state.payments.length, 1);
+  assert.equal(state.payments[0].paymentMethod, "qris");
+  assert.equal(state.cashEntries.length, 0);
 });
 
 test("concurrent encounter registration creates separate visit rows and unique queue numbers", async () => {

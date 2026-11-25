@@ -370,13 +370,36 @@ class ClinicStore {
   }
 
   // Lunasi Utang Faktur
-  lunasiBeli(beliId) {
+  async lunasiBeli(beliId) {
     const beli = this.get('beli', beliId);
     if (!beli) return;
+    if (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.recordSupplierPayment({
+          payment: {
+            sourceType: "supplier_payable",
+            sourceId: String(beli.id || beliId),
+            amount: String(beli.total || beli.sisa || 0),
+            paymentMethod: "bank_transfer",
+            paymentStatus: "settled",
+            businessDate: new Date().toISOString().slice(0, 10),
+            eventAtUtc: new Date().toISOString(),
+            evidenceFileId: "evidence-direct-settlement"
+          }
+        }, tidbKey);
+      } catch (err) {
+        if (typeof showAlert === 'function') {
+          showAlert('Pelunasan utang ke TiDB gagal: ' + (err.message || 'Kesalahan jaringan'), 'Gagal');
+        }
+        return;
+      }
+    }
     beli.lunas = true;
     beli.tglBayar = new Date().toISOString().slice(0, 10);
     this.logActivity('Pelunasan', 'Pembelian', `Faktur ${beli.faktur} (${rp(beli.total)})`);
     this.saveLocal();
+    if (typeof renderApp === 'function') renderApp();
   }
 
   // Pembatalan transaksi wajib melalui persetujuan Cloud; tidak ada rollback stok lokal.
