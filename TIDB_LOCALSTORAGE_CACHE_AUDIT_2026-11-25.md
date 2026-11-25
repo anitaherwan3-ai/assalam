@@ -70,6 +70,9 @@ After the initial audit, the branch received these additional source changes:
 - `js/app.js` now hydrates sales history from those server fields rather than fabricating empty item lists and defaulting every invoice to cash. Unrecognized non-cash income is excluded from active financial totals until the full invoice amount is recognized. This is conservative for partial approvals and still needs a precise partial-recognition accounting treatment before launch.
 - `js/app.js` no longer performs local batch deduction or local stock rollback in TiDB Preview checkout mode. The server checkout transaction is the sole stock authority; local batch prevalidation is bypassed in TiDB mode because batches are not yet hydrated into the browser. After checkout, the app refreshes server-owned operational state.
 - `js/store.js` now routes the patient-call action through `POST /api/queue` in TiDB Preview, and only changes local call state/broadcasts after the server confirms the call event.
+- `lib/repositories/tidb-queue-repository.js` and the UI sync now preserve the queue ticket ID separately from the encounter ID and patient ID. This fixes a reload path where checkout could otherwise send a queue-ticket ID as the encounter ID, and a call path that could send the encounter ID as the ticket ID.
+- Queue status mapping now recognizes the backend status `called` as the active call (the previous UI checked only `calling`).
+- TiDB checkout now leaves batch FEFO deduction to the server transaction; it no longer requires an unhydrated browser batch list or locally deducts/rolls back stock before the server commits.
 - Receipt lookup retains the internal TiDB invoice ID, and item display uses net line price from the server read model.
 
 ## Remaining high-priority blockers after this pass
