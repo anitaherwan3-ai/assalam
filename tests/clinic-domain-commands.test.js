@@ -404,7 +404,7 @@ test("supplier payment and refund payout fail closed until their owner policies 
     actor: lead, payment, idempotencyKey: "supplier-pay-1", requestId: "supplier-pay-req"
   }), { code: "SUPPLIER_PAYMENT_POLICY_PENDING" });
   await assert.rejects(commands.payRefund({
-    actor: lead, payout: payment, idempotencyKey: "refund-pay-1", requestId: "refund-pay-req"
+    actor: cashier, payout: payment, idempotencyKey: "refund-pay-1", requestId: "refund-pay-req"
   }), { code: "REFUND_PAYOUT_POLICY_PENDING" });
 });
 
