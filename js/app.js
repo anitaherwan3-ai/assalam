@@ -175,6 +175,20 @@ function calculateFinancials() {
 // Inisialisasi Aplikasi
 function initApp() {
   applyAppSettings();
+  // Only the dedicated migration Preview alias may expose the protected owner bootstrap.
+  const previewHost = String(window.location && window.location.hostname || "").toLowerCase();
+  const ownerBootstrapPreview = previewHost.includes("git-migration-tidb-foundation") && previewHost.endsWith(".vercel.app");
+  if (ownerBootstrapPreview) window.ASSALAM_TIDB_PREVIEW_BOOTSTRAP = true;
+  const ownerBootstrapButton = $("preview-owner-bootstrap");
+  if (ownerBootstrapButton && ownerBootstrapPreview && window.assalamTiDBApi) {
+    ownerBootstrapButton.textContent = "Aktivasi Awal Pimpinan TiDB";
+    ownerBootstrapButton.style.display = "block";
+    ownerBootstrapButton.style.width = "100%";
+    ownerBootstrapButton.style.marginTop = "8px";
+    ownerBootstrapButton.removeAttribute("aria-hidden");
+    ownerBootstrapButton.removeAttribute("tabindex");
+  }
+
   if (isTiDBCatalogPreview()) restoreTiDBPreviewSession().then(ready => {
     if (!ready || !window.ASSALAM_TIDB_PREVIEW_SESSION) return;
     const actor = window.ASSALAM_TIDB_PREVIEW_SESSION.actor;
