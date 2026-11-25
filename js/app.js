@@ -1355,7 +1355,15 @@ function actionBatalBerobat(id) {
   }
   const p = store.get('pasien', id);
   if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat') return;
-  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', () => {
+  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', async () => {
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        await window.assalamTiDBApi.cancelEncounter({ encounterId: String(p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+      } catch (error) {
+        showAlert(error.message || 'Pembatalan belum tersimpan di server TiDB.', 'Gagal Membatalkan');
+        return;
+      }
+    }
     p.status = 'batal_berobat';
     p.batalBerobatPada = Date.now();
     p.batalBerobatOleh = currentUser ? currentUser.u : 'kasir';
@@ -1374,7 +1382,15 @@ function actionPulihkanBatalBerobat(id) {
   }
   const p = store.get('pasien', id);
   if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr) return;
-  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', () => {
+  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', async () => {
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        await window.assalamTiDBApi.restoreEncounter({ encounterId: String(p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+      } catch (error) {
+        showAlert(error.message || 'Pemulihan belum tersimpan di server TiDB.', 'Gagal Memulihkan');
+        return;
+      }
+    }
     p.status = 'aktif';
     p.batalBerobatPada = null;
     p.batalBerobatOleh = null;
