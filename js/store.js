@@ -453,7 +453,7 @@ class ClinicStore {
       }
       try {
         await window.assalamTiDBApi.callQueue({
-          ticketId: String(patient.id),
+          ticketId: String(patient.ticketId || patient.id),
           laneCode,
           eventType: 'call'
         }, window.assalamTiDBApi.newIdempotencyKey());
