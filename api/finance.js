@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
       const [shifts] = await getPool().execute(
         "SELECT s.shift_id AS shiftId, s.public_id AS publicId, s.cashier_user_id AS cashierUserId, u.display_name AS cashierName, " +
         "DATE_FORMAT(s.business_date, '%Y-%m-%d') AS tgl, s.shift_code AS shiftCode, s.opening_float AS openingFloat, " +
-        "(SELECT qa.prefix FROM cashier_queue_assignments qa WHERE qa.user_id = s.cashier_user_id AND qa.valid_from <= s.business_date AND (qa.valid_to IS NULL OR qa.valid_to >= s.business_date) ORDER BY qa.valid_from DESC LIMIT 1) AS laneCode, " +
+        "(SELECT qa.prefix FROM cashier_queue_assignments qa WHERE qa.user_id = s.cashier_user_id AND qa.valid_from <= s.business_date AND (qa.valid_to IS NULL OR qa.valid_to >= s.business_date) ORDER BY qa.valid_from DESC, qa.assignment_id DESC LIMIT 1) AS laneCode, " +
         "s.status, " +
         "r.expected_cash AS expectedCash, r.counted_cash AS countedCash, r.variance_amount AS varianceAmount, " +
         "r.variance_reason AS varianceReason, r.status AS verifStatus " +
