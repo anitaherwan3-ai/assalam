@@ -253,8 +253,8 @@
     // Firebase dinonaktifkan dari pemuatan default.
     // Hanya dimuat sementara jika parameter URL ?legacy_firebase=1 diberikan secara eksplisit.
     if (new URLSearchParams(location.search).get('legacy_firebase') === '1') {
-      document.write('<script src="js/firebase-config.js"><\\/script>');
-      document.write('<script src="js/firebase-backend.js?v=refund4"><\\/script>');
+      document.write('<script src="js/firebase-config.js"><\/script>');
+      document.write('<script src="js/firebase-backend.js?v=refund4"><\/script>');
     }
   </script>
   <script src="js/export-helper.js"></script>
