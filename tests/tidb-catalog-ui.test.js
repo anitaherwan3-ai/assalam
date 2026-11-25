@@ -5,9 +5,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-function installCatalogUI({ enabled = true, api = {} } = {}) {
+function installCatalogUI({ enabled = true, api = {}, role = "pimpinan" } = {}) {
   const window = {
     ASSALAM_TIDB_PREVIEW_BOOTSTRAP: enabled,
+    currentUser: { role },
     assalamTiDBApi: api
   };
   const source = fs.readFileSync(require.resolve("../js/tidb-catalog-ui.js"), "utf8");
@@ -47,6 +48,21 @@ test("TiDB catalog UI loads session, tariffs and suppliers from TiDB and maps ap
     id: "supplier-public-1", publicId: "supplier-public-1", nama: "PBF Uji",
     phone: "", address: "Palembang", active: true, version: "2"
   });
+});
+
+test("cashier catalog loading does not request supplier data restricted to Admin and Pimpinan", async () => {
+  const calls = [];
+  const window = installCatalogUI({
+    role: "kasir",
+    api: {
+      getSession: async () => ({ ok: true }),
+      listTariffs: async () => ({ ok: true, data: [] }),
+      listSuppliers: async () => { calls.push("suppliers"); throw new Error("403 forbidden"); }
+    }
+  });
+  await window.assalamTiDBCatalog.ensureLoaded();
+  assert.deepEqual(calls, []);
+  assert.deepEqual(JSON.parse(JSON.stringify(window.assalamTiDBCatalog.getSuppliers())), []);
 });
 
 test("TiDB catalog UI rejects unsafe BIGINT prices instead of silently rounding", async () => {
