@@ -17,3 +17,29 @@ test("queue repository is wired for independent per-lane call policy", async () 
   assert.deepEqual(await repository.getQueuePrefixPolicy(null, "C"), { approved: false, mode: "per_lane" });
   assert.equal(typeof repository.getDisplayQueue, "function");
 });
+
+test("queue ticket creation requires the latest active lane assignment authored by Pimpinan", async () => {
+  const repository = createTidbQueueRepository();
+  const statements = [];
+  const connection = {
+    async execute(sql) {
+      statements.push(sql);
+      if (sql.includes("FROM patient_encounters")) {
+        return [[{ cashierUserId: "cashier-1", shiftId: "77" }], []];
+      }
+      if (sql.includes("SELECT a.assignment_id FROM cashier_queue_assignments a")) {
+        return [[{ assignment_id: 12 }], []];
+      }
+      if (sql.includes("INSERT INTO queue_tickets")) return [{ insertId: 91 }, []];
+      throw new Error("Unexpected SQL in queue ticket test: " + sql);
+    }
+  };
+  const result = await repository.createQueueTicket(connection, {
+    encounterId: "45", businessDate: "2026-11-25", prefix: "A", sequence: 3
+  });
+  const assignmentSql = statements.find(sql => sql.includes("SELECT a.assignment_id FROM cashier_queue_assignments a"));
+  assert.equal(result.ticketId, "91");
+  assert.equal(result.queueNumber, "A-003");
+  assert.match(assignmentSql, /ra\.role_code = 'pimpinan'/);
+  assert.match(assignmentSql, /a\.assignment_id = \(SELECT MAX\(a2\.assignment_id\)/);
+});
