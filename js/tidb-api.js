@@ -34,7 +34,11 @@
       "/api/inventory",
       "/api/finance"
     ]);
-    if (!allowedPaths.has(path)) {
+    // Query parameters select a read view on the same API route; they are not
+    // separate endpoints. Validate only the pathname, while preserving the
+    // original path (including its query string) for fetch().
+    const endpointPath = String(path || "").split("?", 1)[0];
+    if (!allowedPaths.has(endpointPath)) {
       throw makeError("Endpoint TiDB tidak diizinkan oleh adapter.", 0, "TIDB_ENDPOINT_NOT_ALLOWED");
     }
     const method = String(options.method || "GET").toUpperCase();
