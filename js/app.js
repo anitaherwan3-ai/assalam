@@ -240,7 +240,7 @@ async function syncOperationalDataFromTiDB() {
           const incomeRecognized = recognizedAmount >= Number(inv.total || 0);
           const isCancelled = inv.status === 'cancelled';
           return {
-            id: inv.publicId || String(inv.invoiceId),
+            id: String(inv.invoiceId),
             no: inv.publicId || ('INV-' + inv.invoiceId),
             tgl: inv.tgl,
             jam: '00:00',
