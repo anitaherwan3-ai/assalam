@@ -77,6 +77,51 @@ module.exports = async function handler(req, res) {
         })) });
       }
 
+      if (url.searchParams.get("quarantine") === "1") {
+        const [rows] = await getPool().execute(
+          "SELECT b.batch_id AS batchId, b.medicine_id AS medicineId, m.name AS medicineName, b.batch_number AS batchNo, " +
+          "DATE_FORMAT(b.expiry_date, '%Y-%m-%d') AS expiryDate, b.remaining_quantity AS quantity, " +
+          "b.expiry_verified AS expiryVerified, b.origin_verified AS originVerified, b.disposition, " +
+          "q.quarantine_event_id AS eventId, q.inspection_decision AS inspectionDecision, q.reason, " +
+          "q.inspected_by_user_id AS inspectedByUserId, DATE_FORMAT(q.inspected_at_utc, '%Y-%m-%d %H:%i:%s') AS inspectedAt, " +
+          "q.evidence_file_id AS evidenceReference, q.release_approved_by_user_id AS releaseApprovedByUserId, " +
+          "q.disposition_approved_by_user_id AS dispositionApprovedByUserId, " +
+          "q.released_by_user_id AS releasedByUserId, q.disposition_completed_by_user_id AS dispositionCompletedByUserId " +
+          "FROM inventory_batches b JOIN medicines m ON m.medicine_id = b.medicine_id " +
+          "LEFT JOIN inventory_quarantine_events q ON q.quarantine_event_id = (" +
+          "SELECT q2.quarantine_event_id FROM inventory_quarantine_events q2 " +
+          "WHERE q2.batch_id = b.batch_id AND q2.event_type = 'inspection' " +
+          "ORDER BY q2.occurred_at_utc DESC, q2.quarantine_event_id DESC LIMIT 1) " +
+          "WHERE b.disposition = 'quarantined' AND b.remaining_quantity > 0 " +
+          "ORDER BY q.occurred_at_utc DESC, b.batch_id DESC LIMIT 500"
+        );
+        return res.status(200).json({ ok: true, data: rows.map(row => {
+          const releaseApproved = !!row.releaseApprovedByUserId;
+          const dispositionApproved = !!row.dispositionApprovedByUserId;
+          const decision = row.inspectionDecision || null;
+          let workflowStatus = "needs_inspection";
+          if (decision === "hold") workflowStatus = "on_hold";
+          if (decision === "release") workflowStatus = releaseApproved
+            ? (row.releasedByUserId ? "released" : "release_approved_waiting_admin")
+            : "release_pending_approval";
+          if (decision === "dispose") workflowStatus = dispositionApproved
+            ? (row.dispositionCompletedByUserId ? "disposed" : "disposition_approved_waiting_admin")
+            : "disposition_pending_approval";
+          return {
+            ...row,
+            batchId: String(row.batchId), medicineId: String(row.medicineId),
+            quantity: String(row.quantity), eventId: row.eventId ? String(row.eventId) : null,
+            inspectedByUserId: row.inspectedByUserId ? String(row.inspectedByUserId) : null,
+            releaseApprovedByUserId: row.releaseApprovedByUserId ? String(row.releaseApprovedByUserId) : null,
+            dispositionApprovedByUserId: row.dispositionApprovedByUserId ? String(row.dispositionApprovedByUserId) : null,
+            releasedByUserId: row.releasedByUserId ? String(row.releasedByUserId) : null,
+            dispositionCompletedByUserId: row.dispositionCompletedByUserId ? String(row.dispositionCompletedByUserId) : null,
+            expiryVerified: !!row.expiryVerified, originVerified: !!row.originVerified,
+            workflowStatus
+          };
+        }) });
+      }
+
       if (url.searchParams.get("stocktakes") === "1") {
         const [stocktakes] = await getPool().execute(
           "SELECT s.stocktake_id AS id, s.public_id AS publicId, s.stocktake_id AS stocktakeId, DATE_FORMAT(s.stocktake_date, '%Y-%m-%d') AS tgl, " +
