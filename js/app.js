@@ -333,16 +333,26 @@ async function syncOperationalDataFromTiDB() {
       queueRes.data.forEach(q => {
         const existing = (store.state.pasien || []).find(p => p.no === q.queueNumber || p.id === String(q.ticketId));
         if (existing) {
+          existing.encounterId = String(q.encounterId);
+          existing.patientId = String(q.patientId);
+          existing.ticketId = String(q.ticketId);
+          existing.hp = q.patientPhone || existing.hp || '';
+          existing.layanan = q.serviceName || existing.layanan || 'UMUM';
+          existing.kasir = q.cashierName || q.cashierUserId;
+          existing.sh = q.shiftId;
           existing.status = q.status;
           existing.calling = q.status === 'called' || q.status === 'calling';
           existing.done = q.status === 'completed' || q.status === 'done';
           existing.laneCode = q.laneCode;
         } else {
           store.state.pasien.push({
-            id: String(q.ticketId),
+            id: String(q.encounterId),
+            encounterId: String(q.encounterId),
+            patientId: String(q.patientId),
+            ticketId: String(q.ticketId),
             no: q.queueNumber,
             nama: q.patientName,
-            hp: '',
+            hp: q.patientPhone || '',
             layanan: q.serviceName || 'UMUM',
             tgl: todayStr,
             jam: q.registeredAtUtc ? q.registeredAtUtc.slice(11, 16) : '07:00',
