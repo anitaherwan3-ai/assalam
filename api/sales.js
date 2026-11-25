@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
       const [lines] = await getPool().execute(
         "SELECT l.sales_invoice_id AS invoiceId, l.sales_invoice_line_id AS lineId, l.line_number AS lineNumber, " +
         "l.line_type AS lineType, l.item_name_snapshot AS itemName, l.unit_snapshot AS unit, l.quantity, " +
-        "l.gross_unit_price AS unitPrice, l.gross_amount AS grossAmount, l.line_discount AS discount, l.net_charge AS netCharge, " +
+        "l.gross_unit_price AS unitPrice, l.gross_amount AS grossAmount, l.line_discount AS discount, l.net_charge AS netCharge, l.hpp_snapshot AS hpp, " +
         "m.public_id AS medicinePublicId, t.public_id AS tariffPublicId " +
         "FROM sales_invoice_lines l JOIN sales_invoices i ON i.sales_invoice_id = l.sales_invoice_id " +
         "LEFT JOIN medicines m ON m.medicine_id = l.medicine_id " +
