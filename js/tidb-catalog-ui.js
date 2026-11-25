@@ -60,9 +60,12 @@
       if (!window.ASSALAM_TIDB_PREVIEW_SESSION) {
         window.ASSALAM_TIDB_PREVIEW_SESSION = await window.assalamTiDBApi.getSession();
       }
+      const canReadSuppliers = ["admin", "pimpinan"].includes(
+        String(window.currentUser && window.currentUser.role || "").toLowerCase()
+      );
       const [tariffsResponse, suppliersResponse] = await Promise.all([
         window.assalamTiDBApi.listTariffs(),
-        window.assalamTiDBApi.listSuppliers()
+        canReadSuppliers ? window.assalamTiDBApi.listSuppliers() : Promise.resolve({ data: [] })
       ]);
       const tariffRows = Array.isArray(tariffsResponse && tariffsResponse.data) ? tariffsResponse.data : [];
       const supplierRows = Array.isArray(suppliersResponse && suppliersResponse.data) ? suppliersResponse.data : [];

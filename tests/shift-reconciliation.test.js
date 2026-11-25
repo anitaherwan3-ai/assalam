@@ -5,10 +5,13 @@ const assert = require("node:assert/strict");
 const { createClinicDomainCommands } = require("../lib/clinic-domain-commands");
 
 function makeCommands(shift) {
-  const state = { closed: null, verified: null, verifications: [], activeShift: false, opened: null, assignedLane: null };
+  const state = { closed: null, verified: null, verifications: [], activeShift: false, opened: null, assignedLane: null, assignmentPrefix: "A" };
   const repository = {
     async findActiveShiftSlot(_c, userId) {
       return state.activeShift ? { shiftId: "active-1", cashierUserId: userId } : null;
+    },
+    async getAssignedQueueLane() {
+      return state.assignmentPrefix ? { prefix: state.assignmentPrefix } : null;
     },
     async openShift(_c, input) {
       state.opened = input;
@@ -98,11 +101,11 @@ test("cashier shift requires two distinct Admin approvals; Admin shift requires 
   assert.equal(final.body.data.requiredApprovals, 1);
 });
 
-test("cashier opens shift with opening float and lane assignment", async () => {
+test("cashier shift is derived from the Pimpinan assignment, not browser input", async () => {
   const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
   const result = await commands.openShift({
     actor: { userId: "cashier-1", role: "kasir" },
-    shiftCode: "morning", openingFloat: "100000", laneCode: "A",
+    shiftCode: "admin", laneCode: "B", openingFloat: "100000",
     idempotencyKey: "shift-open-1", requestId: "shift-open-req-1"
   });
   assert.equal(result.body.data.shiftCode, "morning");
@@ -110,18 +113,45 @@ test("cashier opens shift with opening float and lane assignment", async () => {
   assert.equal(result.body.data.laneCode, "A");
   assert.equal(result.body.data.status, "open");
   assert.equal(state.opened.cashierUserId, "cashier-1");
+  assert.equal(state.opened.shiftCode, "morning");
+  assert.equal(state.opened.laneCode, "A");
 
   await assert.rejects(commands.openShift({
     actor: { userId: "cashier-1", role: "kasir" },
-    shiftCode: "morning", openingFloat: "100000", laneCode: "A",
+    openingFloat: "100000",
     idempotencyKey: "shift-open-dup", requestId: "shift-open-req-dup"
   }), { code: "CASHIER_ALREADY_HAS_ACTIVE_SHIFT" });
 });
 
-test("admin assigns queue lane A or B to cashier", async () => {
+test("cashier cannot open a shift without a Pimpinan lane assignment", async () => {
   const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
-  const res = await commands.assignQueueLane({
+  state.assignmentPrefix = null;
+  await assert.rejects(commands.openShift({
+    actor: { userId: "cashier-1", role: "kasir" },
+    openingFloat: "100000",
+    idempotencyKey: "shift-open-unassigned", requestId: "shift-open-unassigned-req"
+  }), { code: "SHIFT_LANE_NOT_ASSIGNED" });
+  assert.equal(state.opened, null);
+});
+
+test("Admin cannot open a cashier shift", async () => {
+  const { commands } = makeCommands({ shiftId: "1", cashierUserId: "admin-1", shiftCode: "admin" });
+  await assert.rejects(commands.openShift({
     actor: { userId: "admin-1", role: "admin" },
+    openingFloat: "100000",
+    idempotencyKey: "shift-open-admin", requestId: "shift-open-admin-req"
+  }), { code: "SHIFT_OPEN_ROLE_FORBIDDEN" });
+});
+
+test("only Pimpinan can assign queue lanes to cashier", async () => {
+  const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
+  await assert.rejects(commands.assignQueueLane({
+    actor: { userId: "admin-1", role: "admin" },
+    userId: "cashier-2", laneCode: "B",
+    idempotencyKey: "lane-assign-admin", requestId: "lane-assign-admin-req"
+  }), { code: "DOMAIN_FORBIDDEN" });
+  const res = await commands.assignQueueLane({
+    actor: { userId: "owner-1", role: "pimpinan" },
     userId: "cashier-2", laneCode: "B",
     idempotencyKey: "lane-assign-1", requestId: "lane-assign-req-1"
   });
@@ -130,7 +160,7 @@ test("admin assigns queue lane A or B to cashier", async () => {
   assert.equal(state.assignedLane.laneCode, "B");
 
   await assert.rejects(commands.assignQueueLane({
-    actor: { userId: "admin-1", role: "admin" },
+    actor: { userId: "owner-1", role: "pimpinan" },
     userId: "cashier-2", laneCode: "C",
     idempotencyKey: "lane-assign-inv", requestId: "lane-assign-req-inv"
   }), { code: "LANE_CODE_INVALID" });
