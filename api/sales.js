@@ -24,6 +24,25 @@ module.exports = async function handler(req, res) {
         "JOIN users u ON u.user_id = i.cashier_user_id " +
         "ORDER BY i.sales_invoice_id DESC LIMIT 200"
       );
+      const [lines] = await getPool().execute(
+        "SELECT l.sales_invoice_id AS invoiceId, l.sales_invoice_line_id AS lineId, l.line_number AS lineNumber, " +
+        "l.line_type AS lineType, l.item_name_snapshot AS itemName, l.unit_snapshot AS unit, l.quantity, " +
+        "l.gross_unit_price AS unitPrice, l.gross_amount AS grossAmount, l.line_discount AS discount, l.net_charge AS netCharge, " +
+        "m.public_id AS medicinePublicId, t.public_id AS tariffPublicId " +
+        "FROM sales_invoice_lines l JOIN sales_invoices i ON i.sales_invoice_id = l.sales_invoice_id " +
+        "LEFT JOIN medicines m ON m.medicine_id = l.medicine_id " +
+        "LEFT JOIN tariffs t ON t.tariff_id = l.tariff_id " +
+        "WHERE i.sales_invoice_id IN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) " +
+        "ORDER BY l.sales_invoice_id DESC, l.line_number"
+      );
+      const [payments] = await getPool().execute(
+        "SELECT p.sales_invoice_id AS invoiceId, p.invoice_payment_id AS paymentId, p.payment_method AS method, " +
+        "p.amount, p.review_status AS reviewStatus, p.settlement_status AS settlementStatus, " +
+        "p.income_recognized_at_utc AS incomeRecognizedAt, p.paid_at_utc AS paidAt, " +
+        "p.settlement_reference AS reference " +
+        "FROM invoice_payments p JOIN sales_invoices i ON i.sales_invoice_id = p.sales_invoice_id " +
+        "WHERE i.sales_invoice_id IN (SELECT sales_invoice_id FROM sales_invoices ORDER BY sales_invoice_id DESC LIMIT 200) " +
+        "ORDER BY p.sales_invoice_id DESC, p.invoice_payment_id";
       const [returns] = await getPool().execute(
         "SELECT r.sales_return_id AS returnId, r.public_id AS publicId, r.sales_invoice_id AS invoiceId, " +
         "r.status, r.requested_by_user_id AS requestedByUserId, r.requested_at_utc AS requestedAt, " +
@@ -32,6 +51,32 @@ module.exports = async function handler(req, res) {
         "LEFT JOIN refund_obligations ro ON ro.sales_return_id = r.sales_return_id " +
         "ORDER BY r.sales_return_id DESC LIMIT 100"
       );
+      const linesByInvoice = new Map();
+      for (const row of lines) {
+        const key = String(row.invoiceId);
+        if (!linesByInvoice.has(key)) linesByInvoice.set(key, []);
+        linesByInvoice.get(key).push({
+          lineId: String(row.lineId), lineNumber: Number(row.lineNumber),
+          lineType: row.lineType, itemName: row.itemName, unit: row.unit,
+          quantity: String(row.quantity), unitPrice: String(row.unitPrice),
+          grossAmount: String(row.grossAmount), discount: String(row.discount),
+          netCharge: String(row.netCharge),
+          medicinePublicId: row.medicinePublicId || null,
+          tariffPublicId: row.tariffPublicId || null
+        });
+      }
+      const paymentsByInvoice = new Map();
+      for (const row of payments) {
+        const key = String(row.invoiceId);
+        if (!paymentsByInvoice.has(key)) paymentsByInvoice.set(key, []);
+        paymentsByInvoice.get(key).push({
+          paymentId: String(row.paymentId), method: row.method, amount: String(row.amount),
+          reviewStatus: row.reviewStatus, settlementStatus: row.settlementStatus,
+          incomeRecognized: !!row.incomeRecognizedAt,
+          incomeRecognizedAt: row.incomeRecognizedAt,
+          paidAt: row.paidAt, reference: row.reference || null
+        });
+      }
       const [cancels] = await getPool().execute(
         "SELECT c.cancellation_request_id AS requestId, c.public_id AS publicId, c.sales_invoice_id AS invoiceId, " +
         "c.status, c.reason, c.requested_by_user_id AS requestedByUserId, c.requested_at_utc AS requestedAt, " +
@@ -47,7 +92,9 @@ module.exports = async function handler(req, res) {
             invoiceId: String(row.invoiceId),
             grossAmount: String(row.grossAmount),
             discountAmount: String(row.discountAmount),
-            total: Number(row.total)
+            total: Number(row.total),
+            items: linesByInvoice.get(String(row.invoiceId)) || [],
+            payments: paymentsByInvoice.get(String(row.invoiceId)) || []
           })),
           returns: returns.map(row => ({
             ...row,
