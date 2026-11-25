@@ -23,11 +23,11 @@ module.exports = async function handler(req, res) {
         const { getPool } = require("../lib/tidb");
         const [assignments] = await getPool().execute(
           "SELECT a.assignment_id AS assignmentId, a.user_id AS userId, u.display_name AS userName, " +
-          "a.prefix, s.shift_id AS shiftId, s.shift_code AS shiftCode, DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
+          "a.prefix, s.shift_id AS shiftId, s.shift_code AS shiftCode, (a.user_id = ?) AS isCurrentUser, DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
           "FROM cashier_queue_assignments a JOIN users u ON u.user_id = a.user_id " +
           "JOIN active_shift_slots active ON active.cashier_user_id = a.user_id " +
           "JOIN cashier_shifts s ON s.shift_id = active.shift_id AND s.cashier_user_id = a.user_id AND s.status = 'open' " +
-          "WHERE a.valid_to IS NULL ORDER BY a.valid_from DESC"
+          "WHERE a.valid_to IS NULL ORDER BY a.valid_from DESC", [actor.userId]
         );
         return res.status(200).json({ ok: true, data: assignments });
       }
