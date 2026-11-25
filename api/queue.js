@@ -19,6 +19,22 @@ module.exports = async function handler(req, res) {
 
     const actor = await requireBetterAuthActor(req);
     if (req.method === "GET") {
+      if (req.query && (req.query.all_assignments === "1" || req.query.all_assignments === "true")) {
+        if (actor.role !== "pimpinan") return res.status(403).json({ ok: false, code: "SHIFT_ASSIGNMENT_FORBIDDEN" });
+        const { getPool } = require("../lib/tidb");
+        const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+        const [assignments] = await getPool().execute(
+          "SELECT a.assignment_id AS assignmentId, a.user_id AS userId, u.display_name AS userName, a.prefix, " +
+          "DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
+          "FROM cashier_queue_assignments a JOIN users u ON u.user_id = a.user_id " +
+          "JOIN active_role_slots ars ON ars.user_id = a.user_id JOIN role_assignments ra ON ra.role_assignment_id = ars.role_assignment_id AND ra.user_id = ars.user_id AND ra.role_code = 'kasir' AND ra.valid_from_utc <= UTC_TIMESTAMP(3) AND (ra.valid_to_utc IS NULL OR ra.valid_to_utc > UTC_TIMESTAMP(3)) " +
+          "WHERE a.valid_from <= ? AND (a.valid_to IS NULL OR a.valid_to >= ?) " +
+          "AND a.assignment_id = (SELECT MAX(a2.assignment_id) FROM cashier_queue_assignments a2 WHERE a2.user_id = a.user_id AND a2.valid_from <= ? AND (a2.valid_to IS NULL OR a2.valid_to >= ?)) " +
+          "ORDER BY a.prefix, u.display_name",
+          [date, date, date, date]
+        );
+        return res.status(200).json({ ok: true, data: assignments });
+      }
       if (req.query && (req.query.assignments === "1" || req.query.assignments === "true")) {
         const { getPool } = require("../lib/tidb");
         const [assignments] = await getPool().execute(
