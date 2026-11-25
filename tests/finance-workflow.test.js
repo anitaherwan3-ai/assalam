@@ -11,6 +11,7 @@ function createFinanceHarness(overrides = {}) {
     async lockPaymentSource() { return { sourceId: "10", status: "posted" }; },
     async appendPaymentEvent(_c, input) { state.payment = { ...input, paymentId: "20", reviewStatus: input.paymentMethod === "cash" ? "not_required" : "pending" }; return "20"; },
     async appendCashLedgerMovement(_c, input) { state.events.push({ type: "cash", ...input }); },
+    async ensureCashAccount() { return "cash-account-1"; },
     async lockPaymentEvent() { return { paymentId: "20", reviewStatus: "pending", settlementStatus: "settled" }; },
     async approvePaymentEvent(_c, input) { state.payment.reviewStatus = "approved"; state.payment.reviewer = input.reviewerUserId; },
     async createExpense(_c, input) { state.expense = { ...input, expenseId: "30", status: "requested" }; return "30"; },
@@ -82,7 +83,7 @@ test("supplier partial payments require evidence and reject overpayment", async 
     sourceType: "supplier_payable", sourceId: "70", amount: "4000",
     paymentMethod: "transfer", paymentStatus: "settled",
     businessDate: "2026-11-17", eventAtUtc: "2026-11-17T10:00:00Z",
-    evidenceFileId: "file-1"
+    settlementReference: "KW-SUP-001", evidenceFileId: "KW-SUP-001"
   };
   const result = await commands.recordSupplierPayment({
     actor: admin, payment, idempotencyKey: "supplier-partial-1", requestId: "supplier-req-1"
@@ -111,16 +112,49 @@ test("expense is submitted by Admin and requires separate Pimpinan approval", as
   assert.equal(state.expense.approver, owner.userId);
 });
 
-test("refund payout does not require a destination account, payment method, or transfer reference", async () => {
+test("refund payout requires a confirmed payment reference and does not require destination account details", async () => {
   const { state, commands } = createFinanceHarness();
   const result = await commands.payRefund({
-    actor: owner,
+    actor: admin,
     payout: {
-      sourceId: "88", amount: "2500", paymentStatus: "settled",
+      sourceId: "88", amount: "2500", paymentStatus: "settled", paymentMethod: "cash",
+      settlementReference: "KAS-REFUND-001",
       businessDate: "2026-11-17", eventAtUtc: "2026-11-17T10:00:00Z"
     },
     idempotencyKey: "refund-transfer-1", requestId: "refund-req-1"
   });
   assert.equal(result.body.data.status, "transferred");
   assert.equal(state.refund.amount, "2500");
+  assert.equal(state.events.filter(event => event.type === "cash" && event.direction === "out").length, 1);
+});
+
+test("expense rejects generated evidence IDs and missing business date", async () => {
+  const { commands } = createFinanceHarness();
+  await assert.rejects(commands.createExpense({
+    actor: admin, category: "supplies", description: "ATK", amount: "1000",
+    businessDate: "2026-11-17", evidenceFileId: "bukti-exp-1234567890",
+    idempotencyKey: "expense-generated-1", requestId: "expense-generated-1"
+  }), { code: "EXPENSE_EVIDENCE_REQUIRED" });
+  await assert.rejects(commands.createExpense({
+    actor: admin, category: "supplies", description: "ATK", amount: "1000",
+    evidenceFileId: "KWT-FISIK-01",
+    idempotencyKey: "expense-date-missing", requestId: "expense-date-missing"
+  }), { code: "INVALID_BUSINESS_DATE" });
+});
+
+test("supplier payment rejects generated evidence IDs", async () => {
+  const { commands } = createFinanceHarness({
+    async getSupplierPaymentPolicy() { return { approved: true, partialPayments: true }; },
+    async lockSupplierPayable() { return { outstandingAmount: "10000" }; }
+  });
+  await assert.rejects(commands.recordSupplierPayment({
+    actor: admin,
+    payment: {
+      sourceType: "supplier_payable", sourceId: "70", amount: "1000",
+      paymentMethod: "cash", paymentStatus: "settled",
+      businessDate: "2026-11-17", eventAtUtc: "2026-11-17T10:00:00Z",
+      settlementReference: "LUNAS-01", evidenceFileId: "evid-fak-123"
+    },
+    idempotencyKey: "supplier-generated-1", requestId: "supplier-generated-1"
+  }), { code: "SUPPLIER_PAYMENT_EVIDENCE_REQUIRED" });
 });

@@ -27,7 +27,8 @@ module.exports = async function handler(req, res) {
       const [returns] = await getPool().execute(
         "SELECT r.sales_return_id AS returnId, r.public_id AS publicId, r.sales_invoice_id AS invoiceId, " +
         "r.status, r.requested_by_user_id AS requestedByUserId, r.requested_at_utc AS requestedAt, " +
-        "r.reason, ro.approved_amount AS refundAmount, ro.status AS refundStatus " +
+        "r.reason, ro.refund_obligation_id AS refundObligationId, ro.approved_amount AS refundAmount, " +
+        "ro.outstanding_amount AS refundOutstanding, ro.status AS refundStatus " +
         "FROM sales_returns r " +
         "LEFT JOIN refund_obligations ro ON ro.sales_return_id = r.sales_return_id " +
         "ORDER BY r.sales_return_id DESC LIMIT 100"
