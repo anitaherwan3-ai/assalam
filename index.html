@@ -245,18 +245,18 @@
   <!-- Script Modules -->
   <script src="js/helpers.js"></script>
   <script src="js/modules/whatsapp.js"></script>
-  <script src="js/store.js"></script>
-  <script>
-    // Firebase dinonaktifkan dari pemuatan default pada domain produksi.
-    // Menghindari ketergantungan ganda dan mengarahkan seluruh jalur data ke TiDB.
-    // Hanya dimuat sementara jika parameter URL ?legacy_firebase=1 diberikan secara eksplisit.
-    if (new URLSearchParams(location.search).get('legacy_firebase') === '1') {
-      document.write('<script src="js/firebase-config.js"><\/script>');
-      document.write('<script src="js/firebase-backend.js?v=refund4"><\/script>');
-    }
-  </script>
+  <!-- Muat penanda mode TiDB sebelum store membaca penyimpanan browser. -->
   <script src="js/tidb-api.js?v=tidb-auth2"></script>
   <script src="js/tidb-catalog-ui.js?v=catalog-preview1"></script>
+  <script src="js/store.js"></script>
+  <script>
+    // Firebase dinonaktifkan dari pemuatan default.
+    // Hanya dimuat sementara jika parameter URL ?legacy_firebase=1 diberikan secara eksplisit.
+    if (new URLSearchParams(location.search).get('legacy_firebase') === '1') {
+      document.write('<script src="js/firebase-config.js"><\\/script>');
+      document.write('<script src="js/firebase-backend.js?v=refund4"><\\/script>');
+    }
+  </script>
   <script src="js/export-helper.js"></script>
   <script src="js/app.js?v=tidb-auth2"></script>
 </body>
