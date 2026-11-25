@@ -842,32 +842,25 @@ function viewShift() {
         ${waNotice}
       </div>
     `;
-  } else {
+  } else if (currentRole === 'kasir') {
     activeCard = `
       <div class="card">
         <h2>Buka Shift Kasir Baru</h2>
-        <p style="color:var(--mu);margin-bottom:12px;">Pilih jenis shift dan jalur antrean, lalu tentukan modal awal uang kembalian di laci kasir.</p>
+        <p style="color:var(--mu);margin-bottom:12px;">Shift dan jalur antrean mengikuti penetapan Pimpinan pada akun ini. Kasir tidak dapat mengubahnya.</p>
         <div class="row">
-          <label>Pilihan Shift *
-            <select id="input-shift-code">
-              <option value="morning">Shift Pagi</option>
-              <option value="evening">Shift Sore</option>
-              <option value="admin">Shift Admin</option>
-            </select>
-          </label>
-          <label>Penetapan Jalur Antrean *
-            <select id="input-shift-lane">
-              <option value="A">Jalur A (Kasir 1 / Pagi)</option>
-              <option value="B">Jalur B (Kasir 2 / Sore)</option>
-            </select>
-          </label>
+          <div style="flex:1;min-width:220px;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;">
+            <b>Penugasan Shift</b>
+            <div style="font-size:13px;color:var(--mu);margin-top:4px;">Sistem mengambil Shift Pagi/Jalur A atau Shift Sore/Jalur B langsung dari TiDB.</div>
+          </div>
           <label>Modal Awal Uang Laci (Rp)
-            <input id="input-shift-modal" type="number" value="100000">
+            <input id="input-shift-modal" type="number" min="0" step="1" value="100000">
           </label>
           <button class="p" onclick="actionBukaShift()">Buka Shift Sekarang</button>
         </div>
       </div>
     `;
+  } else {
+    activeCard = `<div class="card"><h2>Shift Kasir</h2><p style="color:var(--mu);">Menu buka shift hanya tersedia untuk akun Kasir. Admin tidak memiliki shift kasir.</p></div>`;
   }
 
   const shiftRows = myShifts.map(s => [
@@ -904,10 +897,10 @@ async function actionBukaShift() {
   if (window._shiftActionInProgress) { showAlert('Proses shift sedang berlangsung, harap tunggu...', 'Mohon Tunggu'); return; }
   const modal = numVal('input-shift-modal');
   if (modal < 0) { showAlert('Modal awal tidak boleh bernilai negatif.'); return; }
-  const codeEl = $('input-shift-code');
-  const laneEl = $('input-shift-lane');
-  const shiftCode = codeEl ? codeEl.value : (currentRole === 'admin' ? 'admin' : 'morning');
-  const laneCode = laneEl ? laneEl.value : (shiftCode === 'evening' ? 'B' : 'A');
+  if (currentRole !== 'kasir') {
+    showAlert('Hanya akun Kasir dengan penetapan aktif dari Pimpinan yang dapat membuka shift.', 'Akses Ditolak');
+    return;
+  }
 
   let tidbShift = null;
   if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
@@ -915,9 +908,7 @@ async function actionBukaShift() {
     try {
       const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
       const res = await window.assalamTiDBApi.openShift({
-        shiftCode,
-        openingFloat: String(modal),
-        laneCode
+        openingFloat: String(modal)
       }, tidbKey);
       tidbShift = (res && res.data) || (res && res.body && res.body.data) || res || {};
     } catch (err) {
@@ -944,15 +935,15 @@ async function actionBukaShift() {
     selisih: null,
     status: 'buka',
     verif: false,
-    shiftCode,
-    laneCode,
+    shiftCode: tidbShift ? tidbShift.shiftCode : 'morning',
+    laneCode: tidbShift ? tidbShift.laneCode : '',
     _t: Date.now()
   };
   store.state.shift.push(shiftRecord);
   store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)} - Jalur ${laneCode}`);
   store.saveLocal();
   renderApp();
-  showAlert(`Shift kasir (${shiftCode}, Jalur ${laneCode}) berhasil dibuka dengan modal ${rp(modal)}.`, 'Shift Dibuka');
+  showAlert(`Shift kasir (${shiftRecord.shiftCode}, Jalur ${shiftRecord.laneCode || '-'}) berhasil dibuka dengan modal ${rp(modal)}.`, 'Shift Dibuka');
 }
 
 function actionTutupShift() {
