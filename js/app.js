@@ -1401,7 +1401,7 @@ async function actionAddPasien() {
         if (!shift || (!shift.id && !shift.publicId && !shift.shiftId)) {
           throw new Error('Shift kasir belum aktif. Silakan buka shift resmi terlebih dahulu sebelum mendaftarkan antrean.');
         }
-        const shiftId = String(shift.publicId || shift.id || shift.shiftId);
+        const shiftId = String(shift.shiftId || shift.id || shift.publicId);
         const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
         const assignedLane = (shift && shift.laneCode) || (currentUser && currentUser.u && String(currentUser.u).includes('2') ? 'B' : 'A');
         const res = await window.assalamTiDBApi.registerEncounter({
