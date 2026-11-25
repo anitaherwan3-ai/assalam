@@ -901,6 +901,10 @@ async function actionBukaShift() {
     showAlert('Hanya akun Kasir dengan penetapan aktif dari Pimpinan yang dapat membuka shift.', 'Akses Ditolak');
     return;
   }
+  if (!isTiDBCatalogPreview() || !window.assalamTiDBApi) {
+    showAlert('Pembukaan shift harus tersambung ke backend TiDB. Shift lokal tidak dapat dijadikan sumber data operasional.', 'Koneksi TiDB Diperlukan');
+    return;
+  }
 
   let tidbShift = null;
   if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
@@ -940,7 +944,7 @@ async function actionBukaShift() {
     _t: Date.now()
   };
   store.state.shift.push(shiftRecord);
-  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)} - Jalur ${laneCode}`);
+  store.logActivity('Buka Shift', 'Shift', `Modal awal ${rp(modal)} - Jalur ${shiftRecord.laneCode || '-'}`);
   store.saveLocal();
   renderApp();
   showAlert(`Shift kasir (${shiftRecord.shiftCode}, Jalur ${shiftRecord.laneCode || '-'}) berhasil dibuka dengan modal ${rp(modal)}.`, 'Shift Dibuka');
