@@ -1363,7 +1363,7 @@ async function actionTransferAntrean(id) {
   try {
     const response = await window.assalamTiDBApi.listQueueAssignments();
     const assignments = (response && response.data) || [];
-    const targets = assignments.filter(item => String(item.userId) !== String(currentUser && currentUser.id) && item.shiftId);
+    const targets = assignments.filter(item => !Number(item.isCurrentUser) && item.shiftId);
     if (!targets.length) {
       showAlert('Tidak ada kasir tujuan dengan shift aktif dan penugasan antrean.', 'Tujuan Tidak Tersedia');
       return;
