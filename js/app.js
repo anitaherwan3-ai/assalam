@@ -3188,11 +3188,9 @@ function viewPembelian() {
       b.lunas 
         ? `<span class="badge-ok">Lunas (${b.tglBayar})</span>` 
         : `<button class="s p" onclick="openModalLunasiBeli('${b.id}')">Lunasi Sekarang</button>`,
-${isTiDBCatalogPreview()
+isTiDBCatalogPreview()
         ? '<span style="color:var(--mu);font-size:11px;">Retur supplier TiDB menunggu UI workflow</span>'
-        : `
-          <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>
-        `}
+        : `<button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>`
     ];
   });
 
