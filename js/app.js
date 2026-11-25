@@ -226,12 +226,14 @@ async function syncOperationalDataFromTiDB() {
     if (window.assalamTiDBCatalog) {
       await window.assalamTiDBCatalog.ensureLoaded().catch(() => null);
     }
-    const [medRes, queueRes, salesRes, financeRes, invoicesRes] = await Promise.all([
+    const [medRes, queueRes, salesRes, financeRes, invoicesRes, batchRes, supReturnRes] = await Promise.all([
       window.assalamTiDBApi.listMedicines().catch(() => null),
       window.assalamTiDBApi.listQueueTickets().catch(() => null),
       window.assalamTiDBApi.listSales().catch(() => null),
       window.assalamTiDBApi.listFinance().catch(() => null),
-      window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null
+      window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null,
+      window.assalamTiDBApi.listBatches ? window.assalamTiDBApi.listBatches().catch(() => null) : null,
+      window.assalamTiDBApi.listSupplierReturns ? window.assalamTiDBApi.listSupplierReturns().catch(() => null) : null
     ]);
 
     if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
@@ -302,6 +304,41 @@ async function syncOperationalDataFromTiDB() {
               status: c.status === 'approved' ? 'disetujui' : (c.status === 'rejected' ? 'ditolak' : 'menunggu'),
               _t: Date.now()
             });
+          }
+        });
+      }
+      if (Array.isArray(salesRes.data.returns) && salesRes.data.returns.length > 0) {
+        salesRes.data.returns.forEach(r => {
+          const idx = store.state.returJual.findIndex(x => x.id === r.publicId || String(x.returnId || x.id) === String(r.returnId));
+          const appStatus = r.status === 'requested' ? 'menunggu' :
+            (r.status === 'admin_reviewed' ? 'menunggu_pimpinan' :
+            (r.status === 'pimpinan_approved' ? 'disetujui' :
+            (r.status === 'rejected' ? 'ditolak' : r.status)));
+
+          const refundObj = r.refundStatus ? {
+            status: r.refundStatus === 'paid' ? 'dibayar' : 'menunggu',
+            nominal: Number(r.refundAmount || 0),
+            metode: 'Tunai'
+          } : (r.status === 'pimpinan_approved' ? { status: 'menunggu', nominal: Number(r.refundAmount || 0) } : null);
+
+          const item = {
+            id: r.publicId || String(r.returnId),
+            returnId: String(r.returnId),
+            publicId: r.publicId || String(r.returnId),
+            trxId: String(r.invoiceId),
+            noNota: 'INV-' + r.invoiceId,
+            tgl: r.requestedAt ? r.requestedAt.slice(0, 10) : todayStr,
+            alasan: r.reason || '',
+            status: appStatus,
+            nominal: Number(r.refundAmount || 0),
+            pengembalian: refundObj,
+            _t: Date.now()
+          };
+
+          if (idx >= 0) {
+            Object.assign(store.state.returJual[idx], item);
+          } else {
+            store.state.returJual.push(item);
           }
         });
       }
@@ -405,6 +442,50 @@ async function syncOperationalDataFromTiDB() {
           Object.assign(existing, item);
         } else {
           store.state.beli.push(item);
+        }
+      });
+    }
+
+    if (batchRes && batchRes.ok && Array.isArray(batchRes.data) && batchRes.data.length > 0) {
+      batchRes.data.forEach(b => {
+        const idx = (store.state.batch || []).findIndex(x => x.id === b.id || x.no === b.batchNo);
+        const obat = (store.state.obat || []).find(o => o.id === b.publicId || o.nama === b.medicineName);
+        const item = {
+          id: String(b.id),
+          oid: obat ? obat.id : String(b.medicineId),
+          no: b.batchNo || '-',
+          ed: b.ed,
+          qty: Number(b.qty || 0),
+          sisa: Number(b.sisa || 0),
+          hpp: Number(b.hpp || 0),
+          disposition: b.disposition || 'sellable',
+          _t: Date.now()
+        };
+        if (idx >= 0) {
+          Object.assign(store.state.batch[idx], item);
+        } else {
+          store.state.batch.push(item);
+        }
+      });
+    }
+
+    if (supReturnRes && supReturnRes.ok && Array.isArray(supReturnRes.data) && supReturnRes.data.length > 0) {
+      supReturnRes.data.forEach(sr => {
+        const idx = (store.state.returBeli || []).findIndex(x => x.id === sr.id || String(x.returnId || x.id) === String(sr.returnId));
+        const item = {
+          id: String(sr.id),
+          returnId: String(sr.returnId),
+          tgl: sr.tgl || todayStr,
+          obat: sr.medicineName || '-',
+          qty: Number(sr.qtyRetur || 0),
+          alasan: sr.alasan || '-',
+          status: sr.status,
+          _t: Date.now()
+        };
+        if (idx >= 0) {
+          Object.assign(store.state.returBeli[idx], item);
+        } else {
+          store.state.returBeli.push(item);
         }
       });
     }
@@ -3126,7 +3207,7 @@ function viewPembelian() {
       esc(b.tempo || '-'),
       b.lunas 
         ? `<span class="badge-ok">Lunas (${b.tglBayar})</span>` 
-        : `<button class="s p" onclick="store.lunasiBeli('${b.id}')">Lunasi Sekarang</button>`,
+        : `<button class="s p" onclick="openModalLunasiBeli('${b.id}')">Lunasi Sekarang</button>`,
       `
         <button class="s" style="background:rgba(217,119,6,0.15);border-color:#d97706;color:#d97706;" onclick="openModalReturBeli('${b.id}')" title="Retur ke Supplier">Retur</button>
 
@@ -3189,6 +3270,9 @@ function viewPembelian() {
             <option value="tunai">Lunas Tunai / Transfer</option>
           </select>
         </label>
+        <label>No. Bukti Lunas / Referensi
+          <input id="beli-bukti" placeholder="Wajib jika lunas tunai/transfer">
+        </label>
         <button class="p" onclick="actionAddBeli()">Simpan Pembelian</button>
       </div>
     </div>
@@ -3203,6 +3287,69 @@ function viewPembelian() {
       ${renderTable(['Tanggal', 'Supplier', 'No. Faktur', 'Nama Obat', 'Qty Retur', 'Nilai Pengurang', 'Alasan'], returRows, { key: 'retur_beli_tbl' })}
     </div>
   `;
+}
+
+function openModalLunasiBeli(beliId) {
+  const b = store.get('beli', beliId);
+  if (!b) return;
+  const sisa = Number(b.total || 0) - Number(b.paidAmount || 0);
+  const nominalDefault = sisa > 0 ? sisa : b.total;
+
+  showFormModal(`Pelunasan Faktur Supplier - ${b.faktur || b.supplier || b.sup}`, [
+    ['nominal', 'Nominal Pembayaran (Rp) *', 'number', nominalDefault],
+    ['metode', 'Metode Pembayaran', 'select', 'Transfer', [
+      { value: 'Transfer', label: 'Bank Transfer' },
+      { value: 'Tunai', label: 'Kas Tunai' }
+    ]],
+    ['bukti', 'Nomor Bukti Transfer / Kuitansi Fisik Asli *', 'text', 'TRF-' + Date.now()],
+    ['tgl', 'Tanggal Pembayaran *', 'date', todayStr]
+  ], async res => {
+    const bukti = (res.bukti || '').trim();
+    if (!bukti) {
+      showAlert('Nomor Bukti Transfer / Kuitansi Pembayaran Nyata wajib diisi!');
+      return;
+    }
+    const nominal = Number(res.nominal) || 0;
+    if (nominal <= 0) {
+      showAlert('Nominal pembayaran harus lebih besar dari 0!');
+      return;
+    }
+
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        const tidbKey = window.assalamTiDBApi.newIdempotencyKey();
+        const payableId = String(b.publicId || b.id || beliId);
+        await window.assalamTiDBApi.recordSupplierPayment({
+          payableId: payableId,
+          payment: {
+            sourceType: "supplier_payable",
+            sourceId: payableId,
+            amount: String(nominal),
+            paymentMethod: res.metode === 'Tunai' ? 'cash' : 'bank_transfer',
+            paymentStatus: "settled",
+            businessDate: res.tgl || todayStr,
+            eventAtUtc: new Date().toISOString(),
+            settlementReference: bukti,
+            evidenceFileId: bukti
+          }
+        }, tidbKey);
+        await syncOperationalDataFromTiDB();
+        showAlert('Pembayaran supplier sebesar ' + rp(nominal) + ' dengan bukti ' + bukti + ' berhasil dicatat dan dialokasikan ke faktur di TiDB.', 'Sukses');
+        renderApp();
+        return;
+      } catch (err) {
+        showAlert('Pelunasan utang ke TiDB gagal: ' + (err.message || 'Kesalahan jaringan') + '. Status faktur tidak diubah.', 'Gagal');
+        return;
+      }
+    }
+
+    b.paidAmount = (Number(b.paidAmount) || 0) + nominal;
+    b.lunas = b.paidAmount >= Number(b.total);
+    b.tglBayar = res.tgl || todayStr;
+    b.buktiBayar = bukti;
+    store.saveLocal();
+    renderApp();
+  });
 }
 
 function openModalReturBeli(beliId) {
@@ -3472,6 +3619,12 @@ function viewBiaya() {
         💡 Pengeluaran senilai ≥ ${rp(limitAppr)} memerlukan approval (persetujuan) dari Pimpinan sebelum masuk ke laporan keuangan.
       </p>
       <div class="row">
+        <label>Tanggal Operasional *
+          <input id="b-tgl" type="date" value="${todayStr}">
+        </label>
+        <label>No. Bukti / Kuitansi *
+          <input id="b-bukti" placeholder="Contoh: KWT-2026-001">
+        </label>
         <label>Kategori Biaya
           <select id="b-kat">
             <option>Honor Dokter</option>
@@ -3509,6 +3662,9 @@ async function actionAddBiaya() {
   const sat = numVal('b-satuan');
   const qty = numVal('b-qty') || 1;
   const total = sat * qty;
+  const tglOperasional = val('b-tgl') || todayStr;
+  const buktiOperasional = val('b-bukti').trim() || ('KWT-' + Date.now());
+
   if (!ket || total <= 0) {
     showAlert('Mohon lengkapi keterangan dan nominal biaya');
     return;
@@ -3520,11 +3676,12 @@ async function actionAddBiaya() {
 
   const biayaItem = {
     id: uid(),
-    tgl: todayStr,
+    tgl: tglOperasional,
     kat: val('b-kat'),
     ket: ket,
     jml: Number(total),
     status: status,
+    bukti: buktiOperasional,
     kasir: currentUser ? currentUser.u : '-',
     _t: Date.now()
   };
@@ -3535,8 +3692,17 @@ async function actionAddBiaya() {
       await window.assalamTiDBApi.createExpense({
         category: biayaItem.kat,
         description: biayaItem.ket,
-        amount: String(biayaItem.jml)
+        amount: String(biayaItem.jml),
+        businessDate: tglOperasional,
+        evidenceFileId: buktiOperasional
       }, tidbKey);
+      await syncOperationalDataFromTiDB();
+      $('b-ket').value = '';
+      $('b-satuan').value = '';
+      $('b-bukti').value = '';
+      renderApp();
+      showAlert('Biaya operasional berhasil dicatat ke TiDB.', 'Sukses');
+      return;
     } catch (err) {
       showAlert(err.message || 'Gagal mencatat biaya ke TiDB.', 'Gagal');
       return;
@@ -3948,7 +4114,13 @@ function actionApproveReturJual(id) {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const key = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.reviewSalesReturn({ returnId: id, decision: 'forward_to_pimpinan' }, key);
+        await window.assalamTiDBApi.reviewSalesReturn({
+          salesReturnId: id,
+          returnId: id,
+          decision: 'approve',
+          reason: 'Diverifikasi oleh Admin untuk persetujuan Pimpinan'
+        }, key);
+        await syncOperationalDataFromTiDB();
       } else {
         await window.firebaseBackend.approveReturJual(id);
       }
@@ -3963,11 +4135,16 @@ function actionApproveReturJual(id) {
 
 function actionFinalizeReturJual(id) {
   if (currentRole !== 'pimpinan') return;
-  showConfirm('Setujui retur ini sebagai keputusan akhir? Jika disetujui, stok dan batch obat asal akan dipulihkan sekarang. Retur jasa/tindakan tidak mengubah stok.', async () => {
+  showConfirm('Setujui retur ini sebagai keputusan akhir? Jika disetujui, stok dan batch obat asal akan dipulihkan ke karantina. Retur jasa/tindakan tidak mengubah stok.', async () => {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const key = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.approveSalesReturn({ returnId: id }, key);
+        await window.assalamTiDBApi.approveSalesReturn({
+          salesReturnId: id,
+          returnId: id,
+          reason: 'Persetujuan akhir retur oleh Pimpinan'
+        }, key);
+        await syncOperationalDataFromTiDB();
       } else {
         await window.firebaseBackend.finalizeReturJual(id);
       }
@@ -3986,7 +4163,13 @@ function actionRejectReturJual(id) {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
         const key = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.reviewSalesReturn({ returnId: id, decision: 'reject', rejectionReason: res.alasan }, key);
+        await window.assalamTiDBApi.reviewSalesReturn({
+          salesReturnId: id,
+          returnId: id,
+          decision: 'reject',
+          reason: res.alasan || 'Ditolak oleh Admin'
+        }, key);
+        await syncOperationalDataFromTiDB();
       } else {
         await window.firebaseBackend.rejectReturJual(id, res.alasan);
       }
@@ -4012,12 +4195,39 @@ function actionPayReturJual(id) {
   ], async res => {
     try {
       if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
-        const key = window.assalamTiDBApi.newIdempotencyKey();
-        await window.assalamTiDBApi.refundSalesReturn({ returnId: id, refundMethod: res.metode === 'Tunai' ? 'cash' : 'bank_transfer', referenceNumber: res.referensi || '' }, key);
+        // 1. Approval kewajiban refund oleh Pimpinan
+        const apprKey = window.assalamTiDBApi.newIdempotencyKey();
+        let refundRes = await window.assalamTiDBApi.approveRefund({
+          salesReturnId: id,
+          returnId: id,
+          reason: 'Persetujuan kewajiban refund oleh Pimpinan'
+        }, apprKey).catch(err => {
+          if (err && (err.code === 'REFUND_APPROVED_ALREADY' || err.code === 'REFUND_RETURN_NOT_APPROVED')) return null;
+          throw err;
+        });
+
+        // 2. Pembayaran kas / transfer kewajiban refund
+        const retur = (store.state.returJual || []).find(r => r.id === id || r.returnId === id);
+        const nominal = (retur && retur.nominal) || (refundRes && refundRes.data && refundRes.data.amount) || 0;
+        const obligationId = (refundRes && refundRes.data && refundRes.data.refundObligationId) || id;
+        const payKey = window.assalamTiDBApi.newIdempotencyKey();
+
+        await window.assalamTiDBApi.payRefund({
+          payout: {
+            sourceType: "refund_obligation",
+            sourceId: String(obligationId),
+            amount: String(nominal),
+            paymentStatus: "settled",
+            businessDate: todayStr,
+            eventAtUtc: new Date().toISOString(),
+            settlementReference: res.referensi || (res.metode === 'Tunai' ? ('KAS-REF-' + Date.now()) : ('TRF-REF-' + Date.now()))
+          }
+        }, payKey);
+        await syncOperationalDataFromTiDB();
       } else {
         await window.firebaseBackend.payReturJual(id, res.metode, res.referensi);
       }
-      showAlert('Pengembalian uang tercatat satu kali. Saldo kas tunai akan diperbarui bila metode Tunai.', 'Pengembalian Tercatat');
+      showAlert('Pengembalian uang tercatat satu kali. Saldo kas tunai dan status kewajiban refund telah diperbarui di TiDB.', 'Pengembalian Tercatat');
     } catch (err) {
       showAlert(err.message || 'Pengembalian uang gagal dicatat.', 'Gagal');
     }
@@ -4687,7 +4897,7 @@ function viewUtang() {
       rp(b.total),
       esc(b.tempo),
       badge,
-      `<button class="s p" onclick="store.lunasiBeli('${b.id}')">Tandai Lunas</button>`
+      `<button class="s p" onclick="openModalLunasiBeli('${b.id}')">Tandai Lunas</button>`
     ];
   });
 

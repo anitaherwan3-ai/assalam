@@ -31,6 +31,59 @@ module.exports = async function handler(req, res) {
         })) });
       }
 
+      if (url.searchParams.get("batches") === "1") {
+        const [batches] = await getPool().execute(
+          "SELECT b.batch_id AS id, b.batch_id AS batchId, b.medicine_id AS medicineId, m.public_id AS publicId, m.name AS medicineName, " +
+          "b.batch_number AS batchNo, DATE_FORMAT(b.expiry_date, '%Y-%m-%d') AS ed, " +
+          "b.remaining_quantity AS sisa, b.original_quantity AS qty, b.unit_cost_hpp AS hpp, b.disposition, " +
+          "b.expiry_verified AS expiryVerified, b.origin_verified AS originVerified " +
+          "FROM inventory_batches b JOIN medicines m ON m.medicine_id = b.medicine_id " +
+          "ORDER BY b.expiry_date ASC, b.batch_id DESC LIMIT 500"
+        );
+        return res.status(200).json({ ok: true, data: batches.map(row => ({
+          ...row,
+          id: String(row.id),
+          batchId: String(row.batchId),
+          medicineId: String(row.medicineId),
+          sisa: Number(row.sisa),
+          qty: Number(row.qty),
+          hpp: Number(row.hpp || 0)
+        })) });
+      }
+
+      if (url.searchParams.get("supplier_returns") === "1") {
+        const [supplierReturns] = await getPool().execute(
+          "SELECT sr.supplier_return_id AS id, sr.supplier_return_id AS returnId, sr.supplier_invoice_line_id AS purchaseLineId, " +
+          "m.name AS medicineName, sr.quantity AS qtyRetur, sr.reason AS alasan, sr.status, " +
+          "DATE_FORMAT(sr.created_at_utc, '%Y-%m-%d') AS tgl " +
+          "FROM supplier_return_requests sr JOIN medicines m ON m.medicine_id = sr.medicine_id " +
+          "ORDER BY sr.supplier_return_id DESC LIMIT 200"
+        );
+        return res.status(200).json({ ok: true, data: supplierReturns.map(row => ({
+          ...row,
+          id: String(row.id),
+          returnId: String(row.returnId),
+          qtyRetur: Number(row.qtyRetur)
+        })) });
+      }
+
+      if (url.searchParams.get("stocktakes") === "1") {
+        const [stocktakes] = await getPool().execute(
+          "SELECT s.stocktake_id AS id, s.stocktake_id AS stocktakeId, DATE_FORMAT(s.stocktake_date, '%Y-%m-%d') AS tgl, " +
+          "s.status, s.counted_by_user_id AS countedByUserId, " +
+          "COUNT(sl.stocktake_line_id) AS lineCount " +
+          "FROM stocktakes s LEFT JOIN stocktake_lines sl ON sl.stocktake_id = s.stocktake_id " +
+          "GROUP BY s.stocktake_id, s.stocktake_date, s.status, s.counted_by_user_id " +
+          "ORDER BY s.stocktake_id DESC LIMIT 100"
+        );
+        return res.status(200).json({ ok: true, data: stocktakes.map(row => ({
+          ...row,
+          id: String(row.id),
+          stocktakeId: String(row.stocktakeId),
+          lineCount: Number(row.lineCount)
+        })) });
+      }
+
       const [rows] = await getPool().execute(
         "SELECT m.medicine_id AS medicineId, m.public_id AS publicId, m.name, m.canonical_unit AS unit, m.selling_price AS sellingPrice, m.minimum_stock AS minimumStock, m.active, " +
         "COALESCE(p.physical_quantity, 0) AS physicalQuantity, COALESCE(p.sellable_quantity, 0) AS sellableQuantity, " +
