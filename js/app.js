@@ -439,15 +439,20 @@ async function syncOperationalDataFromTiDB() {
         return { id: String(b.id), oid: obat ? obat.id : String(b.publicId || b.medicineId),
           no: b.batchNo || '-', ed: b.ed || '', qty: Number(b.qty || 0), sisa: Number(b.sisa || 0),
           hpp: Number(b.hpp || 0), disposition: b.disposition || 'sellable',
-          expiryVerified: !!b.expiryVerified, originVerified: !!b.originVerified, _t: Date.now() };
+          expiryVerified: !!b.expiryVerified, originVerified: !!b.originVerified,
+          purchaseLineId: b.purchaseLineId ? String(b.purchaseLineId) : '', _t: Date.now() };
       });
     }
 
     if (supReturnRes && supReturnRes.ok && Array.isArray(supReturnRes.data)) {
       store.state.returBeli = supReturnRes.data.map(sr => ({
         id: String(sr.id), returnId: String(sr.returnId), tgl: sr.tgl || '',
-        obat: sr.medicineName || '-', qty: Number(sr.qtyRetur || 0), alasan: sr.alasan || '-',
-        status: sr.status || 'requested', purchaseLineId: sr.purchaseLineId ? String(sr.purchaseLineId) : '', _t: Date.now()
+        obat: sr.medicineName || '-', namaObat: sr.medicineName || '-', qty: Number(sr.qtyRetur || 0),
+        alasan: sr.alasan || '-', supplier: sr.supplierName || '-', faktur: sr.invoiceNumber || '-',
+        nilai: Number(sr.returnValue || 0), invoiceId: String(sr.invoiceId || ''),
+        batchId: String(sr.batchId || ''), status: sr.status || 'requested',
+        settlementStatus: sr.settlementStatus || 'pending', dispatchReference: sr.dispatchReference || '',
+        purchaseLineId: sr.purchaseLineId ? String(sr.purchaseLineId) : '', _t: Date.now()
       }));
     }
     if (stocktakeRes && stocktakeRes.ok && Array.isArray(stocktakeRes.data)) {
@@ -3769,7 +3774,7 @@ function viewOpname() {
           esc(line.medicineName || '-'), esc(line.batchNo || '-'), line.systemQuantity, line.countedQuantity, line.varianceQuantity, esc(line.reason || '-')
         ]), { key: 'stocktake_lines_' + String(st.stocktakeId || st.id) })}</details>`).join('') : '<p>Belum ada riwayat stock opname.</p>'}
     </div>
-    ${isAdmin ? `<div class="card"><h2>Catat Obat Rusak, Hilang, atau Selisih Stok</h2>
+    ${isAdmin && !isTiDBCatalogPreview() ? `<div class="card"><h2>Catat Obat Rusak, Hilang, atau Selisih Stok</h2>
       <div class="row"><label style="flex:1;min-width:240px;">Pilih Batch / Obat *<select id="op-batch">${activeBatches.map(b => { const o = store.getObat(b.oid); return `<option value="${esc(b.id)}">${esc(o ? o.nama : '-')} | Batch ${esc(b.no)} | ED ${esc(b.ed)} | Sisa ${b.sisa}</option>`; }).join('')}</select></label>
       <label style="width:90px;">Jumlah *<input id="op-qty" type="number" min="1" value="1"></label>
       <label>Alasan Kerugian<select id="op-ket"><option>Obat Rusak / Pecah</option><option>Selisih Stok Opname</option><option>Kedaluwarsa (Expired)</option><option>Lainnya</option></select></label>
@@ -3812,6 +3817,10 @@ async function actionApproveStocktake(stocktakeId) {
 }
 
 function actionAddLoss() {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Pencatatan kerugian stok lokal dinonaktifkan pada mode TiDB. Gunakan workflow inventory TiDB yang telah disetujui.');
+    return;
+  }
   const bid = val('op-batch');
   const qty = numVal('op-qty');
   const batch = store.get('batch', bid);
@@ -3847,6 +3856,10 @@ function actionAddLoss() {
 }
 
 function delLoss(id) {
+  if (isTiDBCatalogPreview()) {
+    showAlert('Penghapusan kerugian lokal dinonaktifkan pada mode TiDB agar saldo stok database tidak berbeda.');
+    return;
+  }
   showConfirm('Batalkan catatan kerugian ini? Stok fisik dan batch akan dikembalikan.', () => {
     const l = store.get('loss', id);
     if (!l) return;
