@@ -57,6 +57,16 @@ module.exports = async function handler(req, res) {
         "JOIN suppliers s ON s.supplier_id = i.supplier_id JOIN supplier_return_lines rl ON rl.supplier_return_id = sr.supplier_return_id " +
         "JOIN medicines m ON m.medicine_id = rl.medicine_id ORDER BY sr.supplier_return_id DESC LIMIT 300"
       );
+      const [supplierPaymentRows] = await pool.execute(
+        "SELECT p.supplier_payment_id AS paymentId, p.public_id AS publicId, i.public_id AS invoicePublicId, " +
+        "s.name AS supplierName, DATE_FORMAT(p.payment_date, '%Y-%m-%d') AS paymentDate, p.amount AS paymentAmount, " +
+        "a.allocated_amount AS allocatedAmount, p.payment_method AS paymentMethod, p.evidence_file_id AS evidenceFileId, " +
+        "p.external_reference AS externalReference, p.recorded_by_user_id AS recordedByUserId, p.created_at_utc AS createdAtUtc " +
+        "FROM supplier_payments p JOIN suppliers s ON s.supplier_id = p.supplier_id " +
+        "JOIN supplier_payment_allocations a ON a.supplier_payment_id = p.supplier_payment_id " +
+        "JOIN supplier_invoices i ON i.supplier_invoice_id = a.supplier_invoice_id " +
+        "ORDER BY p.supplier_payment_id DESC LIMIT 500"
+      );
       return res.status(200).json({
         ok: true,
         data: rows.map(row => ({
@@ -88,6 +98,10 @@ module.exports = async function handler(req, res) {
         })),
         supplierReturns: supplierReturnRows.map(row => ({
           ...row, returnId: String(row.returnId), quantity: String(row.quantity), batchId: String(row.batchId)
+        })),
+        supplierPayments: supplierPaymentRows.map(row => ({
+          ...row, paymentId: String(row.paymentId), paymentAmount: String(row.paymentAmount),
+          allocatedAmount: String(row.allocatedAmount)
         }))
       });
     }
