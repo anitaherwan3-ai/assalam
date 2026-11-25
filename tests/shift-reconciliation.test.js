@@ -143,8 +143,13 @@ test("Admin cannot open a cashier shift", async () => {
   }), { code: "SHIFT_OPEN_ROLE_FORBIDDEN" });
 });
 
-test("admin assigns queue lane A or B to cashier", async () => {
+test("only Pimpinan can assign queue lanes to cashier", async () => {
   const { commands, state } = makeCommands({ shiftId: "1", cashierUserId: "cashier-1", shiftCode: "morning" });
+  await assert.rejects(commands.assignQueueLane({
+    actor: { userId: "admin-1", role: "admin" },
+    userId: "cashier-2", laneCode: "B",
+    idempotencyKey: "lane-assign-admin", requestId: "lane-assign-admin-req"
+  }), { code: "DOMAIN_FORBIDDEN" });
   const res = await commands.assignQueueLane({
     actor: { userId: "owner-1", role: "pimpinan" },
     userId: "cashier-2", laneCode: "B",
