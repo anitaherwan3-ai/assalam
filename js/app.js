@@ -334,8 +334,8 @@ async function syncOperationalDataFromTiDB() {
         const existing = (store.state.pasien || []).find(p => p.no === q.queueNumber || p.id === String(q.ticketId));
         if (existing) {
           existing.status = q.status;
-          existing.calling = q.status === 'calling';
-          existing.done = q.status === 'completed';
+          existing.calling = q.status === 'called' || q.status === 'calling';
+          existing.done = q.status === 'completed' || q.status === 'done';
           existing.laneCode = q.laneCode;
         } else {
           store.state.pasien.push({
@@ -349,8 +349,8 @@ async function syncOperationalDataFromTiDB() {
             kasir: q.cashierName || q.cashierUserId,
             sh: q.shiftId,
             status: q.status,
-            calling: q.status === 'calling',
-            done: q.status === 'completed',
+            calling: q.status === 'called' || q.status === 'calling',
+            done: q.status === 'completed' || q.status === 'done',
             laneCode: q.laneCode,
             _t: Date.now()
           });
