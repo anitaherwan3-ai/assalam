@@ -174,6 +174,52 @@ function calculateFinancials() {
       refundPaidCash - pc
   };
 }
+function applyTiDBQueueSnapshot(queueRows) {
+  if (!Array.isArray(queueRows)) return;
+  const rows = queueRows.map(row => {
+    const registeredAt = row.registeredAtUtc ? new Date(row.registeredAtUtc).getTime() : Date.now();
+    const encounterStatus = String(row.encounterStatus || '');
+    const ticketStatus = String(row.status || '');
+    const cancelled = encounterStatus === 'cancelled' || ticketStatus === 'cancelled';
+    const completed = encounterStatus === 'completed' || ticketStatus === 'completed' || ticketStatus === 'done';
+    return {
+      id: String(row.encounterId),
+      encounterId: String(row.encounterId),
+      ticketId: String(row.ticketId),
+      patientId: String(row.patientId || ''),
+      no: String(row.queueNumber || ''),
+      tgl: String(row.businessDate || todayStr).slice(0, 10),
+      jam: Number.isFinite(registeredAt) ? new Date(registeredAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+      nama: String(row.patientName || ''),
+      hp: String(row.phone || ''),
+      layanan: String(row.serviceName || 'Poli Umum'),
+      kasir: String(row.cashierName || row.cashierUserId || ''),
+      cashierUserId: String(row.cashierUserId || ''),
+      sh: String(row.shiftId || ''),
+      shiftId: String(row.shiftId || ''),
+      laneCode: String(row.laneCode || ''),
+      status: cancelled ? 'batal_berobat' : (completed ? 'selesai' : 'aktif'),
+      done: completed,
+      calling: !cancelled && ticketStatus === 'called',
+      batalBerobatPada: null,
+      source: 'tidb',
+      registeredAt: Number.isFinite(registeredAt) ? registeredAt : Date.now(),
+      _t: Date.now()
+    };
+  });
+  const visibleIds = new Set(rows.map(row => row.id));
+  store.state.pasien = (store.state.pasien || []).filter(patient =>
+    patient.source !== 'tidb' || visibleIds.has(String(patient.id))
+  );
+  rows.forEach(row => {
+    const index = store.state.pasien.findIndex(patient =>
+      String(patient.id) === row.id || (patient.ticketId && String(patient.ticketId) === row.ticketId)
+    );
+    if (index >= 0) store.state.pasien[index] = { ...store.state.pasien[index], ...row };
+    else store.state.pasien.push(row);
+  });
+}
+
 async function syncOperationalDataFromTiDB() {
   if (!isTiDBCatalogPreview() || !window.assalamTiDBApi) return;
   try {
@@ -187,6 +233,10 @@ async function syncOperationalDataFromTiDB() {
       window.assalamTiDBApi.listFinance().catch(() => null),
       window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null
     ]);
+
+    if (queueRes && queueRes.ok && Array.isArray(queueRes.data)) {
+      applyTiDBQueueSnapshot(queueRes.data);
+    }
 
     if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
       medRes.data.forEach(m => {
@@ -1075,10 +1125,11 @@ function viewPasien() {
     esc(p.hp || '-'),
     esc(p.layanan),
     p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
-    p.done ? '-' : p.status === 'batal_berobat' ? `
+    p.done ? '-' : p.status === 'batal_berobat' ? (currentRole === 'kasir' ? `
       <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
-    ` : `
+    ` : '-') : `
       <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
+      ${p.ticketId && ['kasir','admin','pimpinan'].includes(currentRole) ? `<button class="s" onclick="actionTransferAntrean('${p.id}')">Limpahkan</button>` : ''}
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
       <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
     `
@@ -1293,6 +1344,8 @@ async function actionAddPasien() {
             number: parseInt(qNum.replace(/\D/g, ""), 10) || (store.state.pasien.length + 1)
           };
           patient.ticketId = allocation.ticketId;
+          patient.encounterId = allocation.id;
+          patient.source = 'tidb';
           patient.laneCode = assignedLane;
         } else {
           throw new Error("Nomor antrean tidak ditemukan pada respons server TiDB.");
@@ -1348,6 +1401,59 @@ function editPasien(id) {
   });
 }
 
+async function actionTransferAntrean(id) {
+  if (!['kasir', 'admin', 'pimpinan'].includes(currentRole)) {
+    showAlert('Akses pemindahan antrean tidak diizinkan.', 'Akses Ditolak');
+    return;
+  }
+  const patient = store.get('pasien', id);
+  if (!patient || !patient.ticketId || patient.done || patient.status === 'batal_berobat') return;
+  if (!isTiDBCatalogPreview() || !window.assalamTiDBApi) {
+    showAlert('Pemindahan antrean lintas kasir harus dilakukan melalui server TiDB.', 'Koneksi TiDB Diperlukan');
+    return;
+  }
+  try {
+    const response = await window.assalamTiDBApi.listQueueAssignments();
+    const assignments = (response && response.data) || [];
+    const targets = assignments.filter(item => !Number(item.isCurrentUser) && item.shiftId);
+    if (!targets.length) {
+      showAlert('Tidak ada kasir tujuan dengan shift aktif dan penugasan antrean.', 'Tujuan Tidak Tersedia');
+      return;
+    }
+    const choices = targets.map((item, index) => (index + 1) + '. ' + item.userName + ' — Jalur ' + item.prefix + ' (' + item.shiftCode + ')').join('\n');
+    const selected = window.prompt('Pilih nomor kasir tujuan:\n' + choices, '1');
+    if (selected === null) return;
+    const index = Number(selected) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= targets.length) {
+      showAlert('Pilihan kasir tujuan tidak valid.', 'Pilihan Tidak Valid');
+      return;
+    }
+    const target = targets[index];
+    const reason = window.prompt('Masukkan alasan pelimpahan antrean (wajib):', '');
+    if (reason === null) return;
+    if (!String(reason).trim()) {
+      showAlert('Alasan pelimpahan wajib diisi.', 'Alasan Diperlukan');
+      return;
+    }
+    await window.assalamTiDBApi.transferQueue({
+      ticketId: String(patient.ticketId),
+      toCashierUserId: String(target.userId),
+      toShiftId: String(target.shiftId),
+      reason: String(reason).trim()
+    }, window.assalamTiDBApi.newIdempotencyKey());
+    patient.kasir = target.userName;
+    patient.cashierUserId = String(target.userId);
+    patient.shiftId = String(target.shiftId);
+    patient._t = Date.now();
+    store.logActivity('Limpahkan Antrean', 'Antrean', patient.no + ' — ' + String(reason).trim());
+    store.saveLocal();
+    if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+    showAlert('Antrean ' + patient.no + ' berhasil dilimpahkan ke ' + target.userName + '.', 'Pelimpahan Berhasil');
+  } catch (error) {
+    showAlert(error.message || 'Pelimpahan antrean gagal disimpan di server TiDB.', 'Gagal Melimpahkan');
+  }
+}
+
 function actionBatalBerobat(id) {
   if (currentRole !== 'kasir') {
     showAlert('Hanya Kasir yang dapat mencatat pembatalan berobat.', 'Akses Ditolak');
@@ -1355,7 +1461,15 @@ function actionBatalBerobat(id) {
   }
   const p = store.get('pasien', id);
   if (!p || p.done || p.deletedAt || p.status === 'dihapus' || p.status === 'batal_berobat') return;
-  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', () => {
+  showConfirm('Tandai pasien ini Batal Berobat? Data pasien tetap tersimpan dan tidak masuk antrean transaksi.', async () => {
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        await window.assalamTiDBApi.cancelEncounter({ encounterId: String(p.encounterId || p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+      } catch (error) {
+        showAlert(error.message || 'Pembatalan belum tersimpan di server TiDB.', 'Gagal Membatalkan');
+        return;
+      }
+    }
     p.status = 'batal_berobat';
     p.batalBerobatPada = Date.now();
     p.batalBerobatOleh = currentUser ? currentUser.u : 'kasir';
@@ -1374,7 +1488,15 @@ function actionPulihkanBatalBerobat(id) {
   }
   const p = store.get('pasien', id);
   if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr) return;
-  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', () => {
+  showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', async () => {
+    if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+      try {
+        await window.assalamTiDBApi.restoreEncounter({ encounterId: String(p.encounterId || p.id) }, window.assalamTiDBApi.newIdempotencyKey());
+      } catch (error) {
+        showAlert(error.message || 'Pemulihan belum tersimpan di server TiDB.', 'Gagal Memulihkan');
+        return;
+      }
+    }
     p.status = 'aktif';
     p.batalBerobatPada = null;
     p.batalBerobatOleh = null;

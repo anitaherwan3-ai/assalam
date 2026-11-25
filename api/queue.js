@@ -23,9 +23,12 @@ module.exports = async function handler(req, res) {
         const { getPool } = require("../lib/tidb");
         const [assignments] = await getPool().execute(
           "SELECT a.assignment_id AS assignmentId, a.user_id AS userId, u.display_name AS userName, " +
-          "a.prefix, DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
+          "a.prefix, s.shift_id AS shiftId, s.shift_code AS shiftCode, (a.user_id = ?) AS isCurrentUser, DATE_FORMAT(a.valid_from, '%Y-%m-%d') AS validFrom, DATE_FORMAT(a.valid_to, '%Y-%m-%d') AS validTo " +
           "FROM cashier_queue_assignments a JOIN users u ON u.user_id = a.user_id " +
-          "WHERE a.valid_to IS NULL ORDER BY a.valid_from DESC"
+          "JOIN active_shift_slots active ON active.cashier_user_id = a.user_id " +
+          "JOIN active_role_slots ars ON ars.user_id = a.user_id JOIN role_assignments ra ON ra.role_assignment_id = ars.role_assignment_id AND ra.user_id = ars.user_id AND ra.role_code = 'kasir' AND ra.valid_from_utc <= UTC_TIMESTAMP(3) AND (ra.valid_to_utc IS NULL OR ra.valid_to_utc > UTC_TIMESTAMP(3)) " +
+          "JOIN cashier_shifts s ON s.shift_id = active.shift_id AND s.cashier_user_id = a.user_id AND s.status = 'open' " +
+          "WHERE a.valid_to IS NULL ORDER BY a.valid_from DESC", [actor.userId]
         );
         return res.status(200).json({ ok: true, data: assignments });
       }
@@ -51,6 +54,8 @@ module.exports = async function handler(req, res) {
 
     let result;
     if (body.action === "register") result = await commands.registerEncounter(value);
+    else if (body.action === "cancel_encounter") result = await commands.cancelEncounter(value);
+    else if (body.action === "restore_encounter") result = await commands.restoreEncounter(value);
     else if (body.action === "call") result = await commands.appendQueueCallEvent(value);
     else if (body.action === "transfer") result = await commands.transferQueue(value);
     else if (body.action === "assign_lane") result = await commands.assignQueueLane(value);

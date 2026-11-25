@@ -27,10 +27,11 @@ test("audit writer inserts a sanitized event with a generated UUID and UTC time"
   const id = await writeAuditEvent(connection, {
     actorUserId: "user-1", actorRole: "admin", actionCode: "PATIENT_UPDATED",
     entityType: "patient", entityId: "p-1", before: { status: "old" },
-    after: { status: "new" }, requestId: "req-1"
+    after: { status: "new" }, reason: "Koreksi data pasien", requestId: "req-1"
   });
   assert.equal(id, "42");
   assert.match(captured.sql, /UTC_TIMESTAMP\(3\)/);
   assert.match(captured.params[0], /^[0-9a-f-]{36}$/i);
   assert.equal(captured.params[6], '{"status":"old"}');
+  assert.equal(captured.params[8], "Koreksi data pasien");
 });

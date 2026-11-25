@@ -130,6 +130,8 @@
     deactivateSupplier: (data, key) => request("/api/catalog/suppliers", { method: "DELETE", body: data, idempotencyKey: key }),
     listQueueTickets: () => request("/api/queue"),
     registerEncounter: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "register" }, data), idempotencyKey: key }),
+    cancelEncounter: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "cancel_encounter" }, data), idempotencyKey: key }),
+    restoreEncounter: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "restore_encounter" }, data), idempotencyKey: key }),
     callQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "call" }, data), idempotencyKey: key }),
     transferQueue: (data, key) => request("/api/queue", { method: "POST", body: Object.assign({ action: "transfer" }, data), idempotencyKey: key }),
     listSales: () => request("/api/sales"),

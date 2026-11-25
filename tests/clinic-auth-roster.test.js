@@ -24,3 +24,19 @@ test("only the primary owner is protected by the bootstrap roster", () => {
   assert.equal(getBootstrapIdentity("praktekrose@gmail.com").protectedOwner, true);
   assert.equal(getBootstrapIdentity("nursalim42@gmail.com").protectedOwner, false);
 });
+
+test("the five active clinic identities map to the owner-confirmed roles", () => {
+  assert.deepEqual({
+    "praktekrose@gmail.com": getBootstrapIdentity("praktekrose@gmail.com").role,
+    "nursalim42@gmail.com": getBootstrapIdentity("nursalim42@gmail.com").role,
+    "assalamkasir1@gmail.com": getBootstrapIdentity("assalamkasir1@gmail.com").role,
+    "assalamkasir2@gmail.com": getBootstrapIdentity("assalamkasir2@gmail.com").role,
+    "assalamadmin1@gmail.com": getBootstrapIdentity("assalamadmin1@gmail.com").role
+  }, {
+    "praktekrose@gmail.com": "pimpinan",
+    "nursalim42@gmail.com": "pimpinan",
+    "assalamkasir1@gmail.com": "kasir",
+    "assalamkasir2@gmail.com": "kasir",
+    "assalamadmin1@gmail.com": "admin"
+  });
+});
