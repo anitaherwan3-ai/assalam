@@ -1961,12 +1961,13 @@ async function actionBayarTrx(totalCart) {
     const batchAvailable = (store.state.batch || [])
       .filter(b => b.oid === oid && Number(b.sisa) > 0 && b.ed >= todayStr)
       .reduce((sum, b) => sum + Number(b.sisa || 0), 0);
-    if (!obat || Number(obat.stok || 0) < needed || batchAvailable < needed) {
-      showAlert(`Stok batch obat ${obat ? obat.nama : oid} tidak mencukupi. Stok utama: ${obat ? obat.stok : 0}, stok batch layak: ${batchAvailable}, kebutuhan: ${needed}. Periksa pembelian dan batch terlebih dahulu.`, 'Stok Batch Tidak Cukup');
+    if (!obat || Number(obat.stok || 0) < needed || (!isTiDBCatalogPreview() && batchAvailable < needed)) {
+      showAlert(`Stok obat ${obat ? obat.nama : oid} tidak mencukupi. Stok utama: ${obat ? obat.stok : 0}, stok batch layak lokal: ${batchAvailable}, kebutuhan: ${needed}. Periksa stok TiDB atau batch terlebih dahulu.`, 'Stok Tidak Cukup');
       return;
     }
   }
 
+  if (!isTiDBCatalogPreview()) {
   for (const item of cartItems) {
     if (item.oid) {
       const obat = store.getObat(item.oid);
@@ -1993,6 +1994,7 @@ async function actionBayarTrx(totalCart) {
         pkgIt.batchDeductions = result.deductions;
       }
     }
+  }
   }
 
   const trxId = uid();
@@ -2115,26 +2117,33 @@ async function actionBayarTrx(totalCart) {
       }
     } catch (err) {
       // Kembalikan perubahan lokal jika transaksi atomik di server gagal.
-      stockMap.forEach(entry => {
-        const obat = store.getObat(entry.oid);
-        if (obat) { obat.stok = Number(obat.stok || 0) + entry.qty; obat._t = Date.now(); }
-        entry.batches.forEach(b => {
-          const batch = store.get('batch', b.bid);
-          if (batch) { batch.sisa = Number(batch.sisa || 0) + b.qty; batch._t = Date.now(); }
+      if (!isTiDBCatalogPreview()) {
+        stockMap.forEach(entry => {
+          const obat = store.getObat(entry.oid);
+          if (obat) { obat.stok = Number(obat.stok || 0) + entry.qty; obat._t = Date.now(); }
+          entry.batches.forEach(b => {
+            const batch = store.get('batch', b.bid);
+            if (batch) { batch.sisa = Number(batch.sisa || 0) + b.qty; batch._t = Date.now(); }
+          });
         });
-      });
-      store.saveLocal(false);
+        store.saveLocal(false);
+      }
       showAlert(err.message || 'Transaksi gagal disimpan ke server. Stok lokal telah dikembalikan.', 'Transaksi Gagal');
       return;
     }
   }
 
+  if (isTiDBCatalogPreview()) {
+    newTrx.incomeRecognized = metode === 'Tunai';
+    newTrx.status = metode === 'Tunai' ? 'selesai' : 'menunggu_review';
+  }
   store.state.trx.push(newTrx);
   pasien.done = true;
   pasien._t = Date.now();
   cartItems = [];
 
   store.logActivity('Transaksi', 'Kasir', `Nota ${noNota} - Pasien ${pasien.nama} (${rp(totalCart)})`);
+  if (isTiDBCatalogPreview()) await syncOperationalDataFromTiDB();
   store.saveLocal();
   renderApp();
   printReceipt(newTrx.id);
