@@ -1125,9 +1125,9 @@ function viewPasien() {
     esc(p.hp || '-'),
     esc(p.layanan),
     p.status === 'batal_berobat' ? '<span class="badge-bad">Batal Berobat</span>' : p.done ? '<span class="badge-ok">Lunas</span>' : p.calling ? '<span class="badge-ok" style="background:#06b6d4;color:#042f2e;">📢 Sedang Dipanggil</span>' : '<span class="badge-warn">Menunggu</span>',
-    p.done ? '-' : p.status === 'batal_berobat' ? `
+    p.done ? '-' : p.status === 'batal_berobat' ? (currentRole === 'kasir' ? `
       <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
-    ` : `
+    ` : '-') : `
       <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
       ${p.ticketId && ['kasir','admin','pimpinan'].includes(currentRole) ? `<button class="s" onclick="actionTransferAntrean('${p.id}')">Limpahkan</button>` : ''}
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
