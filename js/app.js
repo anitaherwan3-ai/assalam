@@ -232,7 +232,7 @@ async function syncOperationalDataFromTiDB() {
             nama: line.itemName || 'Item',
             satuan: line.unit || '',
             qty: Number(line.quantity || 0),
-            harga: Number(line.unitPrice || 0),
+            harga: Number(line.quantity || 0) > 0 ? Number(line.netCharge || 0) / Number(line.quantity) : Number(line.unitPrice || 0),
             total: Number(line.netCharge || 0),
             hpp: line.hpp === null || line.hpp === undefined ? 0 : Number(line.hpp),
             diskon: Number(line.discount || 0)
