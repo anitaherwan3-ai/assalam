@@ -1442,6 +1442,7 @@ async function actionTransferAntrean(id) {
       reason: String(reason).trim()
     }, window.assalamTiDBApi.newIdempotencyKey());
     patient.kasir = target.userName;
+    patient.cashierUserId = String(target.userId);
     patient.shiftId = String(target.shiftId);
     patient._t = Date.now();
     store.logActivity('Limpahkan Antrean', 'Antrean', patient.no + ' — ' + String(reason).trim());
