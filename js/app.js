@@ -180,11 +180,12 @@ async function syncOperationalDataFromTiDB() {
     if (window.assalamTiDBCatalog) {
       await window.assalamTiDBCatalog.ensureLoaded().catch(() => null);
     }
-    const [medRes, queueRes, salesRes, financeRes] = await Promise.all([
+    const [medRes, queueRes, salesRes, financeRes, invoicesRes] = await Promise.all([
       window.assalamTiDBApi.listMedicines().catch(() => null),
       window.assalamTiDBApi.listQueueTickets().catch(() => null),
       window.assalamTiDBApi.listSales().catch(() => null),
-      window.assalamTiDBApi.listFinance().catch(() => null)
+      window.assalamTiDBApi.listFinance().catch(() => null),
+      window.assalamTiDBApi.listSupplierInvoices ? window.assalamTiDBApi.listSupplierInvoices().catch(() => null) : null
     ]);
 
     if (medRes && Array.isArray(medRes.data) && medRes.data.length > 0) {
@@ -331,6 +332,29 @@ async function syncOperationalDataFromTiDB() {
             laneCode: q.laneCode,
             _t: Date.now()
           });
+        }
+      });
+    }
+
+    if (invoicesRes && invoicesRes.ok && Array.isArray(invoicesRes.data)) {
+      invoicesRes.data.forEach(inv => {
+        const existing = (store.state.beli || []).find(b => b.id === inv.publicId || b.fak === inv.supplierInvoiceNumber);
+        const item = {
+          id: inv.publicId || String(inv.supplierInvoiceId),
+          publicId: inv.publicId || String(inv.supplierInvoiceId),
+          sup: inv.supplierName || 'Supplier',
+          fak: inv.supplierInvoiceNumber,
+          tgl: inv.invoiceDate,
+          tempo: inv.dueDate,
+          total: Number(inv.totalAmount || 0),
+          status: inv.status,
+          lines: inv.lines || [],
+          _t: Date.now()
+        };
+        if (existing) {
+          Object.assign(existing, item);
+        } else {
+          store.state.beli.push(item);
         }
       });
     }
@@ -3112,15 +3136,68 @@ async function actionAddBeli() {
       const localObat = (store.state.obat || []).find(o => o.id === purchasePayload.oid);
       const tidbMed = localObat ? tidbMedicines.find(m => m.publicId === localObat.publicId || m.name === localObat.nama) : null;
       const tidbMedicineId = (tidbMed && tidbMed.publicId) || purchasePayload.oid;
-      await window.assalamTiDBApi.receivePurchase({
+      const unitCost = String(Math.round(purchasePayload.total / purchasePayload.qty));
+
+      // 1. Buat Faktur Pembelian dan baris faktur di TiDB
+      const invoiceRes = await window.assalamTiDBApi.createSupplierInvoice({
         supplierName: purchasePayload.supplier,
-        invoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
-        medicineId: tidbMedicineId,
-        quantity: String(purchasePayload.qty),
-        totalBilled: String(purchasePayload.total),
-        batchNumber: purchasePayload.batchNo || ("B-" + Date.now()),
-        expiryDate: purchasePayload.ed
+        supplierInvoiceNumber: purchasePayload.faktur || ("FAK-" + Date.now()),
+        invoiceDate: todayStr,
+        dueDate: purchasePayload.tempo || todayStr,
+        totalAmount: String(purchasePayload.total),
+        lines: [
+          {
+            medicineId: tidbMedicineId,
+            orderedQty: String(purchasePayload.qty),
+            unitCost: unitCost,
+            subtotal: String(purchasePayload.total)
+          }
+        ]
       }, tidbKey);
+
+      const purchaseLineId = invoiceRes && invoiceRes.data && invoiceRes.data.lines && invoiceRes.data.lines[0] && invoiceRes.data.lines[0].purchaseLineId;
+      if (!purchaseLineId) {
+        throw new Error('Gagal memperoleh ID baris faktur dari TiDB');
+      }
+
+      // 2. Hubungkan penerimaan fisik ke baris faktur (mengupdate stok, batch, dan HPP secara transaksional)
+      const receiveKey = window.assalamTiDBApi.newIdempotencyKey();
+      await window.assalamTiDBApi.receivePurchase({
+        purchaseLineId: purchaseLineId,
+        receivedQty: String(purchasePayload.qty),
+        receiptReference: purchasePayload.faktur || ("RCV-" + Date.now()),
+        batch: {
+          batchNo: purchasePayload.batchNo || ("B-" + Date.now()),
+          expiryDate: purchasePayload.ed,
+          receivedAtUtc: new Date().toISOString(),
+          disposition: 'sellable',
+          receivedQty: String(purchasePayload.qty),
+          unitCost: unitCost
+        }
+      }, receiveKey);
+
+      // 3. Jika lunas, catat pelunasan utang supplier
+      if (purchasePayload.isLunas) {
+        const payKey = window.assalamTiDBApi.newIdempotencyKey();
+        await window.assalamTiDBApi.recordSupplierPayment({
+          payableId: (invoiceRes.data && invoiceRes.data.payableId) || invoiceRes.data.supplierInvoiceId,
+          amount: String(purchasePayload.total),
+          paymentMethod: 'cash',
+          paymentReference: 'LUNAS-' + (purchasePayload.faktur || Date.now())
+        }, payKey).catch(err => {
+          console.warn('[Supplier Payment Notice]:', err.message || err);
+        });
+      }
+
+      await syncOperationalDataFromTiDB();
+      showAlert('Pembelian obat berhasil dicatat ke TiDB dan HPP telah diperbarui secara otomatis.', 'Sukses');
+      $('beli-sup').value = '';
+      $('beli-fak').value = '';
+      $('beli-total').value = '';
+      $('beli-batch').value = '';
+      $('beli-ed').value = '';
+      renderApp();
+      return;
     } catch (e) {
       showAlert(e.message || 'Pencatatan pembelian ke TiDB gagal. Transaksi dibatalkan.', 'Gagal');
       return;

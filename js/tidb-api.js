@@ -134,6 +134,8 @@
     cancelTransaction: (data, key) => request("/api/sales", { method: "POST", body: Object.assign({ action: "cancel_transaction" }, data), idempotencyKey: key }),
     listMedicines: () => request("/api/inventory"),
     createMedicine: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "create_medicine" }, data), idempotencyKey: key }),
+    listSupplierInvoices: () => request("/api/inventory?invoices=1"),
+    createSupplierInvoice: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "create_supplier_invoice" }, data), idempotencyKey: key }),
     receivePurchase: (data, key) => request("/api/inventory", { method: "POST", body: Object.assign({ action: "receive_purchase" }, data), idempotencyKey: key }),
     recordSupplierPayment: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "record_supplier_payment" }, data), idempotencyKey: key }),
     recordPayment: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "record_payment" }, data), idempotencyKey: key }),

@@ -14,6 +14,23 @@ module.exports = async function handler(req, res) {
     const actor = await requireBetterAuthActor(req);
     if (req.method === "GET") {
       const { getPool } = require("../lib/tidb");
+      const url = new URL(req.url, "http://localhost");
+      if (url.searchParams.get("invoices") === "1") {
+        const [invoices] = await getPool().execute(
+          "SELECT i.supplier_invoice_id AS invoiceId, i.public_id AS publicId, s.name AS supplierName, i.supplier_invoice_number AS invoiceNumber, " +
+          "DATE_FORMAT(i.invoice_date, '%Y-%m-%d') AS tgl, i.gross_amount AS total, i.status, " +
+          "COALESCE((SELECT SUM(a.allocated_amount) FROM supplier_payment_allocations a WHERE a.supplier_invoice_id = i.supplier_invoice_id), 0) AS paidAmount " +
+          "FROM supplier_invoices i JOIN suppliers s ON s.supplier_id = i.supplier_id ORDER BY i.supplier_invoice_id DESC LIMIT 100"
+        );
+        return res.status(200).json({ ok: true, data: invoices.map(row => ({
+          ...row,
+          invoiceId: String(row.invoiceId),
+          total: Number(row.total),
+          paidAmount: Number(row.paidAmount),
+          lunas: row.status === "paid" || Number(row.paidAmount) >= Number(row.total)
+        })) });
+      }
+
       const [rows] = await getPool().execute(
         "SELECT m.medicine_id AS medicineId, m.public_id AS publicId, m.name, m.canonical_unit AS unit, m.selling_price AS sellingPrice, m.minimum_stock AS minimumStock, m.active, " +
         "COALESCE(p.physical_quantity, 0) AS physicalQuantity, COALESCE(p.sellable_quantity, 0) AS sellableQuantity, " +
@@ -49,6 +66,8 @@ module.exports = async function handler(req, res) {
         actor, medicine: { ...body.medicine, actorUserId: actor.userId },
         idempotencyKey, requestId
       });
+    } else if (body.action === "create_supplier_invoice") {
+      result = await commands.createSupplierInvoice(value);
     } else if (body.action === "receive_purchase") {
       result = await commands.receivePurchase(value);
     } else if (body.action === "supplier_return_request") {

@@ -13,6 +13,8 @@ function createHarness(overrides = {}) {
     payments: [], cashEntries: [],
     purchaseLine: { purchaseId: "purchase-1", purchaseLineId: "line-1", medicineId: "med-1", supplierId: "sup-1", quantityScale: 0, orderedQty: "5", receivedQty: "0", purchasedQty: "5", returnedQty: "0", originalBatchAllocations: [{ batchId: "batch-1" }] },
     receipts: [], payableUpserts: [], supplierReturnRequests: [], supplierReturnStatus: null,
+    suppliers: [{ supplierId: 1, supplierName: "Kimia Farma" }],
+    supplierInvoices: [], supplierInvoiceLines: [],
     currentCall: null, nextSequence: 0, claims: new Map(), completed: new Map()
   };
   let queue = Promise.resolve();
@@ -31,6 +33,7 @@ function createHarness(overrides = {}) {
       payments: state.payments, cashEntries: state.cashEntries,
       purchaseLine: state.purchaseLine, receipts: state.receipts, payableUpserts: state.payableUpserts,
       supplierReturnRequests: state.supplierReturnRequests, supplierReturnStatus: state.supplierReturnStatus,
+      suppliers: state.suppliers, supplierInvoices: state.supplierInvoices, supplierInvoiceLines: state.supplierInvoiceLines,
       currentCall: state.currentCall,
       nextSequence: state.nextSequence, claims: state.claims, completed: state.completed
     });
@@ -78,7 +81,14 @@ function createHarness(overrides = {}) {
     async createReturnQuotas(_c, id, lines) { state.returnQuotas.push({ invoiceId: id, lineCount: lines.length }); },
     async markEncounterCompleted(_c, id, invoiceId) { state.encounterCompleted = { id, invoiceId }; },
     async previewMedicine() { return { ...state.medicine }; },
-    async previewPurchaseLine() { return { medicineId: "med-1", supplierId: "sup-1", unitCost: "2000", quantityScale: 0 }; },
+    async previewPurchaseLine() {
+      return {
+        medicineId: state.purchaseLine ? state.purchaseLine.medicineId : "med-1",
+        supplierId: state.purchaseLine ? String(state.purchaseLine.supplierId) : "sup-1",
+        unitCost: "2000",
+        quantityScale: 0
+      };
+    },
     async lockPurchaseLine() { return state.purchaseLine; },
     async getPurchaseReceiptPolicy() { return { mode: "split_receipts" }; },
     async createPurchaseReceipt(_c, data) { state.receipts.push(data); return "receipt-" + state.receipts.length; },
@@ -94,6 +104,29 @@ function createHarness(overrides = {}) {
     },
     async updatePurchaseLineReceived(_c, data) { state.purchaseLine.receivedQty = data.receivedQty; },
     async ensureSupplierPayable(_c, data) { state.payableUpserts.push(data); },
+    async ensureSupplier(_c, name) {
+      let sup = state.suppliers.find(s => s.supplierName.toLowerCase() === name.toLowerCase());
+      if (!sup) {
+        sup = { supplierId: state.suppliers.length + 1, supplierName: name };
+        state.suppliers.push(sup);
+      }
+      return sup.supplierId;
+    },
+    async findSupplierInvoiceByNumber(_c, supplierId, invoiceNumber) {
+      return state.supplierInvoices.find(inv => inv.supplierId === supplierId && inv.supplierInvoiceNumber === invoiceNumber) || null;
+    },
+    async createSupplierInvoice(_c, data) {
+      const id = state.supplierInvoices.length + 1;
+      const record = { supplierInvoiceId: id, ...data };
+      state.supplierInvoices.push(record);
+      return id;
+    },
+    async createSupplierInvoiceLine(_c, data) {
+      const id = state.supplierInvoiceLines.length + 1;
+      const record = { supplierInvoiceLineId: id, ...data };
+      state.supplierInvoiceLines.push(record);
+      return id;
+    },
     async previewSupplierReturnSource() {
       return {
         quantityScale: 0,
@@ -516,5 +549,169 @@ test("queue transfer requires an active target shift and rolls back on invalid t
     idempotencyKey: "queue-transfer-closed", requestId: "queue-transfer-closed-req"
   }), { code: "QUEUE_TRANSFER_TARGET_SHIFT_INVALID" });
   assert.equal(state.transfer, undefined);
+  assert.equal(state.audits.length, 0);
+});
+
+test("createSupplierInvoice creates supplier invoice and lines atomically", async () => {
+  const { state, commands } = createHarness();
+  const res = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-001",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "50000",
+    lines: [
+      { medicineId: "med-1", orderedQty: "10", unitCost: "5000", subtotal: "50000" }
+    ],
+    idempotencyKey: "key-inv-1",
+    requestId: "req-inv-1"
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.data.supplierInvoiceNumber, "INV-KF-001");
+  assert.equal(res.body.data.lines.length, 1);
+  assert.equal(res.body.data.lines[0].orderedQty, "10");
+  assert.equal(state.supplierInvoices.length, 1);
+  assert.equal(state.supplierInvoiceLines.length, 1);
+  assert.equal(state.audits.at(-1).actionCode, "SUPPLIER_INVOICE_CREATED");
+});
+
+test("createSupplierInvoice rejects duplicate invoice number for the same supplier", async () => {
+  const { commands } = createHarness();
+  await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-DUP",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "10000",
+    lines: [{ medicineId: "med-1", orderedQty: "2", unitCost: "5000", subtotal: "10000" }],
+    idempotencyKey: "key-dup-1",
+    requestId: "req-dup-1"
+  });
+
+  await assert.rejects(commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-DUP",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "10000",
+    lines: [{ medicineId: "med-1", orderedQty: "2", unitCost: "5000", subtotal: "10000" }],
+    idempotencyKey: "key-dup-2",
+    requestId: "req-dup-2"
+  }), { code: "SUPPLIER_INVOICE_DUPLICATE" });
+});
+
+test("createSupplierInvoice retry with same idempotency key returns replayed response without duplicate lines", async () => {
+  const { state, commands } = createHarness();
+  const first = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-RETRY",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "25000",
+    lines: [{ medicineId: "med-1", orderedQty: "5", unitCost: "5000", subtotal: "25000" }],
+    idempotencyKey: "key-retry-1",
+    requestId: "req-retry-1"
+  });
+
+  const retry = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-RETRY",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "25000",
+    lines: [{ medicineId: "med-1", orderedQty: "5", unitCost: "5000", subtotal: "25000" }],
+    idempotencyKey: "key-retry-1",
+    requestId: "req-retry-1-attempt-2"
+  });
+
+  assert.equal(retry.body.data.supplierInvoiceNumber, first.body.data.supplierInvoiceNumber);
+  assert.equal(state.supplierInvoices.length, 1);
+  assert.equal(state.supplierInvoiceLines.length, 1);
+});
+
+test("receivePurchase connects to created supplier invoice line and updates stock and payable", async () => {
+  const { state, commands } = createHarness();
+  const invoiceRes = await commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-RCV",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "20000",
+    lines: [{ medicineId: "med-1", orderedQty: "4", unitCost: "5000", subtotal: "20000" }],
+    idempotencyKey: "key-inv-rcv",
+    requestId: "req-inv-rcv"
+  });
+
+  const createdLine = invoiceRes.body.data.lines[0];
+  state.purchaseLine = {
+    purchaseId: invoiceRes.body.data.supplierInvoiceId,
+    purchaseLineId: createdLine.purchaseLineId,
+    medicineId: "med-1",
+    supplierId: String(invoiceRes.body.data.supplierId),
+    quantityScale: 0,
+    orderedQty: "4",
+    receivedQty: "0",
+    purchasedQty: "4",
+    returnedQty: "0",
+    originalBatchAllocations: []
+  };
+
+  const receiveRes = await commands.receivePurchase({
+    actor: { userId: "admin-1", role: "admin" },
+    purchaseLineId: createdLine.purchaseLineId,
+    receivedQty: "4",
+    receiptReference: "RCV-KF-001",
+    purchaseValue: "20000",
+    batch: {
+      batchNo: "BATCH-KF-99",
+      expiryDate: "2028-12-31",
+      receivedAtUtc: "2026-11-25T00:00:00Z",
+      disposition: "sellable"
+    },
+    idempotencyKey: "key-rcv-1",
+    requestId: "req-rcv-1"
+  });
+
+  assert.equal(receiveRes.body.ok, true);
+  assert.equal(state.purchaseLine.receivedQty, "4");
+  assert.equal(state.batches.length, 2);
+  assert.equal(state.batches.at(-1).batchNo, "BATCH-KF-99");
+  assert.equal(state.movements.length, 1);
+  assert.equal(state.movements[0].direction, "in");
+  assert.equal(state.movements[0].quantity, "4");
+  assert.equal(state.payableUpserts.length >= 1, true);
+});
+
+test("failure in supplier invoice line creation rolls back invoice header cleanly", async () => {
+  const { state, commands } = createHarness({
+    async createSupplierInvoiceLine() {
+      const err = new Error("Disk / Database error inserting line");
+      err.code = "DB_LINE_INSERT_FAILED";
+      throw err;
+    }
+  });
+
+  await assert.rejects(commands.createSupplierInvoice({
+    actor: { userId: "admin-1", role: "admin" },
+    supplierName: "Kimia Farma",
+    supplierInvoiceNumber: "INV-KF-FAIL",
+    invoiceDate: "2026-11-25",
+    dueDate: "2026-12-25",
+    totalAmount: "10000",
+    lines: [{ medicineId: "med-1", orderedQty: "2", unitCost: "5000", subtotal: "10000" }],
+    idempotencyKey: "key-fail-1",
+    requestId: "req-fail-1"
+  }), { code: "DB_LINE_INSERT_FAILED" });
+
+  assert.equal(state.supplierInvoices.length, 0);
+  assert.equal(state.supplierInvoiceLines.length, 0);
   assert.equal(state.audits.length, 0);
 });

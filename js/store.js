@@ -331,6 +331,10 @@ class ClinicStore {
 
   // Weighted Average HPP Calculation on Purchase
   recordPurchase({ supplier, faktur, oid, qty, total, tempo, batchNo, ed, isLunas }) {
+    if (this.isCacheOnly) {
+      console.warn('recordPurchase lokal dinonaktifkan pada mode TiDB; pencatatan pembelian wajib melalui TiDB API.');
+      return false;
+    }
     const today = new Date().toISOString().slice(0, 10);
     const obat = this.getObat(oid);
     if (!obat) return false;
