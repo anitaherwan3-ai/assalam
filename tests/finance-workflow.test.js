@@ -126,7 +126,7 @@ test("expense rejection is Pimpinan-only, requires a reason, and records rejecte
   await assert.rejects(commands.rejectExpense({
     actor: admin, expenseId: "30", reason: "Alasan",
     idempotencyKey: "expense-reject-admin", requestId: "expense-reject-admin"
-  }), { code: "ROLE_FORBIDDEN" });
+  }), { code: "DOMAIN_FORBIDDEN" });
   await assert.rejects(commands.rejectExpense({
     actor: owner, expenseId: "30", reason: "",
     idempotencyKey: "expense-reject-empty", requestId: "expense-reject-empty"
