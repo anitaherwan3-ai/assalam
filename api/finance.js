@@ -59,7 +59,7 @@ module.exports = async function handler(req, res) {
     const body = req.body && typeof req.body === "object" ? req.body : {};
     const allowed = [
       "record_payment", "approve_payment", "record_supplier_payment", "open_shift", "close_shift", "verify_shift",
-      "refund_transfer", "create_expense", "approve_expense", "post_journal"
+      "refund_transfer", "create_expense", "approve_expense", "reject_expense", "post_journal"
     ];
     if (!allowed.includes(body.action)) return res.status(400).json({ ok: false, code: "FINANCE_ACTION_INVALID" });
     const idempotencyKey = req.headers["idempotency-key"];
@@ -78,6 +78,7 @@ module.exports = async function handler(req, res) {
     else if (body.action === "refund_transfer") result = await commands.payRefund(value);
     else if (body.action === "create_expense") result = await commands.createExpense(value);
     else if (body.action === "approve_expense") result = await commands.approveExpense(value);
+    else if (body.action === "reject_expense") result = await commands.rejectExpense(value);
     else result = await commands.postJournal(value);
     return res.status(result.statusCode).json(result.body);
   } catch (error) {
