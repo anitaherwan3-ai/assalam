@@ -1583,12 +1583,67 @@ function actionPulihkanBatalBerobat(id) {
     return;
   }
   const p = store.get('pasien', id);
-  if (!p || p.status !== 'batal_berobat' || p.done || p.tgl !== todayStr) return;
+  if (!p || p.status !== 'batal_berobat' || p.done) return;
+
+  // Refresh the WIB business date on every action; a cashier page can remain
+  // open across midnight and otherwise send yesterday's encounter as today's.
+  const currentClinicDate = getClinicTodayStr();
+  todayStr = currentClinicDate;
+
+  const registerNewVisitToday = async () => {
+    const api = window.assalamTiDBApi;
+    if (!isTiDBCatalogPreview() || !api || !p.patientId) {
+      showAlert('Kunjungan lama tidak dapat dipulihkan. Untuk membuat kunjungan baru hari ini, muat data pasien dari TiDB dan gunakan pendaftaran antrean.', 'Kunjungan Baru Diperlukan');
+      return;
+    }
+    const shift = getCurrentShift();
+    const shiftId = shift && shift.shiftId ? String(shift.shiftId) : '';
+    const laneCode = shift && shift.laneCode ? String(shift.laneCode).trim().toUpperCase() : '';
+    if (!shiftId || !['A', 'B'].includes(laneCode)) {
+      showAlert('Shift aktif atau jalur antrean Pimpinan belum tersedia. Buka shift resmi dan muat ulang antrean sebelum mendaftarkan kunjungan baru.', 'Shift Diperlukan');
+      return;
+    }
+    try {
+      const response = await api.registerEncounter({
+        patientId: String(p.patientId),
+        serviceCode: String(p.layanan || 'UMUM'),
+        shiftId,
+        queuePrefix: laneCode
+      }, api.newIdempotencyKey());
+      const data = (response && response.data) || (response && response.body && response.body.data) || response || {};
+      const queueNumber = data.queueNumber || response.queueNumber;
+      if (!queueNumber || !(data.queueTicketId || data.ticketId)) {
+        throw new Error('Respons pendaftaran tidak memuat nomor dan ID tiket antrean.');
+      }
+      await syncOperationalDataFromTiDB();
+      store.logActivity('Kunjungan Baru', 'Pasien', String(queueNumber) + ' - ' + String(p.nama || 'Pasien'));
+      store.saveLocal();
+      if (typeof broadcastQueueUpdate === 'function') broadcastQueueUpdate();
+      showAlert('Kunjungan baru berhasil didaftarkan untuk hari ini dengan nomor ' + queueNumber + '. Riwayat kunjungan batal tetap tersimpan.', 'Kunjungan Baru Berhasil');
+    } catch (error) {
+      showAlert(error.message || 'Pendaftaran kunjungan baru ke TiDB gagal.', 'Gagal Mendaftarkan Kunjungan');
+    }
+  };
+
+  const offerNewVisit = () => showConfirm(
+    'Kunjungan tanggal ' + String(p.tgl || 'sebelumnya') + ' sudah melewati tanggal operasional. Kunjungan lama tetap tersimpan. Daftarkan pasien yang sama sebagai kunjungan baru hari ini?',
+    registerNewVisitToday
+  );
+
+  if (String(p.tgl || '').slice(0, 10) !== currentClinicDate) {
+    offerNewVisit();
+    return;
+  }
+
   showConfirm('Aktifkan kembali pasien ini ke antrean hari ini?', async () => {
     if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
       try {
         await window.assalamTiDBApi.restoreEncounter({ encounterId: String(p.encounterId || p.id) }, window.assalamTiDBApi.newIdempotencyKey());
       } catch (error) {
+        if (error && error.code === 'ENCOUNTER_RESTORE_DATE_EXPIRED') {
+          offerNewVisit();
+          return;
+        }
         showAlert(error.message || 'Pemulihan belum tersimpan di server TiDB.', 'Gagal Memulihkan');
         return;
       }
