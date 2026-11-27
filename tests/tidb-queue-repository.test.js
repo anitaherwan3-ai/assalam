@@ -49,7 +49,7 @@ test("display projection exposes the latest call event ID for repeat announcemen
   const repositorySource = fs.readFileSync(require.resolve("../lib/repositories/tidb-queue-repository"), "utf8");
   const displaySource = fs.readFileSync(require.resolve("../display.html"), "utf8");
 
-  assert.match(repositorySource, /MAX\(qce\.event_id\).*queue_call_events qce.*event_type IN \('call', 'recall'\)/);
+  assert.match(repositorySource, /MAX\(.*qce\.(?:call_)?event_id\).*queue_call_events qce.*event_type IN \('call', 'recall'\)/);
   assert.match(repositorySource, /callEventId: activeCall\.callEventId == null \? null : String\(activeCall\.callEventId\)/);
   assert.match(displaySource, /_t: activeCall\.callEventId \|\| activeCall\.calledAtUtc \|\| activeCall\.ticketId/);
 });
