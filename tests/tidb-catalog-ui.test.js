@@ -142,3 +142,16 @@ test("cancelled TiDB encounter refreshes business date and offers a new encounte
   assert.match(body, /patientId: String\(p\.patientId\)/);
   assert.match(body, /queuePrefix: laneCode/);
 });
+
+test('cashier queue recovery controls call audited TiDB actions and hide call for non-callable tickets', () => {
+  const app = fs.readFileSync(require.resolve('../js/app.js'), 'utf8');
+  const store = fs.readFileSync(require.resolve('../js/store.js'), 'utf8');
+  const api = fs.readFileSync(require.resolve('../api/queue.js'), 'utf8');
+  assert.match(app, /renderTiDBQueueCallButtons\(p\)/);
+  assert.match(app, /Pulihkan Status Antrean/);
+  assert.match(app, /Batal Panggilan Aktif Jalur/);
+  assert.match(store, /async cancelActiveQueueCall\(laneCode\)/);
+  assert.match(store, /async repairQueueTicket\(patientId\)/);
+  assert.match(api, /cancel_active_call/);
+  assert.match(api, /repair_ticket_status/);
+});
