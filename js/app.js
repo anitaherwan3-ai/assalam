@@ -1211,6 +1211,9 @@ function viewPasien() {
     return aNo - bNo;
   });
 
+  const currentQueueShift = typeof getCurrentShift === 'function' ? getCurrentShift() : null;
+  const activeLaneCode = String((currentQueueShift && currentQueueShift.laneCode) ||
+    ((sortedTodayPatients.find(p => p.ticketId && p.laneCode) || {}).laneCode || '')).trim().toUpperCase();
   const rows = sortedTodayPatients.map(p => [
     esc(p.no),
     esc(p.jam),
@@ -1243,6 +1246,7 @@ function viewPasien() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
         <h2 style="margin:0;">Registrasi Kedatangan Pasien Hari Ini</h2>
         <button class="btn-tv-header s" onclick="openTvDisplay()">📺 Buka Layar Display TV (HDMI)</button>
+        ${currentRole === 'kasir' && ['A', 'B'].includes(activeLaneCode) ? `<button class="s btn-danger" onclick="store.cancelActiveQueueCall('${activeLaneCode}')" title="Batalkan panggilan aktif yang tersangkut di TiDB">⛔ Batal Panggilan Aktif Jalur ${activeLaneCode}</button>` : ''}
       </div>
 
       <div style="position:relative;margin-bottom:16px;">
