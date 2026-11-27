@@ -180,6 +180,13 @@ function calculateFinancials() {
       refundPaidCash - pc
   };
 }
+function renderTiDBQueueCallButtons(patient) {
+  const callable = !patient.queueStatus || ['waiting', 'called'].includes(String(patient.queueStatus));
+  const disabled = callable ? '' : ' disabled';
+  const callButton = '<button class=\"s p\" data-patient-id=\"' + patient.id + '\" onclick=\"store.callPatient(this.dataset.patientId)\" title=\"Panggil ke Layar TV & Bunyikan Bel\"' + disabled + '>📢 Panggil</button>';
+  const repairButton = callable ? '' : '<button class=\"s btn-danger\" data-patient-id=\"' + patient.id + '\" onclick=\"store.repairQueueTicket(this.dataset.patientId)\" title=\"Pulihkan status tiket agar dapat dipanggil\">Pulihkan Status Antrean</button>';
+  return callButton + repairButton;
+}
 function applyTiDBQueueSnapshot(queueRows) {
   if (!Array.isArray(queueRows)) return;
   const rows = queueRows.map(row => {
@@ -206,6 +213,7 @@ function applyTiDBQueueSnapshot(queueRows) {
       laneCode: String(row.laneCode || ''),
       status: cancelled ? 'batal_berobat' : (completed ? 'selesai' : 'aktif'),
       done: completed,
+      queueStatus: ticketStatus,
       calling: !cancelled && ticketStatus === 'called',
       batalBerobatPada: null,
       source: 'tidb',
@@ -1226,7 +1234,7 @@ function viewPasien() {
     p.done ? '-' : p.status === 'batal_berobat' ? (currentRole === 'kasir' ? `
       <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
     ` : '-') : `
-      <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
+      ${renderTiDBQueueCallButtons(p)}
       ${p.calling ? `<button class="s btn-danger" onclick="store.cancelCallPatient('${p.id}')" title="Batalkan status panggilan pasien ini">Selesai/Batal Panggil</button>` : ''}
       ${p.ticketId && ['kasir','admin','pimpinan'].includes(currentRole) ? `<button class="s" onclick="actionTransferAntrean('${p.id}')">Limpahkan</button>` : ''}
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
