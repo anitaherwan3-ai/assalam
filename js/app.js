@@ -7,6 +7,12 @@ function isTiDBCatalogPreview() {
   return !!(window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled());
 }
 
+function blockLocalMutationInTiDB(actionLabel) {
+  if (!isTiDBCatalogPreview()) return false;
+  showAlert(actionLabel + ' belum terhubung ke backend TiDB. Tidak ada perubahan yang disimpan; jangan mengandalkan cache browser untuk data operasional.', 'Fungsi Belum Tersambung');
+  return true;
+}
+
 function getMasterTariffs() {
   return isTiDBCatalogPreview()
     ? window.assalamTiDBCatalog.getTariffs()
@@ -334,18 +340,22 @@ async function syncOperationalDataFromTiDB() {
 
     if (financeRes && financeRes.ok && financeRes.data && Array.isArray(financeRes.data.expenses)) {
       financeRes.data.expenses.forEach(e => {
-        const idx = store.state.biaya.findIndex(b => b.id === e.publicId);
+        const expensePublicId = e.publicId || String(e.expenseId);
+        const expenseStatus = e.status === 'requested' ? 'pending' : e.status;
+        const idx = store.state.biaya.findIndex(b => b.id === expensePublicId || String(b.tidbExpenseId || '') === String(e.expenseId));
         if (idx >= 0) {
-          store.state.biaya[idx].status = e.status;
+          store.state.biaya[idx].tidbExpenseId = String(e.expenseId);
+          store.state.biaya[idx].status = expenseStatus;
           store.state.biaya[idx].jml = e.jml;
         } else {
           store.state.biaya.push({
-            id: e.publicId || String(e.expenseId),
+            id: expensePublicId,
+            tidbExpenseId: String(e.expenseId),
             tgl: e.tgl,
             kat: e.kat,
             ket: e.ket,
             jml: e.jml,
-            status: e.status || 'approved',
+            status: expenseStatus || 'pending',
             kasir: e.creatorName || '-',
             _t: Date.now()
           });
@@ -2532,6 +2542,7 @@ function viewPetty() {
 }
 
 function actionAddPetty() {
+  if (blockLocalMutationInTiDB('Kas kecil')) return;
   const ket = val('petty-ket').trim();
   const jml = numVal('petty-jml');
   if (!ket || jml <= 0) {
@@ -2556,6 +2567,7 @@ function actionAddPetty() {
 }
 
 function editPetty(id) {
+  if (blockLocalMutationInTiDB('Edit kas kecil')) return;
   const p = store.get('petty', id);
   if (!p) return;
   showFormModal('Edit Kas Kecil', [
@@ -2571,6 +2583,7 @@ function editPetty(id) {
 }
 
 function delPetty(id) {
+  if (blockLocalMutationInTiDB('Hapus kas kecil')) return;
   showConfirm('Hapus catatan kas kecil ini?', () => {
     const p = store.get('petty', id);
     if (p) {
@@ -2699,6 +2712,7 @@ async function actionAddObat() {
 }
 
 function editObat(id) {
+  if (blockLocalMutationInTiDB('Edit master obat')) return;
   const o = store.getObat(id);
   if (!o) return;
   showFormModal('Edit Obat', [
@@ -2722,6 +2736,7 @@ function editObat(id) {
 }
 
 function delObat(id) {
+  if (blockLocalMutationInTiDB('Nonaktifkan master obat')) return;
   showConfirm('Hapus data master obat ini?', () => {
     const o = store.getObat(id);
     if (o) {
@@ -2940,6 +2955,7 @@ function updatePaketBuilderSummary() {
 }
 
 function actionSavePaket() {
+  if (blockLocalMutationInTiDB('Simpan paket pelayanan')) return;
   const nama = val('pkg-nama').trim();
   const desk = val('pkg-desk').trim();
   const harga = numVal('pkg-harga');
@@ -3011,6 +3027,7 @@ function cancelEditPaket() {
 }
 
 function delPaket(id) {
+  if (blockLocalMutationInTiDB('Hapus paket pelayanan')) return;
   showConfirm('Hapus paket pelayanan ini?', () => {
     const p = store.get('paket', id);
     if (p) {
@@ -3826,6 +3843,7 @@ async function actionAddBiaya() {
 }
 
 function editBiaya(id) {
+  if (blockLocalMutationInTiDB('Edit biaya operasional')) return;
   const b = store.get('biaya', id);
   if (!b) return;
   showFormModal('Edit Biaya', [
@@ -3844,6 +3862,7 @@ function editBiaya(id) {
 }
 
 function delBiaya(id) {
+  if (blockLocalMutationInTiDB('Hapus biaya operasional')) return;
   showConfirm('Hapus data pengeluaran biaya ini?', () => {
     const b = store.get('biaya', id);
     if (b) {
@@ -5156,9 +5175,42 @@ function viewApproval() {
   `;
 }
 
-function actionApproveBiaya(id, isApproved) {
+async function actionApproveBiaya(id, isApproved) {
+  if (currentRole !== 'pimpinan') {
+    showAlert('Hanya Pimpinan yang dapat menyetujui atau menolak pengeluaran.', 'Akses Ditolak');
+    return;
+  }
   const b = store.get('biaya', id);
   if (!b) return;
+
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    const expenseId = String(b.tidbExpenseId || '').trim();
+    if (!expenseId) {
+      showAlert('ID pengeluaran TiDB tidak tersedia. Muat ulang data biaya sebelum memproses approval.', 'Data Belum Sinkron');
+      return;
+    }
+    const label = isApproved ? 'persetujuan' : 'penolakan';
+    showFormModal(isApproved ? 'Persetujuan Pengeluaran' : 'Penolakan Pengeluaran', [
+      ['reason', isApproved ? 'Catatan persetujuan Pimpinan *' : 'Alasan penolakan Pimpinan *', 'text', isApproved ? 'Bukti telah diperiksa' : 'Tidak disetujui setelah pemeriksaan']
+    ], async res => {
+      const reason = String(res.reason || '').trim();
+      if (!reason) { showAlert('Catatan keputusan wajib diisi.'); return; }
+      try {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        const payload = { expenseId, reason };
+        if (isApproved) await window.assalamTiDBApi.approveExpense(payload, key);
+        else await window.assalamTiDBApi.rejectExpense(payload, key);
+        await syncOperationalDataFromTiDB();
+        store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
+        showAlert(`Pengeluaran berhasil diproses: ${isApproved ? 'disetujui' : 'ditolak'} di TiDB.`, 'Keputusan Tersimpan');
+      } catch (err) {
+        showAlert(err.message || `Gagal memproses ${label} pengeluaran. Status server tidak diubah.`, 'Gagal');
+      }
+      renderApp();
+    });
+    return;
+  }
+
   b.status = isApproved ? 'approved' : 'ditolak';
   b._t = Date.now();
   store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
@@ -5607,6 +5659,7 @@ function deleteClinicLogo() {
 }
 
 function actionSaveSettings() {
+  if (blockLocalMutationInTiDB('Simpan pengaturan klinik')) return;
   const set = store.state.set;
   set.nama = 'Klinik Assalaam Palembang';
   set.logo = val('set-logo');
@@ -5638,6 +5691,7 @@ function actionSaveSettings() {
 }
 
 function actionConnectFirebase() {
+  if (blockLocalMutationInTiDB('Pengaturan koneksi Firebase')) return;
   const cfg = {
     apiKey: val('fb-apiKey').trim(),
     authDomain: val('fb-authDomain').trim(),
@@ -5655,6 +5709,7 @@ function actionConnectFirebase() {
 }
 
 function actionDisconnectFirebase() {
+  if (blockLocalMutationInTiDB('Putuskan koneksi Firebase')) return;
   showConfirm('Putuskan koneksi cloud? Aplikasi akan kembali menyimpan data secara lokal di browser ini.', () => {
     window.firebaseBackend.disconnect();
     showAlert('Koneksi Firebase diputuskan. Aplikasi sekarang berjalan dalam Mode Lokal.', 'Mode Lokal');
@@ -5953,6 +6008,7 @@ function previewRunningTextAdmin() {
 }
 
 async function actionSaveDisplayTV() {
+  if (blockLocalMutationInTiDB('Simpan pengaturan Display TV')) return;
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';

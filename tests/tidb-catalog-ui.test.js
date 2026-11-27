@@ -16,6 +16,23 @@ function installCatalogUI({ enabled = true, api = {}, role = "pimpinan" } = {}) 
   return window;
 }
 
+test("legacy local-only UI mutations fail closed while TiDB is active", () => {
+  const source = fs.readFileSync(require.resolve("../js/app.js"), "utf8");
+  assert.match(source, /function blockLocalMutationInTiDB\(actionLabel\)/);
+  for (const action of [
+    "actionAddPetty", "editPetty", "delPetty", "editObat", "delObat",
+    "actionSavePaket", "delPaket", "editBiaya", "delBiaya",
+    "actionSaveSettings", "actionSaveDisplayTV"
+  ]) {
+    const actionStart = source.indexOf("function " + action + "(");
+    assert.notEqual(actionStart, -1, action + " exists");
+    const body = source.slice(actionStart, source.indexOf("\n}", actionStart) + 2);
+    assert.match(body, /blockLocalMutationInTiDB/, action + " blocks unsupported TiDB writes");
+  }
+  assert.match(source, /e\.status === 'requested' \? 'pending' : e\.status/);
+  assert.match(source, /tidbExpenseId: String\(e\.expenseId\)/);
+});
+
 test("TiDB catalog UI is enabled only for the isolated TiDB preview deployment", async () => {
   const preview = installCatalogUI();
   const production = installCatalogUI({ enabled: false });
