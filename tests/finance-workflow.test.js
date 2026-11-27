@@ -18,6 +18,7 @@ function createFinanceHarness(overrides = {}) {
     async appendExpenseEvent(_c, input) { state.events.push({ type: "expense", ...input }); },
     async lockExpense() { return state.expense; },
     async approveExpense(_c, input) { state.expense.status = "approved"; state.expense.approver = input.approverUserId; },
+    async rejectExpense() { state.expense.status = "rejected"; },
     async getRefundPayoutPolicy() { return { approved: true }; },
     async lockRefundObligation() { return { status: "approved_pending_payout", outstandingAmount: "2500" }; },
     async appendRefundPayout(_c, input) { state.refund = { ...input, payoutId: "40" }; return "40"; },
@@ -110,6 +111,26 @@ test("expense is submitted by Admin and requires separate Pimpinan approval", as
   });
   assert.equal(approved.body.data.status, "approved");
   assert.equal(state.expense.approver, owner.userId);
+});
+
+test("expense rejection is Pimpinan-only, requires a reason, and records rejected status", async () => {
+  const { state, commands } = createFinanceHarness();
+  state.expense = { expenseId: "30", status: "requested", createdByUserId: "admin-1" };
+  const rejected = await commands.rejectExpense({
+    actor: owner, expenseId: "30", reason: "Bukti tidak sesuai",
+    idempotencyKey: "expense-reject-1", requestId: "expense-reject-req-1"
+  });
+  assert.equal(rejected.body.data.status, "rejected");
+  assert.equal(state.expense.status, "rejected");
+  assert.equal(state.events.at(-1).eventType, "rejected");
+  await assert.rejects(commands.rejectExpense({
+    actor: admin, expenseId: "30", reason: "Alasan",
+    idempotencyKey: "expense-reject-admin", requestId: "expense-reject-admin"
+  }), { code: "ROLE_FORBIDDEN" });
+  await assert.rejects(commands.rejectExpense({
+    actor: owner, expenseId: "30", reason: "",
+    idempotencyKey: "expense-reject-empty", requestId: "expense-reject-empty"
+  }), { code: "EXPENSE_REJECTION_REASON_REQUIRED" });
 });
 
 test("refund payout requires a confirmed payment reference and does not require destination account details", async () => {
