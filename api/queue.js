@@ -83,6 +83,8 @@ module.exports = async function handler(req, res) {
     else if (body.action === "cancel_encounter") result = await commands.cancelEncounter(value);
     else if (body.action === "restore_encounter") result = await commands.restoreEncounter(value);
     else if (body.action === "call") result = await commands.appendQueueCallEvent(value);
+    else if (body.action === "cancel_active_call") result = await commands.cancelActiveQueueCall(value);
+    else if (body.action === "repair_ticket_status") result = await commands.repairQueueTicketStatus(value);
     else if (body.action === "transfer") result = await commands.transferQueue(value);
     else if (body.action === "assign_lane") result = await commands.assignQueueLane(value);
     else return res.status(400).json({ ok: false, code: "QUEUE_ACTION_INVALID" });
