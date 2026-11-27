@@ -482,7 +482,7 @@ class ClinicStore {
       }
       return true;
     } catch (err) {
-      if (err && err.status === 409) {
+      if (err && err.status === 409 && err.code === 'QUEUE_ACTIVE_CALL_CONFLICT') {
         if (typeof showConfirmModal === 'function') {
           showConfirmModal(
             'Masih ada nomor aktif yang sedang dipanggil pada jalur ini.\n\nApakah Anda ingin membatalkan panggilan nomor sebelumnya dan memanggil pasien ini (' + (patient.no || '') + ' - ' + (patient.nama || '') + ')?',
