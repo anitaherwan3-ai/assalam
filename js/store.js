@@ -488,9 +488,12 @@ class ClinicStore {
             'Masih ada nomor aktif yang sedang dipanggil pada jalur ini.\n\nApakah Anda ingin membatalkan panggilan nomor sebelumnya dan memanggil pasien ini (' + (patient.no || '') + ' - ' + (patient.nama || '') + ')?',
             async () => {
               const activePatient = (this.state.pasien || []).find(p => p.calling && !p.done && p.laneCode === patient.laneCode);
-              if (activePatient && activePatient.ticketId) {
-                await this.cancelCallPatientTiDB(activePatient);
+              if (!activePatient || !activePatient.ticketId) {
+                if (typeof showAlert === 'function') showAlert('Panggilan aktif lama tidak ditemukan di data antrean. Muat ulang antrean; panggilan baru belum dilakukan.', 'Ganti Panggilan Gagal');
+                return;
               }
+              const cancelled = await this.cancelCallPatientTiDB(activePatient);
+              if (!cancelled) return;
               await this.callPatientTiDB(patient, Date.now());
             },
             null,
@@ -524,10 +527,8 @@ class ClinicStore {
   async cancelCallPatientTiDB(patient) {
     const api = window.assalamTiDBApi;
     if (!api || !patient.ticketId || !patient.laneCode) {
-      patient.calling = false;
-      this.saveLocal();
-      if (typeof renderApp === 'function') renderApp();
-      return true;
+      if (typeof showAlert === 'function') showAlert('Data tiket/jalur antrean tidak lengkap. Tidak ada perubahan panggilan yang disimpan; muat ulang antrean.', 'Batal Panggil Gagal');
+      return false;
     }
     try {
       await api.callQueue({
