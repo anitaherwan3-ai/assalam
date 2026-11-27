@@ -926,3 +926,28 @@ test("recordSupplierPayment rejects payment without evidenceFileId", async () =>
     requestId: "req-pay-no-evid"
   }), { code: "SUPPLIER_PAYMENT_EVIDENCE_REQUIRED" });
 });
+
+test("queue call automatically reconciles a completed encounter left in the active guard", async () => {
+  let cleared = false;
+  const { state, commands } = createHarness({
+    async lockQueueCallGuard() { return { prefix: "A", activeTicketId: "ticket-old", version: "2" }; },
+    async lockQueueTicket(_connection, ticketId) {
+      if (ticketId === "ticket-old") return { ticketId, laneCode: "A", status: "called", encounterStatus: "completed" };
+      return { ticketId, laneCode: "A", status: "waiting", encounterStatus: "registered" };
+    },
+    async findActiveQueueCall() { return { ticketId: "ticket-old" }; },
+    async clearStaleQueueCallGuard(_connection, guard) {
+      cleared = true;
+      return { ...guard, activeTicketId: null, version: "3" };
+    },
+    async setCurrentQueueCall(_connection, _guard, active) { state.currentCall = active; }
+  });
+  state.tickets = [{ ticketId: "ticket-new", laneCode: "A", queueNumber: "A-002" }];
+  const result = await commands.appendQueueCallEvent({
+    actor: cashier, ticketId: "ticket-new", laneCode: "A", eventType: "call",
+    idempotencyKey: "call-after-complete", requestId: "call-after-complete"
+  });
+  assert.equal(result.statusCode, 200);
+  assert.equal(cleared, true);
+  assert.equal(state.currentCall.ticketId, "ticket-new");
+});
