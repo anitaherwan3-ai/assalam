@@ -48,6 +48,22 @@ test("TiDB adapter permits query variants on explicitly allowed API routes", asy
   ]);
 });
 
+test("TiDB adapter sends expense approval and rejection through finance commands", async () => {
+  const requests = [];
+  const api = installAdapter(async (path, init) => {
+    requests.push({ path, init });
+    return { ok: true, status: 200, json: async () => ({ ok: true, data: { status: "approved" } }) };
+  });
+  await api.approveExpense({ expenseId: "31", reason: "Bukti sesuai" }, "expense-approve-key");
+  await api.rejectExpense({ expenseId: "32", reason: "Bukti tidak sesuai" }, "expense-reject-key");
+  assert.deepEqual(requests.map(x => [x.path, x.init.method, JSON.parse(x.init.body)]), [
+    ["/api/finance", "POST", { action: "approve_expense", expenseId: "31", reason: "Bukti sesuai" }],
+    ["/api/finance", "POST", { action: "reject_expense", expenseId: "32", reason: "Bukti tidak sesuai" }]
+  ]);
+  assert.equal(requests[0].init.headers["Idempotency-Key"], "expense-approve-key");
+  assert.equal(requests[1].init.headers["Idempotency-Key"], "expense-reject-key");
+});
+
 test("TiDB adapter still rejects unknown API pathnames", async () => {
   const api = installAdapter(async () => {
     throw new Error("fetch must not be called for an unknown endpoint");
