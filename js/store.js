@@ -524,6 +524,35 @@ class ClinicStore {
     return true;
   }
 
+  async cancelActiveQueueCall(laneCode) {
+    const lane = String(laneCode || '').trim().toUpperCase();
+    if (!['A', 'B'].includes(lane)) {
+      if (typeof showAlert === 'function') showAlert('Jalur aktif kasir tidak ditemukan. Muat ulang data shift dan antrean.', 'Batal Panggil Gagal');
+      return false;
+    }
+    const api = window.assalamTiDBApi;
+    if (!api || typeof api.cancelActiveQueueCall !== 'function') {
+      if (typeof showAlert === 'function') showAlert('Fitur pemulihan panggilan aktif belum tersedia pada versi server ini.', 'Batal Panggil Gagal');
+      return false;
+    }
+    if (typeof showConfirmModal !== 'function') return false;
+    showConfirmModal(
+      'Batalkan panggilan yang tersimpan aktif pada Jalur ' + lane + '? Jika panggilan sudah usang, server membersihkan guard. Jika masih aktif, tiket dikembalikan ke menunggu. Pasien tidak di-checkout atau dihapus.',
+      async () => {
+        try {
+          await api.cancelActiveQueueCall({ laneCode: lane }, api.newIdempotencyKey());
+          if (typeof syncOperationalDataFromTiDB === 'function') await syncOperationalDataFromTiDB();
+          if (typeof showAlert === 'function') showAlert('Panggilan aktif Jalur ' + lane + ' sudah dibatalkan/dibersihkan di TiDB. Silakan panggil nomor berikutnya.', 'Panggilan Dibersihkan');
+          else if (typeof renderApp === 'function') renderApp();
+          return true;
+        } catch (err) {
+          if (typeof showAlert === 'function') showAlert('Gagal membatalkan panggilan aktif: ' + (err.message || 'Kesalahan jaringan'), 'Batal Panggil Gagal');
+          return false;
+        }
+      }, null, 'Batal Panggilan Aktif'
+    );
+    return true;
+  }
   async cancelCallPatientTiDB(patient) {
     const api = window.assalamTiDBApi;
     if (!api || !patient.ticketId || !patient.laneCode) {
