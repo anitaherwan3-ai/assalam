@@ -420,7 +420,7 @@ async function syncOperationalDataFromTiDB() {
             kasir: q.cashierName || q.cashierUserId,
             sh: q.shiftId,
             status: q.status,
-            calling: q.status === 'calling',
+            calling: q.status === 'called',
             done: q.status === 'completed',
             laneCode: q.laneCode,
             _t: Date.now()

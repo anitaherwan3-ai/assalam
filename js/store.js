@@ -483,8 +483,8 @@ class ClinicStore {
       return true;
     } catch (err) {
       if (err && err.status === 409 && err.code === 'QUEUE_ACTIVE_CALL_CONFLICT') {
-        if (typeof showConfirmModal === 'function') {
-          showConfirmModal(
+        if (typeof showConfirm === 'function') {
+          showConfirm(
             'Masih ada nomor aktif yang sedang dipanggil pada jalur ini.\n\nApakah Anda ingin membatalkan panggilan nomor sebelumnya dan memanggil pasien ini (' + (patient.no || '') + ' - ' + (patient.nama || '') + ')?',
             async () => {
               const activePatient = (this.state.pasien || []).find(p => p.calling && !p.done && p.laneCode === patient.laneCode);
@@ -496,7 +496,6 @@ class ClinicStore {
               if (!cancelled) return;
               await this.callPatientTiDB(patient, Date.now());
             },
-            null,
             'Ganti Panggilan'
           );
           return false;
