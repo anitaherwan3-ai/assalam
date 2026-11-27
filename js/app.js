@@ -334,18 +334,22 @@ async function syncOperationalDataFromTiDB() {
 
     if (financeRes && financeRes.ok && financeRes.data && Array.isArray(financeRes.data.expenses)) {
       financeRes.data.expenses.forEach(e => {
-        const idx = store.state.biaya.findIndex(b => b.id === e.publicId);
+        const expensePublicId = e.publicId || String(e.expenseId);
+        const expenseStatus = e.status === 'requested' ? 'pending' : e.status;
+        const idx = store.state.biaya.findIndex(b => b.id === expensePublicId || String(b.tidbExpenseId || '') === String(e.expenseId));
         if (idx >= 0) {
-          store.state.biaya[idx].status = e.status;
+          store.state.biaya[idx].tidbExpenseId = String(e.expenseId);
+          store.state.biaya[idx].status = expenseStatus;
           store.state.biaya[idx].jml = e.jml;
         } else {
           store.state.biaya.push({
-            id: e.publicId || String(e.expenseId),
+            id: expensePublicId,
+            tidbExpenseId: String(e.expenseId),
             tgl: e.tgl,
             kat: e.kat,
             ket: e.ket,
             jml: e.jml,
-            status: e.status || 'approved',
+            status: expenseStatus || 'pending',
             kasir: e.creatorName || '-',
             _t: Date.now()
           });
@@ -5156,9 +5160,42 @@ function viewApproval() {
   `;
 }
 
-function actionApproveBiaya(id, isApproved) {
+async function actionApproveBiaya(id, isApproved) {
+  if (currentRole !== 'pimpinan') {
+    showAlert('Hanya Pimpinan yang dapat menyetujui atau menolak pengeluaran.', 'Akses Ditolak');
+    return;
+  }
   const b = store.get('biaya', id);
   if (!b) return;
+
+  if (isTiDBCatalogPreview() && window.assalamTiDBApi) {
+    const expenseId = String(b.tidbExpenseId || '').trim();
+    if (!expenseId) {
+      showAlert('ID pengeluaran TiDB tidak tersedia. Muat ulang data biaya sebelum memproses approval.', 'Data Belum Sinkron');
+      return;
+    }
+    const label = isApproved ? 'persetujuan' : 'penolakan';
+    showFormModal(isApproved ? 'Persetujuan Pengeluaran' : 'Penolakan Pengeluaran', [
+      ['reason', isApproved ? 'Catatan persetujuan Pimpinan *' : 'Alasan penolakan Pimpinan *', 'text', isApproved ? 'Bukti telah diperiksa' : 'Tidak disetujui setelah pemeriksaan']
+    ], async res => {
+      const reason = String(res.reason || '').trim();
+      if (!reason) { showAlert('Catatan keputusan wajib diisi.'); return; }
+      try {
+        const key = window.assalamTiDBApi.newIdempotencyKey();
+        const payload = { expenseId, reason };
+        if (isApproved) await window.assalamTiDBApi.approveExpense(payload, key);
+        else await window.assalamTiDBApi.rejectExpense(payload, key);
+        await syncOperationalDataFromTiDB();
+        store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
+        showAlert(`Pengeluaran berhasil diproses: ${isApproved ? 'disetujui' : 'ditolak'} di TiDB.`, 'Keputusan Tersimpan');
+      } catch (err) {
+        showAlert(err.message || `Gagal memproses ${label} pengeluaran. Status server tidak diubah.`, 'Gagal');
+      }
+      renderApp();
+    });
+    return;
+  }
+
   b.status = isApproved ? 'approved' : 'ditolak';
   b._t = Date.now();
   store.logActivity('Approval', 'Biaya', `${isApproved ? 'Menyetujui' : 'Menolak'} ${b.ket} (${rp(b.jml)})`);
