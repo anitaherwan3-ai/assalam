@@ -167,6 +167,8 @@
     recordPayment: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "record_payment" }, data), idempotencyKey: key }),
     listFinance: () => request("/api/finance"),
     createExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "create_expense" }, data), idempotencyKey: key }),
+    approveExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "approve_expense" }, data), idempotencyKey: key }),
+    rejectExpense: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "reject_expense" }, data), idempotencyKey: key }),
     closeShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "close_shift" }, data), idempotencyKey: key }),
     openShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "open_shift" }, data), idempotencyKey: key }),
     verifyShift: (data, key) => request("/api/finance", { method: "POST", body: Object.assign({ action: "verify_shift" }, data), idempotencyKey: key }),
