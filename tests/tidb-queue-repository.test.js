@@ -86,3 +86,19 @@ test("queue repository clears a stale active-call guard with optimistic versioni
   assert.equal(updated.version, "5");
   assert.equal(captured.params[2], "4");
 });
+
+test("queue guard reconciliation does not reset a live registered ticket", async () => {
+  const statements = [];
+  const connection = {
+    async execute(sql, params) {
+      statements.push({ sql, params });
+      if (sql.startsWith("UPDATE queue_call_guards SET active_queue_ticket_id = NULL")) return [{ affectedRows: 1 }, []];
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  const updated = await createTidbQueueRepository().clearStaleQueueCallGuard(connection, {
+    prefix: "B", activeTicketId: "92", version: "8"
+  }, { status: "called", encounterStatus: "registered" });
+  assert.equal(updated.activeTicketId, null);
+  assert.equal(statements.length, 1, "only guard should be cleared for a registered encounter");
+});
