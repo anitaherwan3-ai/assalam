@@ -733,6 +733,17 @@ function doLogout() {
 }
 
 function setTab(tabName) {
+  const allowedTabs = ROLE_TABS[currentRole] || [];
+  const previewPimpinanTabs = isTiDBCatalogPreview() && currentRole === 'pimpinan'
+    ? ['Obat & Tarif', 'Pembelian']
+    : [];
+  if (!allowedTabs.includes(tabName) && !previewPimpinanTabs.includes(tabName)) {
+    console.warn('[Role UI] Tab ditolak untuk role:', currentRole, tabName);
+    showAlert('Menu ini hanya tersedia untuk peran yang berwenang.', 'Akses Ditolak');
+    activeTab = allowedTabs[0] || '';
+    renderApp();
+    return;
+  }
   activeTab = tabName;
   window.PAGE_STATE = {};
   renderApp();
@@ -5248,6 +5259,10 @@ function viewPengguna() {
 }
 
 function viewTiDBPengguna() {
+ if (currentRole !== 'pimpinan') {
+   console.warn('[Role UI] Manajemen petugas hanya untuk Pimpinan.');
+   return '<div class="card"><h2>Akses Ditolak</h2><p class="muted">Manajemen petugas hanya tersedia untuk akun Pimpinan.</p></div>';
+ }
  const ready=!!(window.ASSALAM_TIDB_PREVIEW_SESSION&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor&&window.ASSALAM_TIDB_PREVIEW_SESSION.actor.role==='pimpinan');
  return '<div class="card"><h2>Manajemen Akun — TiDB Preview</h2><p class="muted">Sumber otorisasi Better Auth + TiDB. Penonaktifan bersifat soft-disable dan tercatat dalam audit. Lima akun inti tidak dapat diubah identitas/role atau dinonaktifkan.</p>' +
  '<div class="row" style="gap:8px;flex-wrap:wrap;margin:10px 0;">' +
