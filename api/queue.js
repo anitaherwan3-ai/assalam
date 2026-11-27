@@ -14,7 +14,15 @@ module.exports = async function handler(req, res) {
     const isDisplay = req.query && (req.query.display === "1" || req.query.display === "true");
     if (req.method === "GET" && isDisplay) {
       const displayData = await queueRepository.getDisplayQueue();
-      return res.status(200).json({ ok: true, data: displayData });
+      const payloadString = JSON.stringify({ ok: true, data: displayData });
+      const etag = `"${crypto.createHash('md5').update(payloadString).digest('hex')}"`;
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("ETag", etag);
+      if (req.headers["if-none-match"] === etag) {
+        return res.status(304).end();
+      }
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).send(payloadString);
     }
 
     const actor = await requireBetterAuthActor(req);

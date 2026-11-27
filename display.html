@@ -1241,14 +1241,20 @@
 
     // TiDB Backend Realtime Polling for TV Display
     let tidbPollingActive = false;
+    let lastDisplayETag = null;
     async function pollTiDBDisplay() {
       try {
+        const fetchHeaders = { 'Accept': 'application/json' };
+        if (lastDisplayETag) fetchHeaders['If-None-Match'] = lastDisplayETag;
         const response = await fetch('/api/queue?display=1', {
           method: 'GET',
-          headers: { 'Accept': 'application/json' },
+          headers: fetchHeaders,
           cache: 'no-store'
         });
+        if (response.status === 304) return;
         if (!response.ok) return;
+        const etagHeader = response.headers.get('ETag');
+        if (etagHeader) lastDisplayETag = etagHeader;
         const resJson = await response.json();
         if (!resJson || !resJson.ok || !resJson.data) return;
         tidbPollingActive = true;
@@ -1324,8 +1330,8 @@
       // Tampilkan health tips dulu sebagai default — akan diganti YouTube jika Admin sudah set video
       startHealthTips();
       pollTiDBDisplay();
-      // Fast polling (setiap 2 detik) untuk responsivitas audio panggilan dan nomor antrean TV
-      setInterval(pollTiDBDisplay, 2000);
+      // Polling setiap 3 detik dengan ETag HTTP 304 (responsif dan hemat serverless bandwidth)
+      setInterval(pollTiDBDisplay, 3000);
     });
   </script>
 </body>
