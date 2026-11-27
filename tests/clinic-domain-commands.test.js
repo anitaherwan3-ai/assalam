@@ -951,3 +951,24 @@ test("queue call automatically reconciles a completed encounter left in the acti
   assert.equal(cleared, true);
   assert.equal(state.currentCall.ticketId, "ticket-new");
 });
+
+test('queue ticket status repair restores a registered non-callable ticket to waiting with audit', async () => {
+  const ticket = { ticketId: 'ticket-repair', laneCode: 'A', currentCashierUserId: 'cashier-1', status: 'in_service', encounterStatus: 'registered', version: '7' };
+  const { state, commands } = createHarness({
+    async readQueueActiveCallPolicy() { return { mode: 'per_lane' }; },
+    async lockQueueCallGuard(_c, mode, lane) { return { mode, prefix: lane, activeTicketId: null, version: '2' }; },
+    async lockQueueTicket(_c, id) { return id === ticket.ticketId ? ticket : null; },
+    async findActiveQueueCall() { return null; },
+    async resetQueueTicketToWaiting(_c, id, expectedVersion) {
+      assert.equal(id, ticket.ticketId); assert.equal(expectedVersion, '7'); ticket.status = 'waiting'; return true;
+    }
+  });
+  const result = await commands.repairQueueTicketStatus({
+    actor: cashier, ticketId: ticket.ticketId, laneCode: 'A',
+    idempotencyKey: 'repair-ticket-key', requestId: 'repair-ticket-req'
+  });
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.data.status, 'waiting');
+  assert.equal(ticket.status, 'waiting');
+  assert.equal(state.audits.at(-1).actionCode, 'QUEUE_TICKET_STATUS_REPAIRED');
+});
