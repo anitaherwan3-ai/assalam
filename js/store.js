@@ -553,6 +553,27 @@ class ClinicStore {
     );
     return true;
   }
+  async repairQueueTicket(patientId) {
+    const patient = (this.state.pasien || []).find(p => String(p.id) === String(patientId));
+    const api = window.assalamTiDBApi;
+    if (!patient || !patient.ticketId || !patient.laneCode || !api || typeof api.repairQueueTicketStatus !== 'function') {
+      if (typeof showAlert === 'function') showAlert('Data tiket/jalur atau endpoint pemulihan belum tersedia. Muat ulang antrean.', 'Pemulihan Antrean Gagal');
+      return false;
+    }
+    if (typeof showConfirmModal !== 'function') return false;
+    showConfirmModal('Pulihkan status tiket ' + String(patient.no || '') + ' menjadi menunggu? Tindakan hanya berlaku jika kunjungan masih terdaftar dan tiket belum selesai/dibatalkan.', async () => {
+      try {
+        await api.repairQueueTicketStatus({ ticketId: String(patient.ticketId), laneCode: String(patient.laneCode).trim().toUpperCase() }, api.newIdempotencyKey());
+        if (typeof syncOperationalDataFromTiDB === 'function') await syncOperationalDataFromTiDB();
+        if (typeof showAlert === 'function') showAlert('Status tiket sudah dipulihkan dari TiDB. Silakan panggil pasien.', 'Antrean Dipulihkan');
+        return true;
+      } catch (err) {
+        if (typeof showAlert === 'function') showAlert('Status tiket tidak dapat dipulihkan: ' + (err.message || 'Kesalahan jaringan'), 'Pemulihan Antrean Gagal');
+        return false;
+      }
+    }, null, 'Pulihkan Status Antrean');
+    return true;
+  }
   async cancelCallPatientTiDB(patient) {
     const api = window.assalamTiDBApi;
     if (!api || !patient.ticketId || !patient.laneCode) {
