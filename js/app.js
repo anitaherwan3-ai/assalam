@@ -7,6 +7,12 @@ function isTiDBCatalogPreview() {
   return !!(window.assalamTiDBCatalog && window.assalamTiDBCatalog.enabled());
 }
 
+function blockLocalMutationInTiDB(actionLabel) {
+  if (!isTiDBCatalogPreview()) return false;
+  showAlert(actionLabel + ' belum terhubung ke backend TiDB. Tidak ada perubahan yang disimpan; jangan mengandalkan cache browser untuk data operasional.', 'Fungsi Belum Tersambung');
+  return true;
+}
+
 function getMasterTariffs() {
   return isTiDBCatalogPreview()
     ? window.assalamTiDBCatalog.getTariffs()
@@ -2535,7 +2541,7 @@ function viewPetty() {
   `;
 }
 
-function actionAddPetty() {
+function actionAddPetty() {\n  if (blockLocalMutationInTiDB('Kas kecil')) return;
   const ket = val('petty-ket').trim();
   const jml = numVal('petty-jml');
   if (!ket || jml <= 0) {
@@ -2559,7 +2565,7 @@ function actionAddPetty() {
   $('petty-jml').value = '';
 }
 
-function editPetty(id) {
+function editPetty(id) {\n  if (blockLocalMutationInTiDB('Edit kas kecil')) return;
   const p = store.get('petty', id);
   if (!p) return;
   showFormModal('Edit Kas Kecil', [
@@ -2574,7 +2580,7 @@ function editPetty(id) {
   });
 }
 
-function delPetty(id) {
+function delPetty(id) {\n  if (blockLocalMutationInTiDB('Hapus kas kecil')) return;
   showConfirm('Hapus catatan kas kecil ini?', () => {
     const p = store.get('petty', id);
     if (p) {
@@ -2702,7 +2708,7 @@ async function actionAddObat() {
   $('m-o-nama').value = '';
 }
 
-function editObat(id) {
+function editObat(id) {\n  if (blockLocalMutationInTiDB('Edit master obat')) return;
   const o = store.getObat(id);
   if (!o) return;
   showFormModal('Edit Obat', [
@@ -2725,7 +2731,7 @@ function editObat(id) {
   });
 }
 
-function delObat(id) {
+function delObat(id) {\n  if (blockLocalMutationInTiDB('Nonaktifkan master obat')) return;
   showConfirm('Hapus data master obat ini?', () => {
     const o = store.getObat(id);
     if (o) {
@@ -2943,7 +2949,7 @@ function updatePaketBuilderSummary() {
   }
 }
 
-function actionSavePaket() {
+function actionSavePaket() {\n  if (blockLocalMutationInTiDB('Simpan paket pelayanan')) return;
   const nama = val('pkg-nama').trim();
   const desk = val('pkg-desk').trim();
   const harga = numVal('pkg-harga');
@@ -3014,7 +3020,7 @@ function cancelEditPaket() {
   renderApp();
 }
 
-function delPaket(id) {
+function delPaket(id) {\n  if (blockLocalMutationInTiDB('Hapus paket pelayanan')) return;
   showConfirm('Hapus paket pelayanan ini?', () => {
     const p = store.get('paket', id);
     if (p) {
@@ -3829,7 +3835,7 @@ async function actionAddBiaya() {
   showAlert('Biaya operasional berhasil dicatat.', 'Sukses');
 }
 
-function editBiaya(id) {
+function editBiaya(id) {\n  if (blockLocalMutationInTiDB('Edit biaya operasional')) return;
   const b = store.get('biaya', id);
   if (!b) return;
   showFormModal('Edit Biaya', [
@@ -3847,7 +3853,7 @@ function editBiaya(id) {
   });
 }
 
-function delBiaya(id) {
+function delBiaya(id) {\n  if (blockLocalMutationInTiDB('Hapus biaya operasional')) return;
   showConfirm('Hapus data pengeluaran biaya ini?', () => {
     const b = store.get('biaya', id);
     if (b) {
@@ -5643,7 +5649,7 @@ function deleteClinicLogo() {
   store.saveLocal();
 }
 
-function actionSaveSettings() {
+function actionSaveSettings() {\n  if (blockLocalMutationInTiDB('Simpan pengaturan klinik')) return;
   const set = store.state.set;
   set.nama = 'Klinik Assalaam Palembang';
   set.logo = val('set-logo');
@@ -5674,7 +5680,7 @@ function actionSaveSettings() {
   showAlert('Pengaturan klinik berhasil disimpan!', 'Sukses');
 }
 
-function actionConnectFirebase() {
+function actionConnectFirebase() {\n  if (blockLocalMutationInTiDB('Pengaturan koneksi Firebase')) return;
   const cfg = {
     apiKey: val('fb-apiKey').trim(),
     authDomain: val('fb-authDomain').trim(),
@@ -5691,7 +5697,7 @@ function actionConnectFirebase() {
   showAlert('Konfigurasi Firebase disimpan. Sistem sedang mencoba menghubungkan ke cloud Firestore...', 'Koneksi Cloud');
 }
 
-function actionDisconnectFirebase() {
+function actionDisconnectFirebase() {\n  if (blockLocalMutationInTiDB('Putuskan koneksi Firebase')) return;
   showConfirm('Putuskan koneksi cloud? Aplikasi akan kembali menyimpan data secara lokal di browser ini.', () => {
     window.firebaseBackend.disconnect();
     showAlert('Koneksi Firebase diputuskan. Aplikasi sekarang berjalan dalam Mode Lokal.', 'Mode Lokal');
@@ -5989,7 +5995,7 @@ function previewRunningTextAdmin() {
   preview.textContent = input.value || 'Pratinjau teks berjalan...';
 }
 
-async function actionSaveDisplayTV() {
+async function actionSaveDisplayTV() {\n  if (blockLocalMutationInTiDB('Simpan pengaturan Display TV')) return;
   const rawYt    = document.getElementById('dtv-ytId')        ? document.getElementById('dtv-ytId').value.trim()        : '';
   const enableYt = document.getElementById('dtv-enableYt')    ? document.getElementById('dtv-enableYt').checked          : true;
   const rtxt     = document.getElementById('dtv-runningText') ? document.getElementById('dtv-runningText').value.trim() : '';
