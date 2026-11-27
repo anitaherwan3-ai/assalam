@@ -105,3 +105,30 @@ test("batch with unverified origin is quarantined even when expiry date is prese
   assert.equal(params[5], 0, "origin remains unverified");
   assert.equal(params[9], "quarantined", "unverified origin must never enter sellable stock");
 });
+
+
+test("checkout completion marks ticket completed and clears its active lane guard atomically", async () => {
+  const calls = [];
+  const connection = {
+    async execute(sql, params) {
+      calls.push({ sql, params });
+      if (sql.includes("SELECT queue_ticket_id AS ticketId, prefix AS laneCode FROM queue_tickets WHERE encounter_id")) {
+        return [[{ ticketId: "91", laneCode: "A" }], []];
+      }
+      if (sql.includes("FROM queue_call_guards WHERE prefix = ? FOR UPDATE")) {
+        return [[{ prefix: "A", activeTicketId: "91", version: "4" }], []];
+      }
+      if (sql.includes("FROM queue_tickets WHERE queue_ticket_id = ? FOR UPDATE")) {
+        return [[{ ticketId: "91", laneCode: "A", status: "called" }], []];
+      }
+      if (sql.startsWith("UPDATE queue_tickets SET status = 'completed'")) return [{ affectedRows: 1 }, []];
+      if (sql.startsWith("UPDATE queue_call_guards SET active_queue_ticket_id = NULL")) return [{ affectedRows: 1 }, []];
+      if (sql.startsWith("UPDATE patient_encounters SET status = 'completed'")) return [{ affectedRows: 1 }, []];
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  await createTidbInventoryRepository().markEncounterCompleted(connection, "45", "123");
+  assert.equal(calls.some(call => call.sql.startsWith("UPDATE queue_tickets SET status = 'completed'")), true);
+  assert.equal(calls.some(call => call.sql.startsWith("UPDATE queue_call_guards SET active_queue_ticket_id = NULL")), true);
+  assert.equal(calls.at(-1).sql.startsWith("UPDATE patient_encounters SET status = 'completed'"), true);
+});
