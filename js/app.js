@@ -387,7 +387,7 @@ async function syncOperationalDataFromTiDB() {
         const existing = (store.state.pasien || []).find(p => p.no === q.queueNumber || p.id === String(q.ticketId));
         if (existing) {
           existing.status = q.status;
-          existing.calling = q.status === 'calling';
+          existing.calling = q.status === 'called';
           existing.done = q.status === 'completed';
           existing.laneCode = q.laneCode;
         } else {

@@ -57,3 +57,20 @@ test("TiDB adapter still rejects unknown API pathnames", async () => {
     error => error.code === "TIDB_ENDPOINT_NOT_ALLOWED"
   );
 });
+
+test("TiDB callQueue sends the call command to the shared queue API", async () => {
+  let request;
+  const api = installAdapter(async (path, init) => {
+    request = { path, init };
+    return { ok: true, status: 200, json: async () => ({ ok: true, data: { ticketId: "12" } }) };
+  });
+
+  await api.callQueue({ ticketId: "12", laneCode: "A", eventType: "call" }, "queue-call-key");
+
+  assert.equal(request.path, "/api/queue");
+  assert.equal(request.init.method, "POST");
+  assert.equal(request.init.headers["Idempotency-Key"], "queue-call-key");
+  assert.deepEqual(JSON.parse(request.init.body), {
+    action: "call", ticketId: "12", laneCode: "A", eventType: "call"
+  });
+});

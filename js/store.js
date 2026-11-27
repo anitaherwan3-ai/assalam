@@ -427,7 +427,8 @@ class ClinicStore {
 
   // Pembatalan transaksi wajib melalui persetujuan Cloud; tidak ada rollback stok lokal.
 
-  // Panggil Pasien ke Layar Display TV
+  // Panggil pasien. Jalur legacy tetap sinkron; mode TiDB mengembalikan Promise
+  // yang hanya berhasil setelah server menerima perintah panggilan.
   callPatient(patientId) {
     const dateParts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -435,10 +436,14 @@ class ClinicStore {
     const part = type => (dateParts.find(item => item.type === type) || {}).value || '';
     const today = `${part('year')}-${part('month')}-${part('day')}`;
     const now = Date.now();
-    const patient = (this.state.pasien || []).find(p => p.id === patientId);
+    const patient = (this.state.pasien || []).find(p => String(p.id) === String(patientId));
     if (!patient || patient.done || patient.deletedAt || patient.status === 'dihapus' || patient.status === 'batal_berobat') return false;
 
-    // Reset hanya panggilan aktif lain pada tanggal operasional WIB.
+    if (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) {
+      return this.callPatientTiDB(patient, now);
+    }
+
+    // Jalur legacy non-TiDB tetap memakai sinkronisasi lokal yang sudah ada.
     (this.state.pasien || []).forEach(p => {
       if (p.tgl === today && p.calling && !p.done && !p.deletedAt &&
           p.status !== 'dihapus' && p.status !== 'batal_berobat') {
@@ -446,20 +451,41 @@ class ClinicStore {
         p._t = now;
       }
     });
-
     patient.calling = true;
     patient._t = now;
     this.logActivity('Panggil', 'Antrean', `${patient.no} - ${patient.nama} (${patient.layanan})`);
     this.saveLocal();
-
-    // Broadcast ke Layar TV
-    if (typeof broadcastCall === 'function') {
-      broadcastCall(patient, patient.layanan);
-    }
-
+    if (typeof broadcastCall === 'function') broadcastCall(patient, patient.layanan);
     return true;
   }
 
+  async callPatientTiDB(patient, now) {
+    const api = window.assalamTiDBApi;
+    if (!api || !patient.ticketId || !patient.laneCode) {
+      if (typeof showAlert === 'function') showAlert('Data tiket/jalur antrean TiDB tidak lengkap. Muat ulang antrean sebelum memanggil pasien.', 'Panggilan Gagal');
+      return false;
+    }
+    try {
+      await api.callQueue({
+        ticketId: String(patient.ticketId),
+        laneCode: String(patient.laneCode).trim().toUpperCase(),
+        eventType: 'call'
+      }, api.newIdempotencyKey());
+      patient.calling = true;
+      patient._t = now;
+      this.logActivity('Panggil', 'Antrean', `${patient.no} - ${patient.nama} (${patient.layanan})`);
+      this.saveLocal();
+      if (typeof syncOperationalDataFromTiDB === 'function') {
+        await syncOperationalDataFromTiDB();
+      } else if (typeof renderApp === 'function') {
+        renderApp();
+      }
+      return true;
+    } catch (err) {
+      if (typeof showAlert === 'function') showAlert('Panggilan ke TiDB gagal: ' + (err.message || 'Kesalahan jaringan'), 'Panggilan Gagal');
+      return false;
+    }
+  }
   // Kasir hanya mengajukan retur. Stok berubah setelah Admin menyetujui.
   processReturJual({ trxId, itemIndex, qtyRetur, alasan }) {
     const trx = this.get('trx', trxId);
