@@ -43,3 +43,13 @@ test("queue ticket creation requires the latest active lane assignment authored 
   assert.match(assignmentSql, /ra\.role_code = 'pimpinan'/);
   assert.match(assignmentSql, /a\.assignment_id = \(SELECT MAX\(a2\.assignment_id\)/);
 });
+
+test("display projection exposes the latest call event ID for repeat announcements", () => {
+  const fs = require("node:fs");
+  const repositorySource = fs.readFileSync(require.resolve("../lib/repositories/tidb-queue-repository"), "utf8");
+  const displaySource = fs.readFileSync(require.resolve("../display.html"), "utf8");
+
+  assert.match(repositorySource, /MAX\(qce\.event_id\).*queue_call_events qce.*event_type IN \('call', 'recall'\)/);
+  assert.match(repositorySource, /callEventId: activeCall\.callEventId == null \? null : String\(activeCall\.callEventId\)/);
+  assert.match(displaySource, /_t: activeCall\.callEventId \|\| activeCall\.calledAtUtc \|\| activeCall\.ticketId/);
+});
