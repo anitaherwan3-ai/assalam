@@ -53,3 +53,36 @@ test("display projection exposes the latest call event ID for repeat announcemen
   assert.match(repositorySource, /callEventId: activeCall\.callEventId == null \? null : String\(activeCall\.callEventId\)/);
   assert.match(displaySource, /_t: activeCall\.callEventId \|\| activeCall\.calledAtUtc \|\| activeCall\.ticketId/);
 });
+
+test("queue repository locks the active ticket with its encounter status for stale guard reconciliation", async () => {
+  let captured = "";
+  const connection = {
+    async execute(sql) {
+      captured = sql;
+      return [[{ ticketId: "91", laneCode: "A", status: "called", encounterStatus: "completed" }], []];
+    }
+  };
+  const row = await createTidbQueueRepository().lockQueueTicket(connection, "91");
+  assert.equal(row.encounterStatus, "completed");
+  assert.match(captured, /JOIN patient_encounters e ON e\.encounter_id = q\.encounter_id/);
+  assert.match(captured, /FOR UPDATE/);
+});
+
+test("queue repository clears a stale active-call guard with optimistic versioning", async () => {
+  let captured;
+  const connection = {
+    async execute(sql, params) {
+      captured = { sql, params };
+      if (sql.startsWith("UPDATE queue_tickets SET status = 'completed'")) return [{ affectedRows: 1 }, []];
+      if (sql.startsWith("UPDATE queue_call_guards SET active_queue_ticket_id = NULL")) return [{ affectedRows: 1 }, []];
+      throw new Error("Unexpected SQL: " + sql);
+    }
+  };
+  const guard = { prefix: "A", activeTicketId: "91", version: "4" };
+  const updated = await createTidbQueueRepository().clearStaleQueueCallGuard(connection, guard, {
+    status: "called", encounterStatus: "completed"
+  });
+  assert.equal(updated.activeTicketId, null);
+  assert.equal(updated.version, "5");
+  assert.equal(captured.params[2], "4");
+});
