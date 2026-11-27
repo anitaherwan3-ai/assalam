@@ -1282,7 +1282,7 @@
             no: activeCall.queueNumber,
             nama: activeCall.patientName,
             layanan: activeCall.serviceName,
-            _t: activeCall.calledAtUtc || activeCall.ticketId
+            _t: activeCall.callEventId || activeCall.calledAtUtc || activeCall.ticketId
           }, activeCall.serviceName || 'Poli Umum');
         } else if (lastServed) {
           document.getElementById('active-no').textContent = lastServed.queueNumber || '-';
