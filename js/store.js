@@ -482,7 +482,71 @@ class ClinicStore {
       }
       return true;
     } catch (err) {
+      if (err && err.status === 409) {
+        if (typeof showConfirmModal === 'function') {
+          showConfirmModal(
+            'Masih ada nomor aktif yang sedang dipanggil pada jalur ini.\n\nApakah Anda ingin membatalkan panggilan nomor sebelumnya dan memanggil pasien ini (' + (patient.no || '') + ' - ' + (patient.nama || '') + ')?',
+            async () => {
+              const activePatient = (this.state.pasien || []).find(p => p.calling && !p.done && p.laneCode === patient.laneCode);
+              if (activePatient && activePatient.ticketId) {
+                await this.cancelCallPatientTiDB(activePatient);
+              }
+              await this.callPatientTiDB(patient, Date.now());
+            },
+            null,
+            'Ganti Panggilan'
+          );
+          return false;
+        }
+      }
       if (typeof showAlert === 'function') showAlert('Panggilan ke TiDB gagal: ' + (err.message || 'Kesalahan jaringan'), 'Panggilan Gagal');
+      return false;
+    }
+  }
+
+  cancelCallPatient(patientId) {
+    const now = Date.now();
+    const patient = (this.state.pasien || []).find(p => String(p.id) === String(patientId));
+    if (!patient) return false;
+
+    if (typeof isTiDBCatalogPreview === 'function' && isTiDBCatalogPreview()) {
+      return this.cancelCallPatientTiDB(patient);
+    }
+
+    patient.calling = false;
+    patient._t = now;
+    this.logActivity('Batal Panggil', 'Antrean', `${patient.no} - ${patient.nama}`);
+    this.saveLocal();
+    if (typeof renderApp === 'function') renderApp();
+    return true;
+  }
+
+  async cancelCallPatientTiDB(patient) {
+    const api = window.assalamTiDBApi;
+    if (!api || !patient.ticketId || !patient.laneCode) {
+      patient.calling = false;
+      this.saveLocal();
+      if (typeof renderApp === 'function') renderApp();
+      return true;
+    }
+    try {
+      await api.callQueue({
+        ticketId: String(patient.ticketId),
+        laneCode: String(patient.laneCode).trim().toUpperCase(),
+        eventType: 'cancel_call'
+      }, api.newIdempotencyKey());
+      patient.calling = false;
+      patient._t = Date.now();
+      this.logActivity('Batal Panggil', 'Antrean', `${patient.no} - ${patient.nama}`);
+      this.saveLocal();
+      if (typeof syncOperationalDataFromTiDB === 'function') {
+        await syncOperationalDataFromTiDB();
+      } else if (typeof renderApp === 'function') {
+        renderApp();
+      }
+      return true;
+    } catch (err) {
+      if (typeof showAlert === 'function') showAlert('Gagal membatalkan panggilan: ' + (err.message || 'Kesalahan jaringan'), 'Batal Panggil Gagal');
       return false;
     }
   }

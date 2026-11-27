@@ -1212,6 +1212,7 @@ function viewPasien() {
       <button class="s p" onclick="actionPulihkanBatalBerobat('${p.id}')">Aktifkan Kembali</button>
     ` : '-') : `
       <button class="s p" onclick="store.callPatient('${p.id}')" title="Panggil ke Layar TV & Bunyikan Bel">📢 Panggil</button>
+      ${p.calling ? `<button class="s btn-danger" onclick="store.cancelCallPatient('${p.id}')" title="Batalkan status panggilan pasien ini">Selesai/Batal Panggil</button>` : ''}
       ${p.ticketId && ['kasir','admin','pimpinan'].includes(currentRole) ? `<button class="s" onclick="actionTransferAntrean('${p.id}')">Limpahkan</button>` : ''}
       <button class="s" onclick="editPasien('${p.id}')">Edit</button>
       <button class="s btn-danger" onclick="actionBatalBerobat('${p.id}')">Batal Berobat</button>
