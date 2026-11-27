@@ -1212,8 +1212,10 @@ function viewPasien() {
   });
 
   const currentQueueShift = typeof getCurrentShift === 'function' ? getCurrentShift() : null;
+  const cashierAssignedLane = currentUser && currentUser.u === 'assalamkasir1@gmail.com' ? 'A' :
+    (currentUser && currentUser.u === 'assalamkasir2@gmail.com' ? 'B' : '');
   const activeLaneCode = String((currentQueueShift && currentQueueShift.laneCode) ||
-    ((sortedTodayPatients.find(p => p.ticketId && p.laneCode) || {}).laneCode || '')).trim().toUpperCase();
+    ((sortedTodayPatients.find(p => p.ticketId && p.laneCode) || {}).laneCode || cashierAssignedLane)).trim().toUpperCase();
   const rows = sortedTodayPatients.map(p => [
     esc(p.no),
     esc(p.jam),
