@@ -134,7 +134,7 @@ test("TiDB catalog UI mutation helpers send expected versions and refresh server
 test("cancelled TiDB encounter refreshes business date and offers a new encounter instead of restoring across dates", () => {
   const source = fs.readFileSync(require.resolve("../js/app.js"), "utf8");
   const start = source.indexOf("function actionPulihkanBatalBerobat(");
-  const end = source.indexOf("\\nfunction delPasien(", start);
+  const end = source.indexOf("\nfunction delPasien(", start);
   const body = source.slice(start, end);
   assert.match(body, /const currentClinicDate = getClinicTodayStr\(\)/);
   assert.match(body, /ENCOUNTER_RESTORE_DATE_EXPIRED/);
